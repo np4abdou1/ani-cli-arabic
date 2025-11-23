@@ -60,3 +60,11 @@ It is heavily inspired by the legendary [pystardust/ani-cli](https://github.com/
 
 ```bash
 ./your-downloaded-file
+
+```
+
+<div>
+<p> discord rpc <p>
+<img width="439" height="180" alt="image" src="https://github.com/user-attachments/assets/94dbfd68-b5f4-483f-903c-fcbd613cee02" />
+
+</div>
