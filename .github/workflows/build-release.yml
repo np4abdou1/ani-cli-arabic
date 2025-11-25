@@ -4,10 +4,11 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Release version (e.g., v1.0.3)'
+        description: 'Release version (e.g., v1.0.5)'
         required: true
         type: string
 
+# Permissions required for the Bot to create releases
 permissions:
   contents: write
 
@@ -43,17 +44,14 @@ jobs:
         run: |
           New-Item -ItemType Directory -Force -Path build
           $currentDir = Get-Location
-          # Note: Using absolute path for icon
+          # Build command using absolute paths
           pyinstaller --onefile --name ani-cli-ar --console --clean --noconfirm --distpath . --workpath build --specpath build --icon "$currentDir\assets\icon.ico" --add-data "$currentDir\src;src" --add-data "$currentDir\themes.py;." --add-data "$currentDir\database;database" --add-binary "$currentDir\mpv_bundle.exe;mpv" --hidden-import pypresence --hidden-import rich --hidden-import requests --hidden-import cryptography --hidden-import cryptography.fernet main.py
 
+      # FIX: Use official GitHub CLI (gh) to create release
+      # This bypasses the "author_id" error by letting the Bot create the release natively.
       - name: Create Release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ inputs.version }}
-          name: Release ${{ inputs.version }}
-          files: ani-cli-ar.exe
-          draft: false
-          prerelease: false
-          make_latest: true
-          # FIX: Explicitly set the token to override the user identity
-          token: ${{ secrets.GITHUB_TOKEN }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ inputs.version }}
+        run: |
+          gh release create "$env:TAG" "ani-cli-ar.exe" --title "Release $env:TAG" --generate-notes
