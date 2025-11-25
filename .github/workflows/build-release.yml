@@ -54,14 +54,14 @@ jobs:
           New-Item -ItemType Directory -Force -Path build
           $currentDir = Get-Location
           
-          pyinstaller --onefile --name ani-cli-ar-win-light --console --clean --noconfirm --distpath . --workpath build --specpath build --icon "$currentDir\assets\icon.ico" --add-data "$currentDir\src;src" --add-data "$currentDir\themes.py;." --add-data "$currentDir\database;database" --hidden-import pypresence --hidden-import rich --hidden-import requests --hidden-import cryptography --hidden-import cryptography.fernet main.py
+          pyinstaller --onefile --name ani-cli-arabic-win64 --console --clean --noconfirm --distpath . --workpath build --specpath build --icon "$currentDir\assets\icon.ico" --add-data "$currentDir\src;src" --add-data "$currentDir\themes.py;." --add-data "$currentDir\database;database" --hidden-import pypresence --hidden-import rich --hidden-import requests --hidden-import cryptography --hidden-import cryptography.fernet main.py
 
-          pyinstaller --onefile --name ani-cli-ar-win-full --console --clean --noconfirm --distpath . --workpath build --specpath build --icon "$currentDir\assets\icon.ico" --add-data "$currentDir\src;src" --add-data "$currentDir\themes.py;." --add-data "$currentDir\database;database" --add-binary "$currentDir\mpv_bundle.exe;mpv" --hidden-import pypresence --hidden-import rich --hidden-import requests --hidden-import cryptography --hidden-import cryptography.fernet main.py
+          pyinstaller --onefile --name ani-cli-arabic-win64-with-mpv --console --clean --noconfirm --distpath . --workpath build --specpath build --icon "$currentDir\assets\icon.ico" --add-data "$currentDir\src;src" --add-data "$currentDir\themes.py;." --add-data "$currentDir\database;database" --add-binary "$currentDir\mpv_bundle.exe;mpv" --hidden-import pypresence --hidden-import rich --hidden-import requests --hidden-import cryptography --hidden-import cryptography.fernet main.py
 
       - env:
           GH_TOKEN: ${{ secrets.GH_PAT }}
         run: |
-          gh release upload "${{ inputs.version }}" ani-cli-ar-win-light.exe ani-cli-ar-win-full.exe
+          gh release upload "${{ inputs.version }}" ani-cli-arabic-win64.exe ani-cli-arabic-win64-with-mpv.exe
 
   build-linux:
     needs: create-release
@@ -81,12 +81,13 @@ jobs:
           pip install pyinstaller
 
       - run: |
-          pyinstaller --onefile --name ani-cli-ar-linux-light --console --clean --noconfirm --distpath . --workpath build --specpath build --add-data "src:src" --add-data "themes.py:." --add-data "database:database" --hidden-import pypresence --hidden-import rich --hidden-import requests --hidden-import cryptography --hidden-import cryptography.fernet main.py
+          PWD=$(pwd)
+          pyinstaller --onefile --name ani-cli-arabic-linux-x64 --console --clean --noconfirm --distpath . --workpath build --specpath build --add-data "$PWD/src:src" --add-data "$PWD/themes.py:." --add-data "$PWD/database:database" --hidden-import pypresence --hidden-import rich --hidden-import requests --hidden-import cryptography --hidden-import cryptography.fernet main.py
 
           MPV_PATH=$(which mpv)
-          pyinstaller --onefile --name ani-cli-ar-linux-full --console --clean --noconfirm --distpath . --workpath build --specpath build --add-data "src:src" --add-data "themes.py:." --add-data "database:database" --add-binary "${MPV_PATH}:mpv" --hidden-import pypresence --hidden-import rich --hidden-import requests --hidden-import cryptography --hidden-import cryptography.fernet main.py
+          pyinstaller --onefile --name ani-cli-arabic-linux-x64-with-mpv --console --clean --noconfirm --distpath . --workpath build --specpath build --add-data "$PWD/src:src" --add-data "$PWD/themes.py:." --add-data "$PWD/database:database" --add-binary "${MPV_PATH}:mpv" --hidden-import pypresence --hidden-import rich --hidden-import requests --hidden-import cryptography --hidden-import cryptography.fernet main.py
 
       - env:
           GH_TOKEN: ${{ secrets.GH_PAT }}
         run: |
-          gh release upload "${{ inputs.version }}" ani-cli-ar-linux-light ani-cli-ar-linux-full
+          gh release upload "${{ inputs.version }}" ani-cli-arabic-linux-x64 ani-cli-arabic-linux-x64-with-mpv
