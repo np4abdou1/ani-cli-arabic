@@ -33,13 +33,13 @@ jobs:
 
       - name: Extract MPV
         run: |
-          7z x mpv.7z -ompv_temp
-          New-Item -ItemType Directory -Force -Path "mpv"
-          Get-ChildItem -Path "mpv_temp" -Recurse -Filter "mpv.exe" | Select-Object -First 1 | ForEach-Object { Copy-Item -Path $_.FullName -Destination "mpv\mpv.exe" -Force }
+          7z x mpv.7z
+          New-Item -ItemType Directory -Force -Path "mpv_final"
+          Copy-Item -Path "mpv.exe" -Destination "mpv_final\mpv.exe" -Force
 
       - name: Build executable
         run: |
-          pyinstaller --onefile --name ani-cli-ar --console --clean --noconfirm --distpath . --workpath build --specpath build --add-data "src;src" --add-data "themes.py;." --add-data "database;database" --add-binary "mpv\mpv.exe;mpv" --hidden-import pypresence --hidden-import rich --hidden-import requests --hidden-import cryptography --hidden-import cryptography.fernet main.py
+          pyinstaller --onefile --name ani-cli-ar --console --clean --noconfirm --distpath . --workpath build --specpath build --add-data "src;src" --add-data "themes.py;." --add-data "database;database" --add-binary "mpv_final\mpv.exe;mpv" --hidden-import pypresence --hidden-import rich --hidden-import requests --hidden-import cryptography --hidden-import cryptography.fernet main.py
 
       - name: Create Release
         uses: softprops/action-gh-release@v1
