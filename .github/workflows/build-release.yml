@@ -4,11 +4,11 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Release version (e.g., v1.0.1)'
+        description: 'Release version (e.g., v1.0.2)'
         required: true
         type: string
 
-# Permissions are required to create the release and upload the file
+# 1. Essential: Grants the Bot permission to write releases
 permissions:
   contents: write
 
@@ -39,21 +39,23 @@ jobs:
         run: |
           7z x mpv.7z
           Copy-Item -Path "mpv.exe" -Destination "mpv_bundle.exe" -Force
-          Write-Host "MPV bundle path: $((Get-Item mpv_bundle.exe).FullName)"
 
       - name: Build executable
         run: |
           New-Item -ItemType Directory -Force -Path build
           $currentDir = Get-Location
-          # Using absolute path for icon and resources
+          # 2. Using absolute path for icon to avoid path errors
           pyinstaller --onefile --name ani-cli-ar --console --clean --noconfirm --distpath . --workpath build --specpath build --icon "$currentDir\assets\icon.ico" --add-data "$currentDir\src;src" --add-data "$currentDir\themes.py;." --add-data "$currentDir\database;database" --add-binary "$currentDir\mpv_bundle.exe;mpv" --hidden-import pypresence --hidden-import rich --hidden-import requests --hidden-import cryptography --hidden-import cryptography.fernet main.py
 
-      # FIX: Switched to ncipollo/release-action to fix the 422 author_id error
+      # 3. FIX: Switched to softprops/action-gh-release@v2 to fix author_id 422 error
       - name: Create Release
-        uses: ncipollo/release-action@v1
+        uses: softprops/action-gh-release@v2
         with:
-          tag: ${{ inputs.version }}
+          tag_name: ${{ inputs.version }}
           name: Release ${{ inputs.version }}
-          artifacts: "ani-cli-ar.exe"
-          allowUpdates: true
-          token: ${{ secrets.GITHUB_TOKEN }}
+          files: ani-cli-ar.exe
+          draft: false
+          prerelease: false
+          make_latest: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
