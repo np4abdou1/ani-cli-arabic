@@ -29,7 +29,7 @@ jobs:
 
       - name: Download MPV
         run: |
-          Invoke-WebRequest -Uri "https://github.com/shinchiro/mpv-winbuild-cmake/releases/download/20251125/mpv-dev-x86_64-20251125-git-8469605.7z" -OutFile "mpv.7z"
+          Invoke-WebRequest -Uri "https://github.com/shinchiro/mpv-winbuild-cmake/releases/download/20251125/mpv-i686-20251125-git-8469605.7z" -OutFile "mpv.7z"
 
       - name: Extract MPV
         run: |
