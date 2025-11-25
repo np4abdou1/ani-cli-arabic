@@ -54,8 +54,7 @@ bin/
 *.app
 *.dmg
 
-# Encrypted credentials database
-database/.credentials.db
+
 
 # User config backups
 user_config_backup.py
