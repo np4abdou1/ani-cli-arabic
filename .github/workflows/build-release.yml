@@ -8,6 +8,10 @@ on:
         required: true
         type: string
 
+# FIX 1: Grant permission to create releases and upload assets
+permissions:
+  contents: write
+
 jobs:
   build-windows:
     runs-on: windows-latest
@@ -41,7 +45,7 @@ jobs:
         run: |
           New-Item -ItemType Directory -Force -Path build
           $currentDir = Get-Location
-          # Using absolute path for icon to avoid lookup inside 'build' folder
+          # FIX 2: Ensure we use the absolute path for the icon to prevent FileNotFoundError
           pyinstaller --onefile --name ani-cli-ar --console --clean --noconfirm --distpath . --workpath build --specpath build --icon "$currentDir\assets\icon.ico" --add-data "$currentDir\src;src" --add-data "$currentDir\themes.py;." --add-data "$currentDir\database;database" --add-binary "$currentDir\mpv_bundle.exe;mpv" --hidden-import pypresence --hidden-import rich --hidden-import requests --hidden-import cryptography --hidden-import cryptography.fernet main.py
 
       - name: Create Release
