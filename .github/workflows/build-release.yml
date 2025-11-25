@@ -40,7 +40,10 @@ jobs:
       - name: Build executable
         run: |
           $mpvPath = (Get-Item mpv_bundle.exe).FullName
-          pyinstaller --onefile --name ani-cli-ar --console --clean --noconfirm --distpath . --workpath build --specpath build --add-data "src;src" --add-data "themes.py;." --add-data "database;database" --add-binary "$mpvPath;mpv" --hidden-import pypresence --hidden-import rich --hidden-import requests --hidden-import cryptography --hidden-import cryptography.fernet main.py
+          $srcPath = (Get-Item src).FullName
+          $themesPath = (Get-Item themes.py).FullName
+          $dbPath = (Get-Item database).FullName
+          pyinstaller --onefile --name ani-cli-ar --console --clean --noconfirm --distpath . --workpath build --specpath build --add-data "$srcPath;src" --add-data "$themesPath;." --add-data "$dbPath;database" --add-binary "$mpvPath;mpv" --hidden-import pypresence --hidden-import rich --hidden-import requests --hidden-import cryptography --hidden-import cryptography.fernet main.py
 
       - name: Create Release
         uses: softprops/action-gh-release@v1
