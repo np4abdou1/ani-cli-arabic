@@ -35,11 +35,7 @@ jobs:
         run: |
           7z x mpv.7z -ompv_temp
           New-Item -ItemType Directory -Force -Path "mpv"
-          Copy-Item -Path "mpv_temp\mpv.exe" -Destination "mpv\mpv.exe" -Force
-
-      - name: Initialize credentials database
-        run: |
-          python scripts\init_secrets.py
+          Get-ChildItem -Path "mpv_temp" -Recurse -Filter "mpv.exe" | Select-Object -First 1 | ForEach-Object { Copy-Item -Path $_.FullName -Destination "mpv\mpv.exe" -Force }
 
       - name: Build executable
         run: |
