@@ -40,7 +40,8 @@ jobs:
       - name: Build executable
         run: |
           New-Item -ItemType Directory -Force -Path build
-          pyinstaller --onefile --name ani-cli-ar --console --clean --noconfirm --distpath . --workpath build --specpath build --add-data "src;src" --add-data "themes.py;." --add-data "database;database" --add-binary "mpv_bundle.exe;mpv" --hidden-import pypresence --hidden-import rich --hidden-import requests --hidden-import cryptography --hidden-import cryptography.fernet main.py
+          $currentDir = Get-Location
+          pyinstaller --onefile --name ani-cli-ar --console --clean --noconfirm --distpath . --workpath build --specpath build --icon "assets/icon.ico" --add-data "src;src" --add-data "themes.py;." --add-data "database;database" --add-binary "$currentDir\mpv_bundle.exe;mpv" --hidden-import pypresence --hidden-import rich --hidden-import requests --hidden-import cryptography --hidden-import cryptography.fernet main.py
 
       - name: Create Release
         uses: softprops/action-gh-release@v1
