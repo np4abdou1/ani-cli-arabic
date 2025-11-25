@@ -111,7 +111,7 @@ class UIManager:
         
         layout["message"].update(Align.center(panel, vertical="middle"))
         
-        self.console.print(layout)
+        self.console.print(Align.center(panel, vertical="middle", height=self.console.height))
         Prompt.ask(f" {Text('Press ENTER to continue...', style='secondary')} ", console=self.console)
 
     def run_with_loading(self, message: str, target_func, *args):
@@ -410,19 +410,16 @@ class UIManager:
                     return selected
                 elif key == 'g':
                     live.stop()
-                    self.console.print()
                     try:
                         prompt_panel = Panel(
                             Text("Jump to episode number:", style="info"), 
                             box=HEAVY, 
                             border_style=COLOR_BORDER,
                         )
-                        layout = Layout()
-                        layout.split_column(Layout(ratio=1), Layout(name="mid", size=5), Layout(ratio=1))
-                        layout["mid"].update(Align.center(prompt_panel))
-                        self.console.print(layout)
-                        
-                        ep_input = Prompt.ask(f" {Text('›', style=COLOR_PROMPT)} ", console=self.console)
+                  
+                        self.console.print(Align.center(prompt_panel, vertical="middle", height=7))
+
+                        ep_input = Prompt.ask(Text('›', style=COLOR_PROMPT), console=self.console)
                         
                         try:
                             ep_num_float = float(ep_input)
