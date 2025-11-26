@@ -1,0 +1,93 @@
+name: Build and Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Release version (e.g., v1.0.5)"
+        required: true
+        type: string
+      changelogs:
+        description: "Release changelogs"
+        required: true
+        default: "Bug fixes and improvements"
+        type: string
+
+permissions:
+  contents: write
+  actions: write
+
+jobs:
+  create-release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      
+      - name: Create Release
+        env:
+          GH_TOKEN: ${{ secrets.GH_PAT }}
+        run: |
+          gh release create "${{ inputs.version }}" --title "Release ${{ inputs.version }}" --notes "${{ inputs.changelogs }}"
+
+  build-windows:
+    needs: create-release
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pyinstaller
+
+      - run: |
+          Invoke-WebRequest -Uri "https://github.com/shinchiro/mpv-winbuild-cmake/releases/download/20251125/mpv-i686-20251125-git-8469605.7z" -OutFile "mpv.7z"
+          7z x mpv.7z
+          Copy-Item -Path "mpv.exe" -Destination "mpv_bundle.exe" -Force
+
+      - run: |
+          New-Item -ItemType Directory -Force -Path build
+          $currentDir = Get-Location
+          
+          pyinstaller --onefile --name ani-cli-arabic-win64 --console --clean --noconfirm --distpath . --workpath build --specpath build --icon "$currentDir\assets\icon.ico" --add-data "$currentDir\src;src" --add-data "$currentDir\themes.py;." --add-data "$currentDir\database;database" --hidden-import pypresence --hidden-import rich --hidden-import requests --hidden-import cryptography --hidden-import cryptography.fernet main.py
+
+          pyinstaller --onefile --name ani-cli-arabic-win64-with-mpv --console --clean --noconfirm --distpath . --workpath build --specpath build --icon "$currentDir\assets\icon.ico" --add-data "$currentDir\src;src" --add-data "$currentDir\themes.py;." --add-data "$currentDir\database;database" --add-binary "$currentDir\mpv_bundle.exe;mpv" --hidden-import pypresence --hidden-import rich --hidden-import requests --hidden-import cryptography --hidden-import cryptography.fernet main.py
+
+      - env:
+          GH_TOKEN: ${{ secrets.GH_PAT }}
+        run: |
+          gh release upload "${{ inputs.version }}" ani-cli-arabic-win64.exe ani-cli-arabic-win64-with-mpv.exe
+
+  build-linux:
+    needs: create-release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - run: |
+          sudo apt-get update
+          sudo apt-get install -y mpv libmpv-dev
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pyinstaller
+
+      - run: |
+          PWD=$(pwd)
+          pyinstaller --onefile --name ani-cli-arabic-linux-x64 --console --clean --noconfirm --distpath . --workpath build --specpath build --add-data "$PWD/src:src" --add-data "$PWD/themes.py:." --add-data "$PWD/database:database" --hidden-import pypresence --hidden-import rich --hidden-import requests --hidden-import cryptography --hidden-import cryptography.fernet main.py
+
+          MPV_PATH=$(which mpv)
+          pyinstaller --onefile --name ani-cli-arabic-linux-x64-with-mpv --console --clean --noconfirm --distpath . --workpath build --specpath build --add-data "$PWD/src:src" --add-data "$PWD/themes.py:." --add-data "$PWD/database:database" --add-binary "${MPV_PATH}:mpv" --hidden-import pypresence --hidden-import rich --hidden-import requests --hidden-import cryptography --hidden-import cryptography.fernet main.py
+
+      - env:
+          GH_TOKEN: ${{ secrets.GH_PAT }}
+        run: |
+          gh release upload "${{ inputs.version }}" ani-cli-arabic-linux-x64 ani-cli-arabic-linux-x64-with-mpv
