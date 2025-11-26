@@ -1,10 +1,8 @@
 <div align="center">
 
 <a href="README.ar.md">
-  <img src="https://img.shields.io/badge/%F0%9F%87%B8%F0%9F%87%A6%20%D8%A7%D9%84%D8%B9%D8%B1%D8%A8%D9%8A%D8%A9-Arabic-green?style=for-the-badge" alt="Arabic">
+  <img src="https://img.shields.io/badge/Language-Arabic-green?style=for-the-badge&logo=google-translate&logoColor=white" alt="Arabic">
 </a>
-
-<br><br>
 
 # ⛩️ ani-cli-ar
 

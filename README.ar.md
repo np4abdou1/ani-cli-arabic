@@ -1,7 +1,7 @@
 <div align="center">
 
 <a href="README.md">
-  <img src="https://img.shields.io/badge/%F0%9F%87%BA%F0%9F%87%B8%20English-English-blue?style=for-the-badge" alt="English">
+  <img src="https://img.shields.io/badge/Language-English-blue?style=for-the-badge&logo=google-translate&logoColor=white" alt="English">
 </a>
 
 <br><br>
