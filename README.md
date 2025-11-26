@@ -1,5 +1,11 @@
 <div align="center">
 
+<a href="README.ar.md">
+  <img src="https://img.shields.io/badge/%F0%9F%87%B8%F0%9F%87%A6%20%D8%A7%D9%84%D8%B9%D8%B1%D8%A8%D9%8A%D8%A9-Arabic-green?style=for-the-badge" alt="Arabic">
+</a>
+
+<br><br>
+
 # ⛩️ ani-cli-ar
 
 **Terminal-based Anime Streaming. Fast. Clean. Arabic Subtitles.**
@@ -11,9 +17,6 @@
 [![Python](https://img.shields.io/badge/Python-3.8+-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://python.org)
 [![License](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)](LICENSE)
 
-<!-- Language switch links -->
-- **Language:** [English](#english) | [العربية](#العربية)
-
 <br>
 
 <img src="/assets/showcase.gif" alt="ani-cli-ar showcase" width="100%">
@@ -23,59 +26,20 @@
 ---
 
 ### 📑 Table of Contents
-## العربية
-
-**القائمة:** [English](#english) | [العربية](#العربية)
-
-### ⛩️ ani-cli-ar
-
-تطبيق عرض أنمي في الطرفية — سريع، نظيف، مع ترجمة عربية.
-
-### ✨ الميزات
-
-- **بث عالي الجودة:** يقوم البرنامج بجلب وحفظ حلقات بجودة **1080p (FHD)**، **720p (HD)**، أو **480p (SD)** من واجهة برمجة تطبيقات خاصة.
-- **حالة متقدمة على ديسكورد:** يحدث حالة ديسكورد تلقائياً بعنوان الأنمي، صورة الغلاف، رقم الحلقة، وحالة المشاهدة.
-- **واجهة طرفية ذكية:** مصممة باستخدام مكتبة `rich` لعرض واجهة تفاعلية مع مؤشرات تحميل وجداول وتنسيق مركزي.
-- **الانتقال للحلقة:** إمكانية القفز السريع إلى رقم حلقة محدد دون التمرير.
-- **تجاوز الإعلانات:** يتجنب الإعلانات ونوافذ البوب آب من خلال بث ملفات الفيديو الخام مباشرة.
-
----
-
-### 📦 التثبيت
-
-**المتطلبات:** يجب أن يكون لديك **Python 3.8+** و`MPV` مثبتين.
-
-#### ويندوز
-
-1. **تثبيت MPV**
-    - **الخيار A (Scoop):** `scoop install mpv`
-    - **الخيار B (يدوي):** نزّل من [mpv.io](https://mpv.io/installation/) وأضف `mpv.exe` إلى متغيرات البيئة (PATH).
-2. **نسخ المشروع وتثبيت الحزم**
-    ```powershell
-    git clone https://github.com/np4abdou1/ani-cli-arabic.git
-    cd ani-cli-arabic
-    pip install -r requirements.txt
-    python main.py
-    ```
-
 - [✨ Features](#-features)
-
-- استخدم الأسهم للتنقل و`Enter` للاختيار.
-- مفاتيح مفيدة: `G` للقفز إلى حلقة، `B` للعودة، `Q` أو `Esc` للخروج.
 - [📦 Installation](#-installation)
   - [Windows](#windows)
   - [Linux](#linux)
   - [macOS](#macos)
 - [🎮 Usage Controls](#-usage-controls)
 - [🛠 Configuration](#-configuration)
-- [🔨 Building & Deployment](#-building--deployment)
 
 ---
 
 ## ✨ Features
 
-* **High-Definition Streaming:** Scrapes and streams episodes in **1080p (FHD)**, **720p (HD)**, or **480p (SD)** directly from a private api .
-* **Discord Rich Presence:** Automatically updates your Discord status with the anime title,anime poster, episode number, and watching state.
+* **High-Definition Streaming:** Scrapes and streams episodes in **1080p (FHD)**, **720p (HD)**, or **480p (SD)** directly from a private api.
+* **Discord Rich Presence:** Automatically updates your Discord status with the anime title, anime poster, episode number, and watching state.
 * **Smart TUI:** Built with `rich` to provide a responsive terminal user interface with loading spinners, tables, and centered layouts.
 * **Episode Jump:** Fast-travel system to skip directly to specific episode numbers without scrolling.
 * **Ad-Block by Design:** Bypasses browser-based ads and popups completely by streaming raw video files.
