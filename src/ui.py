@@ -412,14 +412,19 @@ class UIManager:
                     live.stop()
                     try:
                         prompt_panel = Panel(
-                            Text("Jump to episode number:", style="info"), 
+                            Text("Jump to episode number:", style="info", justify="center"), 
                             box=HEAVY, 
                             border_style=COLOR_BORDER,
                         )
-                  
-                        self.console.print(Align.center(prompt_panel, vertical="middle", height=7))
 
-                        ep_input = Prompt.ask(Text('›', style=COLOR_PROMPT), console=self.console)
+                        self.console.print(Align.center(prompt_panel, vertical="middle", height=7))
+                        
+                        # Center the prompt input by padding it so it appears under the panel
+                        prompt_string = f" {Text('›', style=COLOR_PROMPT)} "
+                        pad_width = (self.console.width - 30) // 2
+                        padding = " " * max(0, pad_width)
+
+                        ep_input = Prompt.ask(f"{padding}{prompt_string}", console=self.console)
                         
                         try:
                             ep_num_float = float(ep_input)

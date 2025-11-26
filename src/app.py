@@ -39,7 +39,7 @@ class AniCliArApp:
             self.ui.clear()
             
             content_height = 16
-            vertical_padding = (self.ui.console.height - content_height) // 2
+            vertical_padding = (self.ui.console.height - content_height) // 3
             
             if vertical_padding > 0:
                 self.ui.print(Text("\n" * vertical_padding))
@@ -88,9 +88,9 @@ class AniCliArApp:
         while True:
             anime_idx = self.ui.anime_selection_menu(results)
             
-            if anime_idx == -1: # Quit
+            if anime_idx == -1:
                 sys.exit(0)
-            if anime_idx is None: # Back
+            if anime_idx is None:
                 return
             
             selected_anime = results[anime_idx]
@@ -118,11 +118,11 @@ class AniCliArApp:
         while True:
             ep_idx = self.ui.episode_selection_menu(selected_anime.title_en, episodes, self.rpc, selected_anime.thumbnail)
             
-            if ep_idx == -1: # Quit
+            if ep_idx == -1:
                 sys.exit(0)
-            elif ep_idx is None: # Back
+            elif ep_idx is None:
                 self.rpc.update_browsing()
-                return True # Signal to go back
+                return True
             
             selected_ep = episodes[ep_idx]
             
