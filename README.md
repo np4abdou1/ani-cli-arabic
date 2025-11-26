@@ -33,9 +33,8 @@
 
 ## ✨ Features
 
-* **High-Definition Streaming:** Scrapes and streams episodes in **1080p (FHD)**, **720p (HD)**, or **480p (SD)** directly from MediaFire servers.
-* **MPV Integration:** leverages the power of `mpv` for hardware-accelerated playback, subtitle rendering, and keyboard shortcuts.
-* **Discord Rich Presence:** Automatically updates your Discord status with the anime title, episode number, and watching state.
+* **High-Definition Streaming:** Scrapes and streams episodes in **1080p (FHD)**, **720p (HD)**, or **480p (SD)** directly from a private api .
+* **Discord Rich Presence:** Automatically updates your Discord status with the anime title,anime poster, episode number, and watching state.
 * **Smart TUI:** Built with `rich` to provide a responsive terminal user interface with loading spinners, tables, and centered layouts.
 * **Episode Jump:** Fast-travel system to skip directly to specific episode numbers without scrolling.
 * **Ad-Block by Design:** Bypasses browser-based ads and popups completely by streaming raw video files.
