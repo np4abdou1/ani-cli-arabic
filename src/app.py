@@ -12,6 +12,8 @@ from .api import AnimeAPI
 from .player import PlayerManager
 from .discord_rpc import DiscordRPCManager
 from .models import QualityOption
+from .utils import download_file
+from .history import HistoryManager
 
 class AniCliArApp:
     def __init__(self):
@@ -19,6 +21,7 @@ class AniCliArApp:
         self.api = AnimeAPI()
         self.rpc = DiscordRPCManager()
         self.player = PlayerManager(rpc_manager=self.rpc, console=self.ui.console)
+        self.history = HistoryManager()
 
     def run(self):
         atexit.register(self.cleanup)
@@ -48,7 +51,7 @@ class AniCliArApp:
             self.ui.print()
 
             search_prompt = Panel(
-                Text("Search Anime (or 'q' to quit)", style="info", justify="center"),
+                Text("S Search | R Relevant/Featured (MAL) | Q Quit", style="info", justify="center"),
                 box=HEAVY,
                 padding=(0, 4),
                 border_style=COLOR_BORDER
@@ -67,19 +70,28 @@ class AniCliArApp:
             if query.lower() in ['q', 'quit', 'exit']:
                 break
             
-            if not query:
+            results = []
+            
+            if query.lower() == 'r':
+                self.rpc.update_searching()
+                # Fetching from Jikan (MAL) with auto-SFW filtering
+                results = self.ui.run_with_loading(
+                    "Fetching currently airing anime from MAL...",
+                    self.api.get_mal_season_now
+                )
+            elif query.lower() == 's':
+                 term = Prompt.ask(f"{padding} Enter Search Term: ", console=self.ui.console).strip()
+                 if term:
+                    self.rpc.update_searching()
+                    results = self.ui.run_with_loading("Searching...", self.api.search_anime, term)
+            elif query:
+                self.rpc.update_searching()
+                results = self.ui.run_with_loading("Searching...", self.api.search_anime, query)
+            else:
                 continue
             
-            self.rpc.update_searching()
-            
-            results = self.ui.run_with_loading(
-                "Searching anime...",
-                self.api.search_anime,
-                query
-            )
-            
             if not results:
-                self.ui.render_message("✗ No Results", f"No results found for '{query}'", "error")
+                self.ui.render_message("✗ No Results", f"No results found.", "error")
                 continue
             
             self.handle_anime_selection(results)
@@ -94,6 +106,22 @@ class AniCliArApp:
                 return
             
             selected_anime = results[anime_idx]
+
+            # --- BRIDGE LOGIC: MAL to Internal API ---
+            if not selected_anime.id:
+                internal_results = self.ui.run_with_loading(
+                    f"Syncing '{selected_anime.title_en}'...",
+                    self.api.search_anime,
+                    selected_anime.title_en
+                )
+                
+                if not internal_results:
+                     self.ui.render_message("✗ Not Found", f"Sorry, '{selected_anime.title_en}' hasn't been uploaded to the server yet.", "error")
+                     continue
+                
+                selected_anime = internal_results[0]
+            # -----------------------------------------
+
             self.rpc.update_viewing_anime(selected_anime.title_en, selected_anime.thumbnail)
             
             episodes = self.ui.run_with_loading(
@@ -115,8 +143,18 @@ class AniCliArApp:
                 break
 
     def handle_episode_selection(self, selected_anime, episodes):
+        current_idx = 0 
+        
         while True:
-            ep_idx = self.ui.episode_selection_menu(selected_anime.title_en, episodes, self.rpc, selected_anime.thumbnail)
+            last_watched = self.history.get_last_watched(selected_anime.id)
+
+            ep_idx = self.ui.episode_selection_menu(
+                selected_anime.title_en, 
+                episodes, 
+                self.rpc, 
+                selected_anime.thumbnail,
+                last_watched_ep=last_watched
+            )
             
             if ep_idx == -1:
                 sys.exit(0)
@@ -124,24 +162,53 @@ class AniCliArApp:
                 self.rpc.update_browsing()
                 return True
             
-            selected_ep = episodes[ep_idx]
+            current_idx = ep_idx
             
-            server_data = self.ui.run_with_loading(
-                "Loading servers...",
-                self.api.get_streaming_servers,
-                selected_anime.id, 
-                selected_ep.number
-            )
-            
-            if not server_data:
-                self.ui.render_message(
-                    "✗ No Servers", 
-                    "No servers available for this episode.",
-                    "error"
+            while True:
+                selected_ep = episodes[current_idx]
+                
+                server_data = self.ui.run_with_loading(
+                    "Loading servers...",
+                    self.api.get_streaming_servers,
+                    selected_anime.id, 
+                    selected_ep.number
                 )
-                continue
-            
-            self.handle_quality_selection(selected_anime, selected_ep, server_data)
+                
+                if not server_data:
+                    self.ui.render_message(
+                        "✗ No Servers", 
+                        "No servers available for this episode.",
+                        "error"
+                    )
+                    break
+                
+                action_taken = self.handle_quality_selection(selected_anime, selected_ep, server_data)
+                
+                # --- UPDATED LOGIC HERE ---
+                # Check for both "watch" AND "download"
+                if action_taken == "watch" or action_taken == "download":
+                    next_action = self.ui.post_watch_menu()
+                    
+                    if next_action == "Next Episode":
+                        if current_idx + 1 < len(episodes):
+                            current_idx += 1
+                            continue
+                        else:
+                            self.ui.render_message("Info", "No more episodes!", "info")
+                            break
+                    elif next_action == "Previous Episode":
+                        if current_idx > 0:
+                            current_idx -= 1
+                            continue
+                        else:
+                            self.ui.render_message("Info", "This is the first episode.", "info")
+                            break
+                    elif next_action == "Replay":
+                        continue
+                    else:
+                        break
+                else:
+                    break
 
     def handle_quality_selection(self, selected_anime, selected_ep, server_data):
         current_ep_data = server_data.get('CurrentEpisode', {})
@@ -159,9 +226,9 @@ class AniCliArApp:
                 "No MediaFire servers found for this episode.", 
                 "error"
             )
-            return
+            return None
 
-        idx = self.ui.quality_selection_menu(
+        result = self.ui.quality_selection_menu(
             selected_anime.title_en, 
             selected_ep.display_num, 
             available, 
@@ -169,11 +236,12 @@ class AniCliArApp:
             selected_anime.thumbnail
         )
         
-        if idx == -1:
+        if result == -1:
             sys.exit(0)
-        if idx is None:
-            return
+        if result is None:
+            return None
             
+        idx, action = result
         quality = available[idx]
         server_id = current_ep_data.get(quality.server_key)
         
@@ -184,14 +252,25 @@ class AniCliArApp:
         )
         
         if direct_url:
-            self.player.play(direct_url, f"{selected_anime.title_en} - Ep {selected_ep.display_num} ({quality.name})")
-            self.rpc.update_selecting_episode(selected_anime.title_en, selected_anime.thumbnail)
+            filename = f"{selected_anime.title_en} - Ep {selected_ep.display_num} [{quality.name.split()[1]}].mp4"
+            
+            if action == 'download':
+                success = download_file(direct_url, filename, self.ui.console)
+                # Save download as "watched" in history so you can jump to it next time
+                self.history.mark_watched(selected_anime.id, selected_ep.display_num, selected_anime.title_en)
+                return "download"
+            else:
+                self.player.play(direct_url, f"{selected_anime.title_en} - Ep {selected_ep.display_num} ({quality.name})")
+                self.history.mark_watched(selected_anime.id, selected_ep.display_num, selected_anime.title_en)
+                self.rpc.update_selecting_episode(selected_anime.title_en, selected_anime.thumbnail)
+                return "watch"
         else:
             self.ui.render_message(
                 "✗ Error", 
                 "Failed to extract direct link from MediaFire.", 
                 "error"
             )
+            return None
 
     def handle_exit(self):
         self.ui.clear()
