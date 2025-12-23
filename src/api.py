@@ -3,6 +3,7 @@ import re
 import sqlite3
 import base64
 import hashlib
+from datetime import datetime
 from typing import List, Optional, Dict
 from cryptography.fernet import Fernet
 from pathlib import Path
@@ -12,6 +13,57 @@ from .models import AnimeResult, Episode
 # Using it in other projects without permission is prohibited.
 
 class AnimeAPI:
+    def get_mal_season_now(self) -> List[AnimeResult]:
+        """Fetches the currently airing anime from Jikan (MAL Public API)."""
+        url = "https://api.jikan.moe/v4/seasons/now"
+        try:
+            # Jikan API is public and free
+            # params={'sfw': 'true'} filters out 18+ (Rx) content
+            response = requests.get(url, params={'sfw': 'true'}, timeout=10)
+            response.raise_for_status()
+            data = response.json().get('data', [])
+            
+            results = []
+            for item in data:
+                # Extra safety check: Skip if rating contains 'Rx' (Hentai)
+                rating_str = item.get('rating', '')
+                if rating_str and 'Rx' in rating_str:
+                    continue
+
+                # Handle English title fallback
+                title = item.get('title_english') or item.get('title')
+                
+                # Get high-res image if available
+                images = item.get('images', {}).get('jpg', {})
+                thumbnail_url = images.get('large_image_url') or images.get('image_url', '')
+                
+                # Extract genres and studios
+                genres = ", ".join([g['name'] for g in item.get('genres', [])])
+                studios = ", ".join([s['name'] for s in item.get('studios', [])])
+                
+                results.append(AnimeResult(
+                    id="", # EMPTY ID: Signals app.py to search for this title on selection
+                    title_en=title,
+                    title_jp=item.get('title_japanese', ''),
+                    type=item.get('type', 'TV'),
+                    episodes=str(item.get('episodes') or '?'),
+                    status=item.get('status', 'N/A'),
+                    genres=genres,
+                    mal_id=str(item.get('mal_id', '')),
+                    relation_id='',
+                    score=str(item.get('score', 'N/A')),
+                    rank=str(item.get('rank', 'N/A')),
+                    popularity=str(item.get('popularity', 'N/A')),
+                    rating=item.get('rating', 'N/A'),
+                    premiered=f"{item.get('season', '')} {item.get('year', '')}",
+                    creators=studios,
+                    duration=item.get('duration', 'N/A'),
+                    thumbnail=thumbnail_url
+                ))
+            return results
+        except Exception:
+            return []
+
     def search_anime(self, query: str) -> List[AnimeResult]:
         endpoint = ANI_CLI_AR_API_BASE + "anime/load_anime_list_v2.php"
         payload = {
@@ -138,7 +190,6 @@ class _CredentialManager:
     
     def _ensure_db_exists(self):
         if not self.db_path.exists():
-            # Fallback creation logic removed. Database file is now required.
             raise FileNotFoundError(
                 f"Required credentials database not found at: {self.db_path}. "
                 "Please reinstall the application or restore the database file."
