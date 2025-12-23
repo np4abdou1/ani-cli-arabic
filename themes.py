@@ -1,4 +1,4 @@
-CURRENT_THEME = "custom"
+CURRENT_THEME = "blue"
 
 THEMES = {
     "red": {
