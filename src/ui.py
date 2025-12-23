@@ -294,7 +294,7 @@ class UIManager:
                 
                 time.sleep(0.005)
 
-    def episode_selection_menu(self, anime_title, episodes, rpc_manager=None, anime_poster=None):
+    def episode_selection_menu(self, anime_title, episodes, rpc_manager=None, anime_poster=None, last_watched_ep=None):
         selected = 0
         scroll_offset = 0
         
@@ -337,7 +337,8 @@ class UIManager:
 
         def generate_renderable():
             content_layout["header"].update(Panel(Text(anime_title, justify="center", style="title"), box=HEAVY, border_style=COLOR_BORDER))
-            content_layout["footer"].update(Panel(Text("↑↓ Navigate | ENTER Select | g Jump | b Back | ESC/q Quit", justify="center", style="secondary"), box=HEAVY, border_style=COLOR_BORDER))
+            # Updated Footer with L key
+            content_layout["footer"].update(Panel(Text("↑↓ Navigate | ENTER Select | g Jump | l Last | b Back", justify="center", style="secondary"), box=HEAVY, border_style=COLOR_BORDER))
             
             max_display = target_height - 3 - 3 - 2
             left_content = Text()
@@ -355,10 +356,21 @@ class UIManager:
                 else:
                     ep_type_str = ""
                 
+                # Logic to check if this episode is the last watched
+                is_last_watched = False
+                if last_watched_ep is not None and str(ep.display_num) == str(last_watched_ep):
+                    is_last_watched = True
+
+                # Suffix and style setup
+                suffix = ""
+                if is_last_watched:
+                    suffix = " 👁" # Eye icon to indicate watched
+                
                 if is_selected:
-                    left_content.append(f"▶ {ep.display_num}{ep_type_str}\n", style="highlight")
+                    left_content.append(f"▶ {ep.display_num}{ep_type_str}{suffix}\n", style="highlight")
                 else:
-                    left_content.append(f"  {ep.display_num}{ep_type_str}\n", style="info")
+                    style = "bold green" if is_last_watched else "info"
+                    left_content.append(f"  {ep.display_num}{ep_type_str}{suffix}\n", style=style)
             
             content_layout["left"].update(Panel(
                 left_content,
@@ -376,10 +388,15 @@ class UIManager:
             if selected_ep.type and str(selected_ep.type).strip().lower() != "episode":
                 right_content.append(f"Type: {selected_ep.type}\n", style="info")
             
+            if last_watched_ep is not None and str(selected_ep.display_num) == str(last_watched_ep):
+                right_content.append(Text("\n[Last Watched]\n", style="bold green", justify="center"))
+
             right_content.append("\n")
             right_content.append(Text.from_markup("Press [highlight]ENTER[/highlight] to select.", justify="center"))
             right_content.append("\n")
             right_content.append(Text.from_markup("Press [highlight]G[/highlight] to jump.", justify="center"))
+            right_content.append("\n")
+            right_content.append(Text.from_markup("Press [highlight]L[/highlight] to go to last watched.", justify="center"))
             
             content_layout["right"].update(Panel(
                 Align.center(right_content, vertical="middle"),
@@ -419,7 +436,6 @@ class UIManager:
 
                         self.console.print(Align.center(prompt_panel, vertical="middle", height=7))
                         
-                        # Center the prompt input by padding it so it appears under the panel
                         prompt_string = f" {Text('›', style=COLOR_PROMPT)} "
                         pad_width = (self.console.width - 30) // 2
                         padding = " " * max(0, pad_width)
@@ -450,6 +466,28 @@ class UIManager:
                     self.clear()
                     live.start()
                     live.update(generate_renderable(), refresh=True)
+                
+                # --- NEW LOGIC FOR L KEY ---
+                elif key == 'l':
+                    if last_watched_ep is not None:
+                        target_idx = -1
+                        for idx, ep in enumerate(episodes):
+                            if str(ep.display_num) == str(last_watched_ep):
+                                target_idx = idx
+                                break
+                        
+                        if target_idx != -1:
+                            selected = target_idx
+                            scroll_offset = max(0, selected - (max_display // 2))
+                            live.update(generate_renderable(), refresh=True)
+                        else:
+                            # If episode not found in list despite being in history
+                            pass
+                    else:
+                        # Optional: flash a message that no history exists
+                        pass
+                # ---------------------------
+                
                 elif key == 'b':
                     return None
                 elif key == 'q' or key == 'ESC':
@@ -480,7 +518,7 @@ class UIManager:
                 box=HEAVY,
                 padding=(2, 4),
                 border_style=COLOR_BORDER,
-                subtitle=Text("↑↓ Navigate | ENTER Select | b Back | ESC/q Quit", style="secondary")
+                subtitle=Text("ENTER Watch | D Download | b Back", style="secondary")
             )
 
         self.clear()
@@ -496,10 +534,48 @@ class UIManager:
                     selected += 1
                     live.update(Align.center(generate_renderable(), vertical="middle", height=self.console.height), refresh=True)
                 elif key == 'ENTER':
-                    return selected
+                    return (selected, 'watch')
+                elif key == 'd' or key == 'D':
+                    return (selected, 'download')
                 elif key == 'b':
                     return None
                 elif key == 'q' or key == 'ESC':
                     return -1
                 
                 time.sleep(0.005)
+
+    def post_watch_menu(self):
+        options = ["Next Episode", "Previous Episode", "Replay", "Back to List"]
+        selected = 0
+        
+        def generate_renderable():
+            content = Text()
+            for idx, option in enumerate(options):
+                if idx == selected:
+                    content.append(f"▶ {option}\n", style="highlight")
+                else:
+                    content.append(f"  {option}\n", style="info")
+            
+            return Panel(
+                Align.center(content, vertical="middle"),
+                title=Text("Finished Watching", style="title"),
+                box=HEAVY,
+                padding=(1, 4),
+                border_style=COLOR_BORDER,
+                subtitle=Text("Select Next Action", style="secondary")
+            )
+
+        self.clear()
+        with Live(Align.center(generate_renderable(), vertical="middle", height=self.console.height), console=self.console, screen=True) as live:
+            while True:
+                key = get_key()
+                if key == 'UP' and selected > 0:
+                    selected -= 1
+                    live.update(Align.center(generate_renderable(), vertical="middle", height=self.console.height))
+                elif key == 'DOWN' and selected < len(options) - 1:
+                    selected += 1
+                    live.update(Align.center(generate_renderable(), vertical="middle", height=self.console.height))
+                elif key == 'ENTER':
+                    return options[selected]
+                elif key == 'q' or key == 'b' or key == 'ESC':
+                    return "Back to List"
