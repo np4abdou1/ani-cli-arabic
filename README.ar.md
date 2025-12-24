@@ -31,7 +31,7 @@
 
 <br>
 
-<img src="/assets/showcase.gif" alt="ani-cli-ar showcase" width="100%">
+https://github.com/user-attachments/assets/22eb92a1-b57e-4126-9869-b0988cab63a6
 
 </div>
 
