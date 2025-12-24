@@ -96,7 +96,7 @@ https://github.com/user-attachments/assets/22eb92a1-b57e-4126-9869-b0988cab63a6
     ```
 2.  **Clone & Install**
     ```bash
-    git clone [https://github.com/np4abdou1/ani-cli-arabic.git](https://github.com/np4abdou1/ani-cli-arabic.git)
+    git clone https://github.com/np4abdou1/ani-cli-arabic.git
     cd ani-cli-arabic
     pip install -r requirements.txt
     python3 main.py
@@ -138,4 +138,4 @@ You can customize the accent colors and visual style by editing `themes.py`.
 **Example:**
 ```python
 # themes.py
-CURRENT_THEME = "purple"
+CURRENT_THEME = "blue"
