@@ -16,7 +16,7 @@ DEFAULT_HEADER_ART = """
   ███    ███ ███   ███ ███  ███   ███   ███   ███    █▄ 
   ███    ███ ███   ███ ███  ███   ███   ███   ███    ███
    ███    █▀   ▀█   █▀  █▀    ▀█   ███   █▀    ██████████
-      v1.0-stable - Made by @np4abdou1/ani-cli-arabic
+      v1.2-release - Made by @np4abdou1/ani-cli-arabic
 """
 
 def load_user_config():
