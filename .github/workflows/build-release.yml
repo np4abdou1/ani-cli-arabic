@@ -63,12 +63,15 @@ jobs:
           API_RELEASES_URL = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
           "@ | Out-File -FilePath "src/version.py" -Encoding utf8
           
-          # Parse version numbers
-          $cleanVer = $version -replace '^v', ''
+          # Parse version numbers - strip any non-numeric suffix
+          $cleanVer = $version -replace '^v', '' -replace '-.*$', ''
           $verParts = $cleanVer.Split('.')
-          $major = if ($verParts.Length -gt 0) { $verParts[0] } else { "1" }
-          $minor = if ($verParts.Length -gt 1) { $verParts[1] } else { "0" }
-          $patch = if ($verParts.Length -gt 2) { $verParts[2] } else { "0" }
+          $major = if ($verParts.Length -gt 0) { [int]$verParts[0] } else { 1 }
+          $minor = if ($verParts.Length -gt 1) { [int]$verParts[1] } else { 0 }
+          $patch = if ($verParts.Length -gt 2) { [int]$verParts[2] } else { 0 }
+          
+          # Get full version string for display
+          $fullVersion = $version -replace '^v', ''
           
           # Create version_info.txt
           $content = "VSVersionInfo("
@@ -90,12 +93,12 @@ jobs:
           $content += "`n          ["
           $content += "`n            StringStruct(u'CompanyName', u'np4abdou1'),"
           $content += "`n            StringStruct(u'FileDescription', u'ani-cli-arabic - Arabic Anime CLI'),"
-          $content += "`n            StringStruct(u'FileVersion', u'$cleanVer'),"
+          $content += "`n            StringStruct(u'FileVersion', u'$fullVersion'),"
           $content += "`n            StringStruct(u'InternalName', u'ani-cli-arabic'),"
           $content += "`n            StringStruct(u'LegalCopyright', u'MIT License'),"
           $content += "`n            StringStruct(u'OriginalFilename', u'ani-cli-arabic-win64.exe'),"
           $content += "`n            StringStruct(u'ProductName', u'ani-cli-arabic'),"
-          $content += "`n            StringStruct(u'ProductVersion', u'$version')"
+          $content += "`n            StringStruct(u'ProductVersion', u'$fullVersion')"
           $content += "`n          ]"
           $content += "`n        )"
           $content += "`n      ]"
