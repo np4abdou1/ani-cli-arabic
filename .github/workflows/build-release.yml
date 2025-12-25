@@ -62,40 +62,38 @@ API_RELEASES_URL = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
           $minor = if ($verParts.Length -gt 1) { $verParts[1] } else { "0" }
           $patch = if ($verParts.Length -gt 2) { $verParts[2] } else { "0" }
           
-          $versionInfoContent = @"
-VSVersionInfo(
-  ffi=FixedFileInfo(
-    filevers=($major, $minor, $patch, 0),
-    prodvers=($major, $minor, $patch, 0),
-    mask=0x3f,
-    flags=0x0,
-    OS=0x40004,
-    fileType=0x1,
-    subtype=0x0,
-    date=(0, 0)
-  ),
-  kids=[
-    StringFileInfo(
-      [
-        StringTable(
-          u'040904B0',
-          [
-            StringStruct(u'CompanyName', u'np4abdou1'),
-            StringStruct(u'FileDescription', u'ani-cli-arabic - Arabic Anime CLI'),
-            StringStruct(u'FileVersion', u'$cleanVer'),
-            StringStruct(u'InternalName', u'ani-cli-arabic'),
-            StringStruct(u'LegalCopyright', u'MIT License'),
-            StringStruct(u'OriginalFilename', u'ani-cli-arabic-win64.exe'),
-            StringStruct(u'ProductName', u'ani-cli-arabic'),
-            StringStruct(u'ProductVersion', u'$version')
-          ]
-        )
-      ]
-    ),
-    VarFileInfo([VarStruct(u'Translation', [1033, 1200])])
-  ]
-)
-"@
+          $versionInfoContent = "VSVersionInfo(`n"
+          $versionInfoContent += "  ffi=FixedFileInfo(`n"
+          $versionInfoContent += "    filevers=($major, $minor, $patch, 0),`n"
+          $versionInfoContent += "    prodvers=($major, $minor, $patch, 0),`n"
+          $versionInfoContent += "    mask=0x3f,`n"
+          $versionInfoContent += "    flags=0x0,`n"
+          $versionInfoContent += "    OS=0x40004,`n"
+          $versionInfoContent += "    fileType=0x1,`n"
+          $versionInfoContent += "    subtype=0x0,`n"
+          $versionInfoContent += "    date=(0, 0)`n"
+          $versionInfoContent += "  ),`n"
+          $versionInfoContent += "  kids=[`n"
+          $versionInfoContent += "    StringFileInfo(`n"
+          $versionInfoContent += "      [`n"
+          $versionInfoContent += "        StringTable(`n"
+          $versionInfoContent += "          u'040904B0',`n"
+          $versionInfoContent += "          [`n"
+          $versionInfoContent += "            StringStruct(u'CompanyName', u'np4abdou1'),`n"
+          $versionInfoContent += "            StringStruct(u'FileDescription', u'ani-cli-arabic - Arabic Anime CLI'),`n"
+          $versionInfoContent += "            StringStruct(u'FileVersion', u'$cleanVer'),`n"
+          $versionInfoContent += "            StringStruct(u'InternalName', u'ani-cli-arabic'),`n"
+          $versionInfoContent += "            StringStruct(u'LegalCopyright', u'MIT License'),`n"
+          $versionInfoContent += "            StringStruct(u'OriginalFilename', u'ani-cli-arabic-win64.exe'),`n"
+          $versionInfoContent += "            StringStruct(u'ProductName', u'ani-cli-arabic'),`n"
+          $versionInfoContent += "            StringStruct(u'ProductVersion', u'$version')`n"
+          $versionInfoContent += "          ]`n"
+          $versionInfoContent += "        )`n"
+          $versionInfoContent += "      ]`n"
+          $versionInfoContent += "    ),`n"
+          $versionInfoContent += "    VarFileInfo([VarStruct(u'Translation', [1033, 1200])])`n"
+          $versionInfoContent += "  ]`n"
+          $versionInfoContent += ")`n"
           Set-Content -Path "version_info.txt" -Value $versionInfoContent -Encoding UTF8
 
       - run: |
