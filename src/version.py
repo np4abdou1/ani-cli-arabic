@@ -2,7 +2,7 @@
 # THIS IS THE SINGLE SOURCE OF TRUTH FOR VERSION
 # All other files (pyproject.toml, workflows, etc.) read from here
 
-__version__ = "1.3.2"
+__version__ = "1.3.6"
 
 APP_VERSION = f"v-{__version__}"
 APP_NAME = "ani-cli-arabic"
