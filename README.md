@@ -68,6 +68,25 @@ https://github.com/user-attachments/assets/22eb92a1-b57e-4126-9869-b0988cab63a6
 - Python **3.8+**
 - **MPV** media player
 
+### 🐍 PyPI (Recommended)
+
+The easiest way to install ani-cli-arabic:
+
+```bash
+# Install from PyPI
+pip install ani-cli-arabic
+
+# Run the application
+ani-cli-arabic
+# or
+ani-cli-ar
+```
+
+**Update to latest version:**
+```bash
+pip install --upgrade ani-cli-arabic
+```
+
 ---
 
 ### 🪟 Windows

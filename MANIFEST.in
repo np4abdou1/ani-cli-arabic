@@ -1,0 +1,21 @@
+# Include important files in the package distribution
+include README.md
+include README.ar.md
+include LICENSE
+include requirements.txt
+include themes.py
+
+# Include version file
+include src/version.py
+
+# Include database directory structure
+recursive-include database *.json
+
+# Exclude unnecessary files
+exclude build.bat
+exclude build.sh
+exclude .gitignore
+global-exclude __pycache__
+global-exclude *.py[cod]
+global-exclude *.so
+global-exclude .DS_Store

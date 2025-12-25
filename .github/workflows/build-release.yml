@@ -45,10 +45,16 @@ jobs:
         run: |
           $version = "${{ inputs.version }}"
           
-          # Create version.py
+          # Extract clean version (remove v prefix)
+          $cleanVer = $version -replace '^v', ''
+          
+          # Update version.py with the release version
           @"
           # Version info for ani-cli-arabic
-          # This file gets updated by the build workflow
+          # THIS IS THE SINGLE SOURCE OF TRUTH FOR VERSION
+          # All other files (pyproject.toml, workflows, etc.) read from here
+
+          __version__ = "$cleanVer"
 
           APP_VERSION = "$version"
           APP_NAME = "ani-cli-arabic"

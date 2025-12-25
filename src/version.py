@@ -1,7 +1,7 @@
-# Version info for ani-cli-arabic
-# This file gets updated by the build workflow
 
-APP_VERSION = "v-DEV-1.2"
+__version__ = "1.3" #GLOBAL VERSION VARIABLE
+
+APP_VERSION = f"v-{__version__}"
 APP_NAME = "ani-cli-arabic"
 GITHUB_REPO = "np4abdou1/ani-cli-arabic"
 RELEASES_URL = f"https://github.com/{GITHUB_REPO}/releases"
