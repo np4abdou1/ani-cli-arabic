@@ -265,24 +265,28 @@ def apply_update_and_restart(new_file_path, console):
 def get_installation_type():
     """
     Detect installation type: 'pip', 'executable', or 'source'
-    Priority: Check pip first (before bundled check)
+    Priority: Check executable first (most reliable), then pip
     """
-    # Check if installed via pip FIRST
-    try:
-        import pkg_resources
-        try:
-            pkg_resources.get_distribution('ani-cli-arabic')
-            return 'pip'
-        except pkg_resources.DistributionNotFound:
-            pass
-    except ImportError:
-        pass
-    
-    # Then check if bundled executable
-    if is_bundled():
+    # Check if bundled executable (PyInstaller sets sys.frozen)
+    if getattr(sys, 'frozen', False):
         return 'executable'
     
-    # Running from source
+    # Check if installed via pip
+    try:
+        # Method 1: Try importlib.metadata (Python 3.8+)
+        try:
+            from importlib.metadata import distribution
+            distribution('ani-cli-arabic')
+            return 'pip'
+        except ImportError:
+            # Method 2: Fallback to pkg_resources
+            import pkg_resources
+            pkg_resources.get_distribution('ani-cli-arabic')
+            return 'pip'
+    except Exception:
+        pass
+    
+    # Running from source (development)
     return 'source'
 
 
@@ -303,7 +307,7 @@ def get_pypi_latest_version():
 
 def check_pip_update(console):
     """
-    Check PyPI for updates when installed via pip
+    Check PyPI for updates when installed via pip and auto-update
     """
     try:
         latest_version = get_pypi_latest_version()
@@ -320,44 +324,44 @@ def check_pip_update(console):
             msg.append(f"{__version__}\n", style="cyan")
             msg.append(f"Latest:  ", style="dim")
             msg.append(f"{latest_version}\n\n", style="green bold")
-            msg.append("Update command: ", style="dim")
-            msg.append("pip install --upgrade ani-cli-arabic", style="bold cyan")
+            msg.append("Updating automatically...", style="yellow")
             
             panel = Panel(
                 msg,
-                title="[bold]PyPI Update[/bold]",
+                title="[bold]PyPI Auto-Update[/bold]",
                 border_style="yellow",
                 padding=(1, 2)
             )
             console.print()
             console.print(panel)
+            console.print()
             
-            # Ask if user wants to update now
-            update_now = Confirm.ask("\nWould you like to update now?", default=True, console=console)
-            
-            if update_now:
-                console.print("\n[cyan]Running: pip install --upgrade ani-cli-arabic[/cyan]\n")
-                try:
-                    result = subprocess.run(
-                        [sys.executable, '-m', 'pip', 'install', '--upgrade', 'ani-cli-arabic'],
-                        capture_output=True,
-                        text=True
-                    )
+            # Auto-update without asking
+            console.print("[cyan]Running: pip install --upgrade ani-cli-arabic[/cyan]\n")
+            try:
+                result = subprocess.run(
+                    [sys.executable, '-m', 'pip', 'install', '--upgrade', 'ani-cli-arabic'],
+                    capture_output=True,
+                    text=True
+                )
+                
+                if result.returncode == 0:
+                    console.print("[green]✓ Update successful! Restarting application...[/green]\n")
+                    import time
+                    time.sleep(2)
                     
-                    if result.returncode == 0:
-                        console.print("[green]✓ Update successful! Please restart the application.[/green]\n")
-                        input("Press ENTER to exit...")
-                        sys.exit(0)
+                    # Restart the application
+                    if sys.platform == 'win32':
+                        os.execv(sys.executable, [sys.executable] + sys.argv)
                     else:
-                        console.print(f"[red]Update failed: {result.stderr}[/red]\n")
-                        console.print("[yellow]Please try manually: pip install --upgrade ani-cli-arabic[/yellow]\n")
-                        input("Press ENTER to continue...")
-                except Exception as e:
-                    console.print(f"[red]Update failed: {e}[/red]\n")
+                        os.execv(sys.executable, [sys.executable] + sys.argv)
+                else:
+                    console.print(f"[red]Update failed: {result.stderr}[/red]\n")
                     console.print("[yellow]Please try manually: pip install --upgrade ani-cli-arabic[/yellow]\n")
                     input("Press ENTER to continue...")
-            else:
-                console.print()
+            except Exception as e:
+                console.print(f"[red]Update failed: {e}[/red]\n")
+                console.print("[yellow]Please try manually: pip install --upgrade ani-cli-arabic[/yellow]\n")
                 input("Press ENTER to continue...")
             
             return True
@@ -395,25 +399,16 @@ def check_executable_update(console):
             msg.append(f"{latest_tag.lstrip('v')}\n", style="green bold")
             msg.append(f"Platform: ", style="dim")
             msg.append(f"{system_name}\n\n", style="cyan")
-            msg.append("Downloading update...", style="yellow")
+            msg.append("Downloading and installing update...", style="yellow")
             
             panel = Panel(
                 msg,
-                title="[bold]Executable Update[/bold]",
+                title="[bold]Executable Auto-Update[/bold]",
                 border_style="yellow",
                 padding=(1, 2)
             )
             console.print()
             console.print(panel)
-            
-            # Ask if user wants to update
-            update_now = Confirm.ask("\nWould you like to download and install the update?", default=True, console=console)
-            
-            if not update_now:
-                console.print()
-                input("Press ENTER to continue...")
-                return False
-            
             console.print()
             
             # Get download url
