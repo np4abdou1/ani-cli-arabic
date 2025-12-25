@@ -1,0 +1,7 @@
+{
+    "default_quality": "480p",
+    "player": "mpv",
+    "auto_next": false,
+    "check_updates": false,
+    "theme": "red"
+}

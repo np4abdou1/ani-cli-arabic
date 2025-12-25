@@ -14,14 +14,18 @@ from .discord_rpc import DiscordRPCManager
 from .models import QualityOption
 from .utils import download_file
 from .history import HistoryManager
+from .settings import SettingsManager
+from .favorites import FavoritesManager
 
 class AniCliArApp:
     def __init__(self):
         self.ui = UIManager()
         self.api = AnimeAPI()
         self.rpc = DiscordRPCManager()
+        self.settings = SettingsManager()
         self.player = PlayerManager(rpc_manager=self.rpc, console=self.ui.console)
         self.history = HistoryManager()
+        self.favorites = FavoritesManager()
 
     def run(self):
         atexit.register(self.cleanup)
@@ -41,26 +45,29 @@ class AniCliArApp:
         while True:
             self.ui.clear()
             
-            content_height = 16
-            vertical_padding = (self.ui.console.height - content_height) // 3
+            # Calculate vertical spacing - move content up
+            vertical_space = self.ui.console.height - 14
+            top_padding = (vertical_space // 2) - 2  # Move up by reducing top padding
             
-            if vertical_padding > 0:
-                self.ui.print(Text("\n" * vertical_padding))
+            if top_padding > 0:
+                self.ui.print(Text("\n" * top_padding))
 
             self.ui.print(Align.center(self.ui.get_header_renderable()))
             self.ui.print()
-
-            search_prompt = Panel(
-                Text("S Search | R Relevant/Featured (MAL) | Q Quit", style="info", justify="center"),
-                box=HEAVY,
-                padding=(0, 4),
-                border_style=COLOR_BORDER
-            )
-            
-            self.ui.print(Align.center(search_prompt))
             self.ui.print(Align.center(Text.from_markup("Discord Rpc running ✅", style="secondary")))
             self.ui.print()
+            self.ui.print()
             
+            # Keybinds panel with theme color border - BEFORE prompt
+            keybinds_panel = Panel(
+                Text("S: Search | R: Featured | L: History | F: Favorites | C: Settings | Q: Quit", style="info", justify="center"),
+                box=HEAVY,
+                border_style=COLOR_BORDER
+            )
+            self.ui.print(Align.center(keybinds_panel))
+            self.ui.print()
+            
+            # Type box
             prompt_string = f" {Text('›', style=COLOR_PROMPT)} "
             pad_width = (self.ui.console.width - 30) // 2
             padding = " " * max(0, pad_width)
@@ -84,6 +91,15 @@ class AniCliArApp:
                  if term:
                     self.rpc.update_searching()
                     results = self.ui.run_with_loading("Searching...", self.api.search_anime, term)
+            elif query.lower() == 'l':
+                self.handle_history()
+                continue
+            elif query.lower() == 'f':
+                self.handle_favorites()
+                continue
+            elif query.lower() == 'c':
+                self.ui.settings_menu(self.settings)
+                continue
             elif query:
                 self.rpc.update_searching()
                 results = self.ui.run_with_loading("Searching...", self.api.search_anime, query)
@@ -91,10 +107,77 @@ class AniCliArApp:
                 continue
             
             if not results:
-                self.ui.render_message("✗ No Results", f"No results found.", "error")
+                self.ui.render_message(
+                    "✗ No Anime Found", 
+                    f"No anime matching '{query}' was found.\n\nTry:\n• Checking spelling\n• Using English name\n• Using alternative titles", 
+                    "error"
+                )
                 continue
             
             self.handle_anime_selection(results)
+
+    def handle_history(self):
+        history_items = self.history.get_history()
+        if not history_items:
+            self.ui.render_message("Info", "No history found.", "info")
+            return
+
+        while True:
+            selected_idx = self.ui.history_menu(history_items)
+            if selected_idx is None:
+                break
+            
+            item = history_items[selected_idx]
+            # Create a dummy anime object to reuse handle_anime_selection logic partially
+            # But handle_anime_selection expects a list of results.
+            # Instead, we can directly search for this anime ID or title.
+            
+            self.ui.run_with_loading("Resuming...", self.resume_anime, item)
+            # Refresh history after watching
+            history_items = self.history.get_history()
+
+    def resume_anime(self, history_item):
+        # We need to fetch anime details first
+        results = self.api.search_anime(history_item['title'])
+        if not results:
+            self.ui.render_message("Error", "Could not find anime details.", "error")
+            return
+
+        # Find the matching anime
+        selected_anime = None
+        for res in results:
+            if str(res.id) == str(history_item['anime_id']):
+                selected_anime = res
+                break
+        
+        if not selected_anime:
+            selected_anime = results[0] # Fallback
+
+        self.rpc.update_viewing_anime(selected_anime.title_en, selected_anime.thumbnail)
+        episodes = self.api.load_episodes(selected_anime.id)
+        
+        if episodes:
+            self.handle_episode_selection(selected_anime, episodes)
+
+    def handle_favorites(self):
+        while True:
+            fav_items = self.favorites.get_all()
+            if not fav_items:
+                self.ui.render_message("Info", "No favorites added yet.", "info")
+                return
+
+            result = self.ui.favorites_menu(fav_items)
+            if result is None:
+                break
+            
+            idx, action = result
+            item = fav_items[idx]
+            
+            if action == 'remove':
+                self.favorites.remove(item['anime_id'])
+                continue
+            elif action == 'watch':
+                self.ui.run_with_loading("Loading...", self.resume_anime, item)
 
     def handle_anime_selection(self, results):
         while True:
@@ -147,13 +230,26 @@ class AniCliArApp:
         
         while True:
             last_watched = self.history.get_last_watched(selected_anime.id)
+            is_fav = self.favorites.is_favorite(selected_anime.id)
+            
+            # Prepare anime details for display
+            anime_details = {
+                'score': selected_anime.score,
+                'rank': selected_anime.rank,
+                'type': selected_anime.type,
+                'episodes': selected_anime.episodes,
+                'status': selected_anime.status,
+                'genres': selected_anime.genres
+            }
 
             ep_idx = self.ui.episode_selection_menu(
                 selected_anime.title_en, 
                 episodes, 
                 self.rpc, 
                 selected_anime.thumbnail,
-                last_watched_ep=last_watched
+                last_watched_ep=last_watched,
+                is_favorite=is_fav,
+                anime_details=anime_details
             )
             
             if ep_idx == -1:
@@ -161,6 +257,15 @@ class AniCliArApp:
             elif ep_idx is None:
                 self.rpc.update_browsing()
                 return True
+            elif ep_idx == 'toggle_fav':
+                if is_fav:
+                    self.favorites.remove(selected_anime.id)
+                else:
+                    self.favorites.add(selected_anime.id, selected_anime.title_en, selected_anime.thumbnail)
+                continue
+            elif ep_idx == 'batch_mode':
+                self.handle_batch_download(selected_anime, episodes)
+                continue
             
             current_idx = ep_idx
             
@@ -184,9 +289,18 @@ class AniCliArApp:
                 
                 action_taken = self.handle_quality_selection(selected_anime, selected_ep, server_data)
                 
-                # --- UPDATED LOGIC HERE ---
-                # Check for both "watch" AND "download"
                 if action_taken == "watch" or action_taken == "download":
+                    # Auto Next Logic
+                    auto_next = self.settings.get('auto_next')
+                    if auto_next and action_taken == "watch":
+                        if current_idx + 1 < len(episodes):
+                            current_idx += 1
+                            # Small delay or notification could be nice here
+                            continue
+                        else:
+                            self.ui.render_message("Info", "No more episodes!", "info")
+                            break
+
                     next_action = self.ui.post_watch_menu()
                     
                     if next_action == "Next Episode":
@@ -210,12 +324,67 @@ class AniCliArApp:
                 else:
                     break
 
+    def handle_batch_download(self, selected_anime, episodes):
+        selected_indices = self.ui.batch_selection_menu(episodes)
+        if not selected_indices:
+            return
+
+        self.ui.print(f"\n[info]Preparing to download {len(selected_indices)} episodes...[/info]")
+        
+        for idx in selected_indices:
+            ep = episodes[idx]
+            self.ui.print(f"Processing Episode {ep.display_num}...")
+            
+            server_data = self.api.get_streaming_servers(selected_anime.id, ep.number)
+            if not server_data:
+                self.ui.print(f"[error]Skipping Ep {ep.display_num}: No servers found[/error]")
+                continue
+                
+            # Auto-select quality based on settings or default to best available
+            current_ep_data = server_data.get('CurrentEpisode', {})
+            qualities = [
+                QualityOption("1080p", 'FRFhdQ', "info"),
+                QualityOption("720p", 'FRLink', "info"),
+                QualityOption("480p", 'FRLowQ', "info"),
+            ]
+            
+            target_quality = self.settings.get('default_quality') # e.g. "1080p"
+            selected_q = None
+            
+            # Try to find target quality
+            for q in qualities:
+                if target_quality in q.name and current_ep_data.get(q.server_key):
+                    selected_q = q
+                    break
+            
+            # Fallback to best available
+            if not selected_q:
+                for q in qualities:
+                    if current_ep_data.get(q.server_key):
+                        selected_q = q
+                        break
+            
+            if selected_q:
+                server_id = current_ep_data.get(selected_q.server_key)
+                direct_url = self.api.extract_mediafire_direct(self.api.build_mediafire_url(server_id))
+                
+                if direct_url:
+                    filename = f"{selected_anime.title_en} - Ep {ep.display_num} [{selected_q.name}].mp4"
+                    download_file(direct_url, filename, self.ui.console)
+                    self.history.mark_watched(selected_anime.id, ep.display_num, selected_anime.title_en)
+                else:
+                    self.ui.print(f"[error]Failed to extract link for Ep {ep.display_num}[/error]")
+            else:
+                self.ui.print(f"[error]No suitable quality found for Ep {ep.display_num}[/error]")
+        
+        self.ui.render_message("Success", "Batch download completed!", "success")
+
     def handle_quality_selection(self, selected_anime, selected_ep, server_data):
         current_ep_data = server_data.get('CurrentEpisode', {})
         qualities = [
-            QualityOption("📱 480p (Low Quality)", 'FRLowQ', "info"),
-            QualityOption("🎬 720p (Standard Quality)", 'FRLink', "info"),
-            QualityOption("🎞️  1080p (Full HD)", 'FRFhdQ', "info"),
+            QualityOption("SD • 480p (Low Quality)", 'FRLowQ', "info"),
+            QualityOption("HD • 720p (Standard Quality)", 'FRLink', "info"),
+            QualityOption("FHD • 1080p (Full HD)", 'FRFhdQ', "info"),
         ]
         
         available = [q for q in qualities if current_ep_data.get(q.server_key)]
@@ -260,7 +429,10 @@ class AniCliArApp:
                 self.history.mark_watched(selected_anime.id, selected_ep.display_num, selected_anime.title_en)
                 return "download"
             else:
-                self.player.play(direct_url, f"{selected_anime.title_en} - Ep {selected_ep.display_num} ({quality.name})")
+                player_type = self.settings.get('player')
+                watching_text = f"{selected_anime.title_en} - Episode {selected_ep.display_num}"
+                self.ui.console.print(f"\n[cyan]▶ Watching:[/cyan] [bold]{watching_text}[/bold]\n")
+                self.player.play(direct_url, f"{selected_anime.title_en} - Ep {selected_ep.display_num} ({quality.name})", player_type=player_type)
                 self.history.mark_watched(selected_anime.id, selected_ep.display_num, selected_anime.title_en)
                 self.rpc.update_selecting_episode(selected_anime.title_en, selected_anime.thumbnail)
                 return "watch"
