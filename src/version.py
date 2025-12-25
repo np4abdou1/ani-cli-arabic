@@ -1,5 +1,8 @@
+# Version info for ani-cli-arabic
+# THIS IS THE SINGLE SOURCE OF TRUTH FOR VERSION
+# All other files (pyproject.toml, workflows, etc.) read from here
 
-__version__ = "1.3.2" #GLOBAL VERSION VARIABLE
+__version__ = "1.3.2"
 
 APP_VERSION = f"v-{__version__}"
 APP_NAME = "ani-cli-arabic"
