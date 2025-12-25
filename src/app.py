@@ -457,6 +457,20 @@ class AniCliArApp:
         
         self.ui.print(Align.center(panel, vertical="middle", height=self.ui.console.height))
 
+def main():
+    """Main entry point for the ani-cli-arabic package"""
+    import os
+    # Ensure database directory exists
+    base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    db_dir = os.path.join(base_dir, "database")
+    os.makedirs(db_dir, exist_ok=True)
+    
+    app = AniCliArApp()
+    app.run()
+
+
+if __name__ == "__main__":
+    main()
     def handle_error(self, e):
         self.ui.clear()
         self.ui.console.print_exception()
