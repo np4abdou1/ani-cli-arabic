@@ -265,13 +265,21 @@ def apply_update_and_restart(new_file_path, console):
 def get_installation_type():
     """
     Detect installation type: 'pip', 'executable', or 'source'
-    Priority: Check executable first (most reliable), then pip
     """
     # Check if bundled executable (PyInstaller sets sys.frozen)
     if getattr(sys, 'frozen', False):
         return 'executable'
     
-    # Check if installed via pip
+    # Check if running from site-packages (pip installed)
+    try:
+        file_path = Path(__file__).resolve()
+        # If this file is in site-packages, it's a pip install
+        if 'site-packages' in str(file_path) or 'dist-packages' in str(file_path):
+            return 'pip'
+    except Exception:
+        pass
+    
+    # Double-check with package metadata
     try:
         # Method 1: Try importlib.metadata (Python 3.8+)
         try:
@@ -319,28 +327,29 @@ def check_pip_update(console):
         
         if latest > current:
             msg = Text()
-            msg.append("Update Available!\n\n", style="bold yellow")
+            msg.append("Update Available\n\n", style="bold cyan")
             msg.append(f"Current: ", style="dim")
-            msg.append(f"{__version__}\n", style="cyan")
-            msg.append(f"Latest:  ", style="dim")
-            msg.append(f"{latest_version}\n\n", style="green bold")
-            msg.append("Updating automatically...", style="yellow")
+            msg.append(f"{__version__}", style="white")
+            msg.append(f"  →  ", style="dim")
+            msg.append(f"Latest: ", style="dim")
+            msg.append(f"{latest_version}\n\n", style="bold green")
+            msg.append("Installing update...", style="cyan")
             
             panel = Panel(
                 msg,
-                title="[bold]PyPI Auto-Update[/bold]",
-                border_style="yellow",
-                padding=(1, 2)
+                title="[bold white]PyPI Package Update[/bold white]",
+                border_style="cyan",
+                padding=(0, 2)
             )
             console.print()
             console.print(panel)
             console.print()
             
             # Auto-update without asking
-            console.print("[cyan]Running: pip install --upgrade ani-cli-arabic[/cyan]\n")
+            console.print("[cyan]Updating package...[/cyan]\n")
             try:
                 result = subprocess.run(
-                    [sys.executable, '-m', 'pip', 'install', '--upgrade', 'ani-cli-arabic', '--yes'],
+                    [sys.executable, '-m', 'pip', 'install', '--upgrade', 'ani-cli-arabic'],
                     capture_output=True,
                     text=True
                 )
@@ -392,20 +401,21 @@ def check_executable_update(console):
             system_name = "Windows" if system == "windows" else "Linux"
             
             msg = Text()
-            msg.append("Update Available!\n\n", style="bold yellow")
+            msg.append("Update Available\n\n", style="bold cyan")
             msg.append(f"Current: ", style="dim")
-            msg.append(f"{__version__}\n", style="cyan")
-            msg.append(f"Latest:  ", style="dim")
-            msg.append(f"{latest_tag.lstrip('v')}\n", style="green bold")
+            msg.append(f"{__version__}", style="white")
+            msg.append(f"  →  ", style="dim")
+            msg.append(f"Latest: ", style="dim")
+            msg.append(f"{latest_tag.lstrip('v')}\n", style="bold green")
             msg.append(f"Platform: ", style="dim")
-            msg.append(f"{system_name}\n\n", style="cyan")
-            msg.append("Downloading and installing update...", style="yellow")
+            msg.append(f"{system_name}\n\n", style="white")
+            msg.append("Downloading update...", style="cyan")
             
             panel = Panel(
                 msg,
-                title="[bold]Executable Auto-Update[/bold]",
-                border_style="yellow",
-                padding=(1, 2)
+                title="[bold white]Executable Update[/bold white]",
+                border_style="cyan",
+                padding=(0, 2)
             )
             console.print()
             console.print(panel)
@@ -470,19 +480,20 @@ def check_for_updates(console=None, auto_update=True):
                 
                 if latest > current:
                     msg = Text()
-                    msg.append("Update Available!\n\n", style="bold yellow")
+                    msg.append("Update Available\n\n", style="bold cyan")
                     msg.append(f"Current: ", style="dim")
-                    msg.append(f"v{__version__}\n", style="cyan")
-                    msg.append(f"Latest:  ", style="dim")
-                    msg.append(f"{latest_tag}\n\n", style="green bold")
+                    msg.append(f"{__version__}", style="white")
+                    msg.append(f"  →  ", style="dim")
+                    msg.append(f"Latest: ", style="dim")
+                    msg.append(f"{latest_tag.lstrip('v')}\n\n", style="bold green")
                     msg.append("Visit: ", style="dim")
                     msg.append(RELEASES_URL, style="cyan underline")
                     
                     panel = Panel(
                         msg,
-                        title="[bold]Update Available[/bold]",
-                        border_style="yellow",
-                        padding=(1, 2)
+                        title="[bold white]Update Available[/bold white]",
+                        border_style="cyan",
+                        padding=(0, 2)
                     )
                     console.print()
                     console.print(panel)
