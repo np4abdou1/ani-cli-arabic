@@ -29,6 +29,10 @@ setup(
         "Source Code": "https://github.com/np4abdou1/ani-cli-arabic",
     },
     packages=find_packages(),
+    package_data={
+        '': ['*.json', '*.db'],
+        'database': ['*.db', '*.json'],
+    },
     include_package_data=True,
     install_requires=[
         "rich>=13.0.0",

@@ -458,6 +458,52 @@ class AniCliArApp:
         
         self.ui.print(Align.center(panel, vertical="middle", height=self.ui.console.height))
 
+    def handle_error(self, e):
+        self.ui.clear()
+        self.ui.console.print_exception()
+        
+        panel = Panel(
+            Text(f"✗ Unexpected error: {e}", justify="center", style="error"),
+            title=Text("CRITICAL ERROR", style="title"),
+            box=HEAVY,
+            padding=1,
+            border_style=COLOR_BORDER
+        )
+        
+        self.ui.print(Align.center(panel, vertical="middle", height=self.ui.console.height))
+        input("\nPress ENTER to exit...")
+
+    def cleanup(self):
+        self.rpc.disconnect()
+        self.player.cleanup_temp_mpv()
+        self.ui.clear()
+        
+        panel = Panel(
+            Text("👋 Thanks for using ani-cli-arabic!", justify="center", style="info"),
+            title=Text("GOODBYE", style="title"),
+            box=HEAVY,
+            padding=1,
+            border_style=COLOR_BORDER
+        )
+        
+        self.ui.print(Align.center(panel, vertical="middle", height=self.ui.console.height))
+
+
+def main():
+    """Main entry point for the ani-cli-arabic package"""
+    import os
+    # Ensure database directory exists in user home, not package location
+    home_dir = Path.home()
+    db_dir = home_dir / ".ani-cli-arabic" / "database"
+    db_dir.mkdir(parents=True, exist_ok=True)
+    
+    app = AniCliArApp()
+    app.run()
+
+
+if __name__ == "__main__":
+    main()
+
 def main():
     """Main entry point for the ani-cli-arabic package"""
     import os

@@ -48,11 +48,12 @@ ani-cli-arabic = "src.app:main"
 ani-cli-ar = "src.app:main"
 
 [tool.setuptools]
-packages = ["src"]
+packages = ["src", "database"]
 include-package-data = true
 
 [tool.setuptools.dynamic]
 version = {attr = "src.version.__version__"}
 
 [tool.setuptools.package-data]
-"*" = ["*.json", "*.txt"]
+"*" = ["*.json", "*.txt", "*.db"]
+"database" = ["*.db", "*.json"]

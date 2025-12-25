@@ -185,11 +185,69 @@ class _CredentialManager:
         self._ensure_db_exists()
     
     def _get_db_path(self) -> Path:
-        # Use user home directory instead of package location
+        # Use user home directory
         home_dir = Path.home()
         db_dir = home_dir / ".ani-cli-arabic" / "database"
         db_dir.mkdir(parents=True, exist_ok=True)
-        return db_dir / ".credentials.db"
+        user_db_path = db_dir / ".credentials.db"
+        
+        # If database doesn't exist in user home, copy from package installation
+        if not user_db_path.exists():
+            copied = False
+            
+            # Method 1: Try importlib.resources (Python 3.9+)
+            try:
+                import importlib.resources as resources
+                if hasattr(resources, 'files'):
+                    import shutil
+                    package_db = resources.files('database') / '.credentials.db'
+                    with resources.as_file(package_db) as db_file:
+                        if db_file.exists():
+                            shutil.copy2(db_file, user_db_path)
+                            copied = True
+            except Exception:
+                pass
+            
+            # Method 2: Try finding in sys.path
+            if not copied:
+                try:
+                    import sys
+                    import shutil
+                    for path in sys.path:
+                        potential_db = Path(path) / 'database' / '.credentials.db'
+                        if potential_db.exists():
+                            shutil.copy2(potential_db, user_db_path)
+                            copied = True
+                            break
+                except Exception:
+                    pass
+            
+            # Method 3: Try relative to this file (for development)
+            if not copied:
+                try:
+                    import shutil
+                    local_db = Path(__file__).parent.parent / 'database' / '.credentials.db'
+                    if local_db.exists():
+                        shutil.copy2(local_db, user_db_path)
+                        copied = True
+                except Exception:
+                    pass
+            
+            # Method 4: Check package site-packages directly
+            if not copied:
+                try:
+                    import shutil
+                    import site
+                    for site_dir in site.getsitepackages():
+                        potential_db = Path(site_dir) / 'database' / '.credentials.db'
+                        if potential_db.exists():
+                            shutil.copy2(potential_db, user_db_path)
+                            copied = True
+                            break
+                except Exception:
+                    pass
+        
+        return user_db_path
     
     def _ensure_db_exists(self):
         if not self.db_path.exists():
