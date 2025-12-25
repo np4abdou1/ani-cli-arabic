@@ -41,86 +41,95 @@ jobs:
           python-version: '3.11'
 
       - name: Inject version into source
+        shell: pwsh
         run: |
           $version = "${{ inputs.version }}"
-          $versionContent = @"
-# Version info for ani-cli-arabic
-# This file gets updated by the build workflow
-
-APP_VERSION = "$version"
-APP_NAME = "ani-cli-arabic"
-GITHUB_REPO = "np4abdou1/ani-cli-arabic"
-RELEASES_URL = f"https://github.com/{GITHUB_REPO}/releases"
-API_RELEASES_URL = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
-"@
-          Set-Content -Path "src/version.py" -Value $versionContent -Encoding UTF8
           
-          # also create version info file for exe metadata
+          # Create version.py
+          @"
+          # Version info for ani-cli-arabic
+          # This file gets updated by the build workflow
+
+          APP_VERSION = "$version"
+          APP_NAME = "ani-cli-arabic"
+          GITHUB_REPO = "np4abdou1/ani-cli-arabic"
+          RELEASES_URL = f"https://github.com/{GITHUB_REPO}/releases"
+          API_RELEASES_URL = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
+          "@ | Out-File -FilePath "src/version.py" -Encoding utf8
+          
+          # Parse version numbers
           $cleanVer = $version -replace '^v', ''
           $verParts = $cleanVer.Split('.')
           $major = if ($verParts.Length -gt 0) { $verParts[0] } else { "1" }
           $minor = if ($verParts.Length -gt 1) { $verParts[1] } else { "0" }
           $patch = if ($verParts.Length -gt 2) { $verParts[2] } else { "0" }
           
-          $versionInfoContent = "VSVersionInfo(`n"
-          $versionInfoContent += "  ffi=FixedFileInfo(`n"
-          $versionInfoContent += "    filevers=($major, $minor, $patch, 0),`n"
-          $versionInfoContent += "    prodvers=($major, $minor, $patch, 0),`n"
-          $versionInfoContent += "    mask=0x3f,`n"
-          $versionInfoContent += "    flags=0x0,`n"
-          $versionInfoContent += "    OS=0x40004,`n"
-          $versionInfoContent += "    fileType=0x1,`n"
-          $versionInfoContent += "    subtype=0x0,`n"
-          $versionInfoContent += "    date=(0, 0)`n"
-          $versionInfoContent += "  ),`n"
-          $versionInfoContent += "  kids=[`n"
-          $versionInfoContent += "    StringFileInfo(`n"
-          $versionInfoContent += "      [`n"
-          $versionInfoContent += "        StringTable(`n"
-          $versionInfoContent += "          u'040904B0',`n"
-          $versionInfoContent += "          [`n"
-          $versionInfoContent += "            StringStruct(u'CompanyName', u'np4abdou1'),`n"
-          $versionInfoContent += "            StringStruct(u'FileDescription', u'ani-cli-arabic - Arabic Anime CLI'),`n"
-          $versionInfoContent += "            StringStruct(u'FileVersion', u'$cleanVer'),`n"
-          $versionInfoContent += "            StringStruct(u'InternalName', u'ani-cli-arabic'),`n"
-          $versionInfoContent += "            StringStruct(u'LegalCopyright', u'MIT License'),`n"
-          $versionInfoContent += "            StringStruct(u'OriginalFilename', u'ani-cli-arabic-win64.exe'),`n"
-          $versionInfoContent += "            StringStruct(u'ProductName', u'ani-cli-arabic'),`n"
-          $versionInfoContent += "            StringStruct(u'ProductVersion', u'$version')`n"
-          $versionInfoContent += "          ]`n"
-          $versionInfoContent += "        )`n"
-          $versionInfoContent += "      ]`n"
-          $versionInfoContent += "    ),`n"
-          $versionInfoContent += "    VarFileInfo([VarStruct(u'Translation', [1033, 1200])])`n"
-          $versionInfoContent += "  ]`n"
-          $versionInfoContent += ")`n"
-          Set-Content -Path "version_info.txt" -Value $versionInfoContent -Encoding UTF8
+          # Create version_info.txt
+          $content = "VSVersionInfo("
+          $content += "`n  ffi=FixedFileInfo("
+          $content += "`n    filevers=($major, $minor, $patch, 0),"
+          $content += "`n    prodvers=($major, $minor, $patch, 0),"
+          $content += "`n    mask=0x3f,"
+          $content += "`n    flags=0x0,"
+          $content += "`n    OS=0x40004,"
+          $content += "`n    fileType=0x1,"
+          $content += "`n    subtype=0x0,"
+          $content += "`n    date=(0, 0)"
+          $content += "`n  ),"
+          $content += "`n  kids=["
+          $content += "`n    StringFileInfo("
+          $content += "`n      ["
+          $content += "`n        StringTable("
+          $content += "`n          u'040904B0',"
+          $content += "`n          ["
+          $content += "`n            StringStruct(u'CompanyName', u'np4abdou1'),"
+          $content += "`n            StringStruct(u'FileDescription', u'ani-cli-arabic - Arabic Anime CLI'),"
+          $content += "`n            StringStruct(u'FileVersion', u'$cleanVer'),"
+          $content += "`n            StringStruct(u'InternalName', u'ani-cli-arabic'),"
+          $content += "`n            StringStruct(u'LegalCopyright', u'MIT License'),"
+          $content += "`n            StringStruct(u'OriginalFilename', u'ani-cli-arabic-win64.exe'),"
+          $content += "`n            StringStruct(u'ProductName', u'ani-cli-arabic'),"
+          $content += "`n            StringStruct(u'ProductVersion', u'$version')"
+          $content += "`n          ]"
+          $content += "`n        )"
+          $content += "`n      ]"
+          $content += "`n    ),"
+          $content += "`n    VarFileInfo([VarStruct(u'Translation', [1033, 1200])])"
+          $content += "`n  ]"
+          $content += "`n)"
+          $content | Out-File -FilePath "version_info.txt" -Encoding utf8
 
-      - run: |
+      - name: Install dependencies
+        run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
           pip install pyinstaller
 
-      - run: |
+      - name: Download MPV
+        run: |
           Invoke-WebRequest -Uri "https://github.com/shinchiro/mpv-winbuild-cmake/releases/download/20251125/mpv-i686-20251125-git-8469605.7z" -OutFile "mpv.7z"
           7z x mpv.7z
           Copy-Item -Path "mpv.exe" -Destination "mpv_bundle.exe" -Force
 
       - name: Build executables
+        shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path build
           $currentDir = Get-Location
           $version = "${{ inputs.version }}"
           
+          # Build without MPV
           pyinstaller --onefile --name "ani-cli-arabic-$version-win64" --console --clean --noconfirm --distpath . --workpath build --specpath build --icon "$currentDir\assets\icon.ico" --version-file "$currentDir\version_info.txt" --add-data "$currentDir\src;src" --add-data "$currentDir\themes.py;." --add-data "$currentDir\database;database" --hidden-import pypresence --hidden-import rich --hidden-import requests --hidden-import cryptography --hidden-import cryptography.fernet main.py
-
+          
+          # Build with MPV
           pyinstaller --onefile --name "ani-cli-arabic-$version-win64-with-mpv" --console --clean --noconfirm --distpath . --workpath build --specpath build --icon "$currentDir\assets\icon.ico" --version-file "$currentDir\version_info.txt" --add-data "$currentDir\src;src" --add-data "$currentDir\themes.py;." --add-data "$currentDir\database;database" --add-binary "$currentDir\mpv_bundle.exe;mpv" --hidden-import pypresence --hidden-import rich --hidden-import requests --hidden-import cryptography --hidden-import cryptography.fernet main.py
           
-          # also create standard names without version for updater compatibility
+          # Create standard names for updater
           Copy-Item "ani-cli-arabic-$version-win64.exe" "ani-cli-arabic-win64.exe"
           Copy-Item "ani-cli-arabic-$version-win64-with-mpv.exe" "ani-cli-arabic-win64-with-mpv.exe"
 
-      - env:
+      - name: Upload to release
+        env:
           GH_TOKEN: ${{ secrets.GH_PAT }}
         run: |
           $version = "${{ inputs.version }}"
@@ -139,38 +148,45 @@ API_RELEASES_URL = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
       - name: Inject version into source
         run: |
           VERSION="${{ inputs.version }}"
-          cat > src/version.py << EOF
-# Version info for ani-cli-arabic
-# This file gets updated by the build workflow
+          cat > src/version.py << 'VERSIONEOF'
+          # Version info for ani-cli-arabic
+          # This file gets updated by the build workflow
 
-APP_VERSION = "$VERSION"
-APP_NAME = "ani-cli-arabic"
-GITHUB_REPO = "np4abdou1/ani-cli-arabic"
-RELEASES_URL = f"https://github.com/{GITHUB_REPO}/releases"
-API_RELEASES_URL = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
-EOF
+          APP_VERSION = "VERSION_PLACEHOLDER"
+          APP_NAME = "ani-cli-arabic"
+          GITHUB_REPO = "np4abdou1/ani-cli-arabic"
+          RELEASES_URL = f"https://github.com/{GITHUB_REPO}/releases"
+          API_RELEASES_URL = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
+          VERSIONEOF
+          
+          sed -i "s/VERSION_PLACEHOLDER/$VERSION/g" src/version.py
 
-      - run: |
+      - name: Install dependencies
+        run: |
           sudo apt-get update
           sudo apt-get install -y mpv libmpv-dev
           python -m pip install --upgrade pip
           pip install -r requirements.txt
           pip install pyinstaller
 
-      - run: |
+      - name: Build executables
+        run: |
           PWD=$(pwd)
           VERSION="${{ inputs.version }}"
           
+          # Build without MPV
           pyinstaller --onefile --name "ani-cli-arabic-$VERSION-linux-x64" --console --clean --noconfirm --distpath . --workpath build --specpath build --add-data "$PWD/src:src" --add-data "$PWD/themes.py:." --add-data "$PWD/database:database" --hidden-import pypresence --hidden-import rich --hidden-import requests --hidden-import cryptography --hidden-import cryptography.fernet main.py
-
+          
+          # Build with MPV
           MPV_PATH=$(which mpv)
           pyinstaller --onefile --name "ani-cli-arabic-$VERSION-linux-x64-with-mpv" --console --clean --noconfirm --distpath . --workpath build --specpath build --add-data "$PWD/src:src" --add-data "$PWD/themes.py:." --add-data "$PWD/database:database" --add-binary "${MPV_PATH}:mpv" --hidden-import pypresence --hidden-import rich --hidden-import requests --hidden-import cryptography --hidden-import cryptography.fernet main.py
           
-          # also create standard names without version for updater compatibility
+          # Create standard names for updater
           cp "ani-cli-arabic-$VERSION-linux-x64" "ani-cli-arabic-linux-x64"
           cp "ani-cli-arabic-$VERSION-linux-x64-with-mpv" "ani-cli-arabic-linux-x64-with-mpv"
 
-      - env:
+      - name: Upload to release
+        env:
           GH_TOKEN: ${{ secrets.GH_PAT }}
         run: |
           VERSION="${{ inputs.version }}"
