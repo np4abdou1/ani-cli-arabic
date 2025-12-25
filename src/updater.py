@@ -357,13 +357,23 @@ def check_pip_update(console):
                 if result.returncode == 0:
                     console.print("[green]✓ Update successful! Restarting application...[/green]\n")
                     import time
-                    time.sleep(2)
+                    time.sleep(1)
                     
-                    # Restart the application
-                    if sys.platform == 'win32':
-                        os.execv(sys.executable, [sys.executable] + sys.argv)
+                    # Restart using the entry point command
+                    # Determine which command was used to launch
+                    script_name = Path(sys.argv[0]).stem if sys.argv else 'ani-cli-arabic'
+                    if 'ani-cli-ar' in str(sys.argv[0]).lower():
+                        cmd = 'ani-cli-ar'
                     else:
-                        os.execv(sys.executable, [sys.executable] + sys.argv)
+                        cmd = 'ani-cli-arabic'
+                    
+                    # Restart via subprocess instead of exec (cleaner)
+                    if sys.platform == 'win32':
+                        subprocess.Popen([cmd], creationflags=subprocess.CREATE_NEW_CONSOLE)
+                    else:
+                        subprocess.Popen([cmd])
+                    
+                    sys.exit(0)
                 else:
                     console.print(f"[red]Update failed: {result.stderr}[/red]\n")
                     console.print("[yellow]Please try manually: pip install --upgrade ani-cli-arabic[/yellow]\n")
