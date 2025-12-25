@@ -17,6 +17,7 @@ from .utils import download_file
 from .history import HistoryManager
 from .settings import SettingsManager
 from .favorites import FavoritesManager
+from .updater import check_for_updates
 
 class AniCliArApp:
     def __init__(self):
@@ -32,6 +33,13 @@ class AniCliArApp:
         atexit.register(self.cleanup)
         
         self.rpc.connect()
+        
+        # Check for updates on startup if enabled in settings
+        if self.settings.get('check_updates'):
+            try:
+                check_for_updates(self.ui.console, auto_update=True)
+            except Exception:
+                pass  # Don't let update check break the app
 
         try:
             self.main_loop()
