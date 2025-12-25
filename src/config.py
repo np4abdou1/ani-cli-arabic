@@ -1,13 +1,15 @@
 import os
 import sys
 
-CURRENT_VERSION = "v1.0-stable"
+from .version import APP_VERSION
+
+CURRENT_VERSION = APP_VERSION
 DISCORD_CLIENT_ID = "1437470271895376063"
 DISCORD_LOGO_URL = "https://i.postimg.cc/DydJfKY3/logo.gif"
-DISCORD_LOGO_TEXT = "ani-cli-arabic v1.0-stable"
+DISCORD_LOGO_TEXT = f"ani-cli-arabic {APP_VERSION}"
 MYANIMELIST_API_BASE = "https://api.jikan.moe/v4/anime/"
 
-DEFAULT_HEADER_ART = """
+DEFAULT_HEADER_ART = f"""
    ▄████████ ███▄▄▄▄    ▄█    ▄▄▄▄███▄▄▄▄      ▄████████
   ███    ███ ███▀▀▀██▄ ███  ▄██▀▀▀███▀▀▀██▄   ███    ███
   ███    ███ ███   ███ ███▌ ███   ███   ███   ███    █▀ 
@@ -16,7 +18,7 @@ DEFAULT_HEADER_ART = """
   ███    ███ ███   ███ ███  ███   ███   ███   ███    █▄ 
   ███    ███ ███   ███ ███  ███   ███   ███   ███    ███
    ███    █▀   ▀█   █▀  █▀    ▀█   ███   █▀    ██████████
-      v1.2-release - Made by @np4abdou1/ani-cli-arabic
+      {APP_VERSION} - Made by @np4abdou1/ani-cli-arabic
 """
 
 def load_user_config():

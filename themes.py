@@ -111,7 +111,12 @@ THEMES = {
     }
 }
 
-CUSTOM_ASCII_ART = """
+try:
+    from src.version import APP_VERSION
+except ImportError:
+    APP_VERSION = "v1.2"
+
+CUSTOM_ASCII_ART = f"""
    ▄████████ ███▄▄▄▄    ▄█    ▄▄▄▄███▄▄▄▄      ▄████████
   ███    ███ ███▀▀▀██▄ ███  ▄██▀▀▀███▀▀▀██▄   ███    ███
   ███    ███ ███   ███ ███▌ ███   ███   ███   ███    █▀ 
@@ -120,5 +125,5 @@ CUSTOM_ASCII_ART = """
   ███    ███ ███   ███ ███  ███   ███   ███   ███    █▄ 
   ███    ███ ███   ███ ███  ███   ███   ███   ███    ███
    ███    █▀   ▀█   █▀  █▀    ▀█   ███   █▀    ██████████
-      v1.0-stable - Made by @np4abdou1/ani-cli-arabic
+      {APP_VERSION} - Made by @np4abdou1/ani-cli-arabic
 """
