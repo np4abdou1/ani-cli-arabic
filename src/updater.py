@@ -62,19 +62,21 @@ def get_download_url(release_data):
     
     system = platform.system().lower()
     assets = release_data['assets']
+    version = release_data.get('tag_name', '')
     
     # determine which asset to download based on OS
-    target_name = None
+    # format: ani-cli-arabic-{os}-{arch}-{version}.{ext}
+    target_pattern = None
     if system == 'windows':
         # prefer non-mpv version for smaller download
-        target_name = 'ani-cli-arabic-win64.exe'
+        target_pattern = f'ani-cli-arabic-windows-x64-{version}.exe'
     elif system == 'linux':
-        target_name = 'ani-cli-arabic-linux-x64'
+        target_pattern = f'ani-cli-arabic-linux-x64-{version}'
     else:
         return None
     
     for asset in assets:
-        if asset['name'] == target_name:
+        if asset['name'] == target_pattern:
             return asset['browser_download_url']
     
     return None

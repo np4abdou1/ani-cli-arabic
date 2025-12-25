@@ -119,21 +119,17 @@ jobs:
           $version = "${{ inputs.version }}"
           
           # Build without MPV
-          pyinstaller --onefile --name "ani-cli-arabic-$version-win64" --console --clean --noconfirm --distpath . --workpath build --specpath build --icon "$currentDir\assets\icon.ico" --version-file "$currentDir\version_info.txt" --add-data "$currentDir\src;src" --add-data "$currentDir\themes.py;." --add-data "$currentDir\database;database" --hidden-import pypresence --hidden-import rich --hidden-import requests --hidden-import cryptography --hidden-import cryptography.fernet main.py
+          pyinstaller --onefile --name "ani-cli-arabic-windows-x64-$version" --console --clean --noconfirm --distpath . --workpath build --specpath build --icon "$currentDir\assets\icon.ico" --version-file "$currentDir\version_info.txt" --add-data "$currentDir\src;src" --add-data "$currentDir\themes.py;." --add-data "$currentDir\database;database" --hidden-import pypresence --hidden-import rich --hidden-import requests --hidden-import cryptography --hidden-import cryptography.fernet main.py
           
           # Build with MPV
-          pyinstaller --onefile --name "ani-cli-arabic-$version-win64-with-mpv" --console --clean --noconfirm --distpath . --workpath build --specpath build --icon "$currentDir\assets\icon.ico" --version-file "$currentDir\version_info.txt" --add-data "$currentDir\src;src" --add-data "$currentDir\themes.py;." --add-data "$currentDir\database;database" --add-binary "$currentDir\mpv_bundle.exe;mpv" --hidden-import pypresence --hidden-import rich --hidden-import requests --hidden-import cryptography --hidden-import cryptography.fernet main.py
-          
-          # Create standard names for updater
-          Copy-Item "ani-cli-arabic-$version-win64.exe" "ani-cli-arabic-win64.exe"
-          Copy-Item "ani-cli-arabic-$version-win64-with-mpv.exe" "ani-cli-arabic-win64-with-mpv.exe"
+          pyinstaller --onefile --name "ani-cli-arabic-windows-x64-$version-with-mpv" --console --clean --noconfirm --distpath . --workpath build --specpath build --icon "$currentDir\assets\icon.ico" --version-file "$currentDir\version_info.txt" --add-data "$currentDir\src;src" --add-data "$currentDir\themes.py;." --add-data "$currentDir\database;database" --add-binary "$currentDir\mpv_bundle.exe;mpv" --hidden-import pypresence --hidden-import rich --hidden-import requests --hidden-import cryptography --hidden-import cryptography.fernet main.py
 
       - name: Upload to release
         env:
           GH_TOKEN: ${{ secrets.GH_PAT }}
         run: |
           $version = "${{ inputs.version }}"
-          gh release upload "$version" "ani-cli-arabic-$version-win64.exe" "ani-cli-arabic-$version-win64-with-mpv.exe" "ani-cli-arabic-win64.exe" "ani-cli-arabic-win64-with-mpv.exe"
+          gh release upload "$version" "ani-cli-arabic-windows-x64-$version.exe" "ani-cli-arabic-windows-x64-$version-with-mpv.exe"
 
   build-linux:
     needs: create-release
@@ -175,19 +171,15 @@ jobs:
           VERSION="${{ inputs.version }}"
           
           # Build without MPV
-          pyinstaller --onefile --name "ani-cli-arabic-$VERSION-linux-x64" --console --clean --noconfirm --distpath . --workpath build --specpath build --add-data "$PWD/src:src" --add-data "$PWD/themes.py:." --add-data "$PWD/database:database" --hidden-import pypresence --hidden-import rich --hidden-import requests --hidden-import cryptography --hidden-import cryptography.fernet main.py
+          pyinstaller --onefile --name "ani-cli-arabic-linux-x64-$VERSION" --console --clean --noconfirm --distpath . --workpath build --specpath build --add-data "$PWD/src:src" --add-data "$PWD/themes.py:." --add-data "$PWD/database:database" --hidden-import pypresence --hidden-import rich --hidden-import requests --hidden-import cryptography --hidden-import cryptography.fernet main.py
           
           # Build with MPV
           MPV_PATH=$(which mpv)
-          pyinstaller --onefile --name "ani-cli-arabic-$VERSION-linux-x64-with-mpv" --console --clean --noconfirm --distpath . --workpath build --specpath build --add-data "$PWD/src:src" --add-data "$PWD/themes.py:." --add-data "$PWD/database:database" --add-binary "${MPV_PATH}:mpv" --hidden-import pypresence --hidden-import rich --hidden-import requests --hidden-import cryptography --hidden-import cryptography.fernet main.py
-          
-          # Create standard names for updater
-          cp "ani-cli-arabic-$VERSION-linux-x64" "ani-cli-arabic-linux-x64"
-          cp "ani-cli-arabic-$VERSION-linux-x64-with-mpv" "ani-cli-arabic-linux-x64-with-mpv"
+          pyinstaller --onefile --name "ani-cli-arabic-linux-x64-$VERSION-with-mpv" --console --clean --noconfirm --distpath . --workpath build --specpath build --add-data "$PWD/src:src" --add-data "$PWD/themes.py:." --add-data "$PWD/database:database" --add-binary "${MPV_PATH}:mpv" --hidden-import pypresence --hidden-import rich --hidden-import requests --hidden-import cryptography --hidden-import cryptography.fernet main.py
 
       - name: Upload to release
         env:
           GH_TOKEN: ${{ secrets.GH_PAT }}
         run: |
           VERSION="${{ inputs.version }}"
-          gh release upload "$VERSION" "ani-cli-arabic-$VERSION-linux-x64" "ani-cli-arabic-$VERSION-linux-x64-with-mpv" "ani-cli-arabic-linux-x64" "ani-cli-arabic-linux-x64-with-mpv"
+          gh release upload "$VERSION" "ani-cli-arabic-linux-x64-$VERSION" "ani-cli-arabic-linux-x64-$VERSION-with-mpv"
