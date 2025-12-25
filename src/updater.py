@@ -11,8 +11,9 @@ from rich.console import Console
 from rich.panel import Panel
 from rich.text import Text
 from rich.progress import Progress, DownloadColumn, BarColumn, TransferSpeedColumn, TimeRemainingColumn
+from rich.prompt import Confirm
 
-from .version import APP_VERSION, API_RELEASES_URL, RELEASES_URL
+from .version import __version__, APP_VERSION, API_RELEASES_URL, RELEASES_URL
 from .utils import is_bundled
 
 
@@ -261,20 +262,114 @@ def apply_update_and_restart(new_file_path, console):
     return True
 
 
-def check_for_updates(console=None):
+def get_installation_type():
     """
-    Check if there's a newer version available and automatically update.
-    Only runs when app is bundled as exe.
-    Returns True if update was applied, False otherwise.
+    Detect installation type: 'pip' or 'executable'
     """
-    if not is_bundled():
-        return False
+    if is_bundled():
+        return 'executable'
     
-    if console is None:
-        console = Console()
-    
+    # Check if installed via pip
     try:
-        # fetch latest release
+        import pkg_resources
+        try:
+            pkg_resources.get_distribution('ani-cli-arabic')
+            return 'pip'
+        except pkg_resources.DistributionNotFound:
+            pass
+    except ImportError:
+        pass
+    
+    # Running from source
+    return 'source'
+
+
+def get_pypi_latest_version():
+    """
+    Fetch the latest version from PyPI
+    Returns version string or None
+    """
+    try:
+        resp = requests.get('https://pypi.org/pypi/ani-cli-arabic/json', timeout=10)
+        if resp.status_code == 200:
+            data = resp.json()
+            return data['info']['version']
+    except Exception:
+        pass
+    return None
+
+
+def check_pip_update(console):
+    """
+    Check PyPI for updates when installed via pip
+    """
+    try:
+        latest_version = get_pypi_latest_version()
+        if not latest_version:
+            return False
+        
+        current = parse_version(__version__)
+        latest = parse_version(latest_version)
+        
+        if latest > current:
+            msg = Text()
+            msg.append("Update Available!\n\n", style="bold yellow")
+            msg.append(f"Current: ", style="dim")
+            msg.append(f"v{__version__}\n", style="cyan")
+            msg.append(f"Latest:  ", style="dim")
+            msg.append(f"v{latest_version}\n\n", style="green bold")
+            msg.append("Update command: ", style="dim")
+            msg.append("pip install --upgrade ani-cli-arabic", style="bold cyan")
+            
+            panel = Panel(
+                msg,
+                title="[bold]PyPI Update[/bold]",
+                border_style="yellow",
+                padding=(1, 2)
+            )
+            console.print()
+            console.print(panel)
+            
+            # Ask if user wants to update now
+            update_now = Confirm.ask("\nWould you like to update now?", default=True, console=console)
+            
+            if update_now:
+                console.print("\n[cyan]Running: pip install --upgrade ani-cli-arabic[/cyan]\n")
+                try:
+                    result = subprocess.run(
+                        [sys.executable, '-m', 'pip', 'install', '--upgrade', 'ani-cli-arabic'],
+                        capture_output=True,
+                        text=True
+                    )
+                    
+                    if result.returncode == 0:
+                        console.print("[green]✓ Update successful! Please restart the application.[/green]\n")
+                        input("Press ENTER to exit...")
+                        sys.exit(0)
+                    else:
+                        console.print(f"[red]Update failed: {result.stderr}[/red]\n")
+                        console.print("[yellow]Please try manually: pip install --upgrade ani-cli-arabic[/yellow]\n")
+                        input("Press ENTER to continue...")
+                except Exception as e:
+                    console.print(f"[red]Update failed: {e}[/red]\n")
+                    console.print("[yellow]Please try manually: pip install --upgrade ani-cli-arabic[/yellow]\n")
+                    input("Press ENTER to continue...")
+            else:
+                console.print()
+                input("Press ENTER to continue...")
+            
+            return True
+    except Exception:
+        pass
+    
+    return False
+
+
+def check_executable_update(console):
+    """
+    Check GitHub releases for executable updates
+    """
+    try:
         release_data = get_latest_release()
         if not release_data:
             return False
@@ -283,49 +378,122 @@ def check_for_updates(console=None):
         if not latest_tag:
             return False
         
-        # compare versions
         current = parse_version(APP_VERSION)
         latest = parse_version(latest_tag)
         
         if latest > current:
-            # new version available - show message
+            system = platform.system().lower()
+            system_name = "Windows" if system == "windows" else "Linux"
+            
             msg = Text()
             msg.append("Update Available!\n\n", style="bold yellow")
             msg.append(f"Current: ", style="dim")
             msg.append(f"{APP_VERSION}\n", style="cyan")
             msg.append(f"Latest:  ", style="dim")
-            msg.append(f"{latest_tag}\n\n", style="green bold")
-            msg.append("Downloading update automatically...", style="yellow")
+            msg.append(f"{latest_tag}\n", style="green bold")
+            msg.append(f"Platform: ", style="dim")
+            msg.append(f"{system_name}\n\n", style="cyan")
+            msg.append("Downloading update...", style="yellow")
             
             panel = Panel(
                 msg,
-                title="[bold]Auto-Update[/bold]",
+                title="[bold]Executable Update[/bold]",
                 border_style="yellow",
                 padding=(1, 2)
             )
             console.print()
             console.print(panel)
-            console.print()
             
-            # get download url
-            download_url = get_download_url(release_data)
-            if not download_url:
-                console.print("[red]Could not find download for your OS[/red]")
+            # Ask if user wants to update
+            update_now = Confirm.ask("\nWould you like to download and install the update?", default=True, console=console)
+            
+            if not update_now:
+                console.print()
+                input("Press ENTER to continue...")
                 return False
             
-            # download the update
+            console.print()
+            
+            # Get download url
+            download_url = get_download_url(release_data)
+            if not download_url:
+                console.print(f"[red]Could not find {system_name} executable in release[/red]\n")
+                input("Press ENTER to continue...")
+                return False
+            
+            # Download the update
             new_file = download_update(download_url, console)
             if not new_file:
+                input("Press ENTER to continue...")
                 return False
             
             console.print("[green]✓ Download complete[/green]")
             console.print()
             
-            # apply update and restart
+            # Apply update and restart
             return apply_update_and_restart(new_file, console)
         
-    except Exception as e:
-        # silently fail on any error - don't interrupt user
+    except Exception:
+        pass
+    
+    return False
+
+
+def check_for_updates(console=None, auto_update=True):
+    """
+    Check for updates based on installation type.
+    - pip: Check PyPI and offer to update via pip
+    - executable: Check GitHub releases and offer to download/install
+    - source: Check GitHub but don't auto-update
+    
+    Args:
+        console: Rich Console instance
+        auto_update: Whether to automatically prompt for update (default True)
+    
+    Returns:
+        True if update was found/applied, False otherwise
+    """
+    if console is None:
+        console = Console()
+    
+    install_type = get_installation_type()
+    
+    try:
+        if install_type == 'pip':
+            return check_pip_update(console)
+        elif install_type == 'executable':
+            return check_executable_update(console)
+        elif install_type == 'source':
+            # Running from source - just check for new releases
+            release_data = get_latest_release()
+            if release_data:
+                latest_tag = release_data.get('tag_name', '')
+                current = parse_version(__version__)
+                latest = parse_version(latest_tag)
+                
+                if latest > current:
+                    msg = Text()
+                    msg.append("Update Available!\n\n", style="bold yellow")
+                    msg.append(f"Current: ", style="dim")
+                    msg.append(f"v{__version__}\n", style="cyan")
+                    msg.append(f"Latest:  ", style="dim")
+                    msg.append(f"{latest_tag}\n\n", style="green bold")
+                    msg.append("Visit: ", style="dim")
+                    msg.append(RELEASES_URL, style="cyan underline")
+                    
+                    panel = Panel(
+                        msg,
+                        title="[bold]Update Available[/bold]",
+                        border_style="yellow",
+                        padding=(1, 2)
+                    )
+                    console.print()
+                    console.print(panel)
+                    console.print()
+                    input("Press ENTER to continue...")
+                    return True
+    except Exception:
+        # Silently fail - don't interrupt user
         pass
     
     return False
