@@ -8,9 +8,9 @@ class FavoritesManager:
         self.favorites = self._load()
 
     def _get_path(self) -> Path:
-        base_dir = Path(__file__).parent.parent
-        db_dir = base_dir / "database"
-        db_dir.mkdir(exist_ok=True)
+        home_dir = Path.home()
+        db_dir = home_dir / ".ani-cli-arabic" / "database"
+        db_dir.mkdir(parents=True, exist_ok=True)
         return db_dir / "favorites.json"
 
     def _load(self) -> dict:

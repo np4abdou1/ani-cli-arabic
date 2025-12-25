@@ -9,10 +9,10 @@ class HistoryManager:
         self.history = self._load_history()
 
     def _get_history_path(self) -> Path:
-        # Save in the database directory
-        base_dir = Path(__file__).parent.parent
-        db_dir = base_dir / "database"
-        db_dir.mkdir(exist_ok=True)
+        # Save in user home directory
+        home_dir = Path.home()
+        db_dir = home_dir / ".ani-cli-arabic" / "database"
+        db_dir.mkdir(parents=True, exist_ok=True)
         return db_dir / "history.json"
 
     def _load_history(self) -> dict:
