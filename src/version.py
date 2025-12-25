@@ -1,5 +1,5 @@
 
-__version__ = "1.3" #GLOBAL VERSION VARIABLE
+__version__ = "1.3.2" #GLOBAL VERSION VARIABLE
 
 APP_VERSION = f"v-{__version__}"
 APP_NAME = "ani-cli-arabic"
