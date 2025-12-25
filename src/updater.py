@@ -264,12 +264,10 @@ def apply_update_and_restart(new_file_path, console):
 
 def get_installation_type():
     """
-    Detect installation type: 'pip' or 'executable'
+    Detect installation type: 'pip', 'executable', or 'source'
+    Priority: Check pip first (before bundled check)
     """
-    if is_bundled():
-        return 'executable'
-    
-    # Check if installed via pip
+    # Check if installed via pip FIRST
     try:
         import pkg_resources
         try:
@@ -279,6 +277,10 @@ def get_installation_type():
             pass
     except ImportError:
         pass
+    
+    # Then check if bundled executable
+    if is_bundled():
+        return 'executable'
     
     # Running from source
     return 'source'
@@ -315,9 +317,9 @@ def check_pip_update(console):
             msg = Text()
             msg.append("Update Available!\n\n", style="bold yellow")
             msg.append(f"Current: ", style="dim")
-            msg.append(f"v{__version__}\n", style="cyan")
+            msg.append(f"{__version__}\n", style="cyan")
             msg.append(f"Latest:  ", style="dim")
-            msg.append(f"v{latest_version}\n\n", style="green bold")
+            msg.append(f"{latest_version}\n\n", style="green bold")
             msg.append("Update command: ", style="dim")
             msg.append("pip install --upgrade ani-cli-arabic", style="bold cyan")
             
@@ -388,9 +390,9 @@ def check_executable_update(console):
             msg = Text()
             msg.append("Update Available!\n\n", style="bold yellow")
             msg.append(f"Current: ", style="dim")
-            msg.append(f"{APP_VERSION}\n", style="cyan")
+            msg.append(f"{__version__}\n", style="cyan")
             msg.append(f"Latest:  ", style="dim")
-            msg.append(f"{latest_tag}\n", style="green bold")
+            msg.append(f"{latest_tag.lstrip('v')}\n", style="green bold")
             msg.append(f"Platform: ", style="dim")
             msg.append(f"{system_name}\n\n", style="cyan")
             msg.append("Downloading update...", style="yellow")
