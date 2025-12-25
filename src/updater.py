@@ -139,35 +139,77 @@ def apply_update_and_restart(new_file_path, console):
             batch_script = os.path.join(tempfile.gettempdir(), 'update_ani_cli.bat')
             with open(batch_script, 'w') as f:
                 f.write('@echo off\n')
+                f.write('title ani-cli-arabic Update\n')
+                f.write('color 0A\n')
                 f.write('echo.\n')
                 f.write('echo ========================================\n')
                 f.write('echo   Applying Update...\n')
                 f.write('echo ========================================\n')
                 f.write('echo.\n')
-                f.write('timeout /t 2 /nobreak >nul\n')
+                f.write('echo Waiting for application to close...\n')
+                f.write('timeout /t 3 /nobreak >nul\n')
+                f.write('echo.\n')
+                
+                # Delete old backup if exists
                 f.write(f'if exist "{backup_path}" (\n')
+                f.write(f'    echo Removing old backup...\n')
                 f.write(f'    del /f /q "{backup_path}" 2>nul\n')
                 f.write(')\n')
+                f.write('echo.\n')
+                
+                # Backup current exe
+                f.write(f'echo Backing up current version...\n')
                 f.write(f'move /y "{current_exe}" "{backup_path}" >nul 2>&1\n')
                 f.write('if errorlevel 1 (\n')
-                f.write('    echo Failed to backup current exe\n')
+                f.write('    echo ERROR: Failed to backup current exe\n')
                 f.write('    pause\n')
                 f.write('    exit /b 1\n')
                 f.write(')\n')
+                f.write('echo Done.\n')
+                f.write('echo.\n')
+                
+                # Move new exe
+                f.write(f'echo Installing new version...\n')
                 f.write(f'move /y "{new_file_path}" "{current_exe}" >nul 2>&1\n')
                 f.write('if errorlevel 1 (\n')
-                f.write('    echo Failed to move new exe\n')
+                f.write('    echo ERROR: Failed to install new exe\n')
+                f.write('    echo Restoring backup...\n')
                 f.write(f'    move /y "{backup_path}" "{current_exe}" >nul 2>&1\n')
                 f.write('    pause\n')
                 f.write('    exit /b 1\n')
                 f.write(')\n')
+                f.write('echo Done.\n')
+                f.write('echo.\n')
+                
+                # Verify the new exe exists
+                f.write(f'if not exist "{current_exe}" (\n')
+                f.write('    echo ERROR: New exe not found after installation!\n')
+                f.write('    pause\n')
+                f.write('    exit /b 1\n')
+                f.write(')\n')
+                
+                # Change to app directory and launch
                 f.write('echo Update successful!\n')
                 f.write('echo Starting application...\n')
                 f.write('echo.\n')
-                f.write(f'cd /d "{current_dir}"\n')
-                f.write(f'start "ani-cli-arabic" /d "{current_dir}" "{current_exe}"\n')
-                f.write('timeout /t 3 /nobreak >nul\n')
+                f.write(f'cd /D "{current_dir}"\n')
+                
+                # Use START with /B to run in background and /D for directory
+                f.write(f'start "" /B /D "{current_dir}" "{current_exe}"\n')
+                f.write('if errorlevel 1 (\n')
+                f.write('    echo ERROR: Failed to start application\n')
+                f.write('    pause\n')
+                f.write('    exit /b 1\n')
+                f.write(')\n')
+                
+                # Wait and cleanup
+                f.write('timeout /t 2 /nobreak >nul\n')
+                f.write('echo.\n')
+                f.write('echo Application started! Cleaning up...\n')
                 f.write(f'if exist "{backup_path}" del /f /q "{backup_path}" 2>nul\n')
+                f.write('echo.\n')
+                f.write('echo Update complete!\n')
+                f.write('timeout /t 2 /nobreak >nul\n')
                 f.write('del /f /q "%~f0" 2>nul\n')
             
             # start the batch script in a new window
