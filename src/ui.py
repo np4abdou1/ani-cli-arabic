@@ -1,5 +1,9 @@
 import time
 import threading
+import importlib
+import os
+import sys
+import subprocess
 from rich.console import Console
 from rich.panel import Panel
 from rich.text import Text
@@ -65,6 +69,7 @@ from .config import (
     COLOR_ERROR, COLOR_LOADING_SPINNER, COLOR_ASCII, HEADER_ART
 )
 from .utils import get_key
+from . import config as config_module
 
 class UIManager:
     def __init__(self):
@@ -93,26 +98,25 @@ class UIManager:
     def render_message(self, title: str, message: str, style_name: str):
         self.clear()
         
-        layout = Layout()
-        layout.split_column(
-            Layout(ratio=1),
-            Layout(name="message", size=None),
-            Layout(ratio=1)
-        )
+        # Create styled message text
+        message_text = Text()
+        for line in message.split('\n'):
+            if line.strip():
+                message_text.append(line + "\n", style="info" if not line.startswith('•') else "secondary")
+            else:
+                message_text.append("\n")
         
         panel = Panel(
-            Text(message, justify="center", style="info"),
+            Align.center(message_text, vertical="middle"),
             title=Text(title, style="title"),
             box=HEAVY,
-            border_style=COLOR_BORDER,
-            style=f"{style_name}",
-            padding=(2, 4)
+            border_style="#FF6B6B" if style_name == "error" else COLOR_BORDER,
+            padding=(2, 4),
+            width=60
         )
         
-        layout["message"].update(Align.center(panel, vertical="middle"))
-        
         self.console.print(Align.center(panel, vertical="middle", height=self.console.height))
-        Prompt.ask(f" {Text('Press ENTER to continue...', style='secondary')} ", console=self.console)
+        Prompt.ask(f" {Text('Press ENTER to continue...', style='dim')} ", console=self.console)
 
     def run_with_loading(self, message: str, target_func, *args):
         self.clear()
@@ -229,14 +233,15 @@ class UIManager:
             container.add_row(Text(selected_anime.title_en, style="title", justify="center"))
             container.add_row(Text(selected_anime.title_jp, style="secondary", justify="center"))
             
-            details_grid = Table.grid(padding=(0, 1), expand=True)
-            details_grid.add_column(ratio=1, no_wrap=True)
-            details_grid.add_column(ratio=2)
+            details_grid = Table.grid(padding=(0, 2), expand=True)
+            details_grid.add_column(min_width=25)
+            details_grid.add_column()
             
-            stats_table = Table.grid(padding=(0, 2))
-            stats_table.add_column(style="secondary")
-            stats_table.add_column(style="info")
-            stats_table.add_row("Score:", Text(f"{selected_anime.score}/10", style="title"))
+            stats_table = Table.grid(padding=(0, 1), expand=False)
+            stats_table.add_column(style="secondary", no_wrap=True, min_width=12)
+            stats_table.add_column(style="info", no_wrap=True)
+            score_text = "Not found." if selected_anime.score == "0" or selected_anime.score == 0 else f"⭐ {selected_anime.score}/10"
+            stats_table.add_row("Score:", Text(score_text, style="#FFA500"))
             stats_table.add_row("Rank:", Text(f"#{selected_anime.rank}", style="title"))
             stats_table.add_row("Popularity:", Text(f"#{selected_anime.popularity}", style="title"))
             stats_table.add_row("Rating:", selected_anime.rating)
@@ -244,7 +249,6 @@ class UIManager:
             stats_table.add_row("Episodes:", selected_anime.episodes)
             stats_table.add_row("Status:", selected_anime.status)
             stats_table.add_row("Aired:", selected_anime.premiered)
-            stats_table.add_row("Studio:", selected_anime.creators)
             stats_table.add_row("Duration:", f"{selected_anime.duration} min/ep")
             
             text_container = Table.grid()
@@ -294,7 +298,7 @@ class UIManager:
                 
                 time.sleep(0.005)
 
-    def episode_selection_menu(self, anime_title, episodes, rpc_manager=None, anime_poster=None, last_watched_ep=None):
+    def episode_selection_menu(self, anime_title, episodes, rpc_manager=None, anime_poster=None, last_watched_ep=None, is_favorite=False, anime_details=None):
         selected = 0
         scroll_offset = 0
         
@@ -337,8 +341,7 @@ class UIManager:
 
         def generate_renderable():
             content_layout["header"].update(Panel(Text(anime_title, justify="center", style="title"), box=HEAVY, border_style=COLOR_BORDER))
-            # Updated Footer with L key
-            content_layout["footer"].update(Panel(Text("↑↓ Navigate | ENTER Select | g Jump | l Last | b Back", justify="center", style="secondary"), box=HEAVY, border_style=COLOR_BORDER))
+            content_layout["footer"].update(Panel(Text("↑↓ Navigate | ENTER Select | g Jump | F Fav | M Batch | b Back", justify="center", style="secondary"), box=HEAVY, border_style=COLOR_BORDER))
             
             max_display = target_height - 3 - 3 - 2
             left_content = Text()
@@ -380,30 +383,61 @@ class UIManager:
                 padding=(0, 1)
             ))
             
-            selected_ep = episodes[selected]
-            right_content = Text(EPISODE_ASCII_ART, style=COLOR_ASCII, justify="center")
-            right_content.append("\n")
-            right_content.append(Text(f"Episode {selected_ep.display_num}\n", style="title", justify="center"))
-
-            if selected_ep.type and str(selected_ep.type).strip().lower() != "episode":
-                right_content.append(f"Type: {selected_ep.type}\n", style="info")
+            # Show anime details in right panel
+            fav_icon = "★" if is_favorite else "☆"
             
-            if last_watched_ep is not None and str(selected_ep.display_num) == str(last_watched_ep):
-                right_content.append(Text("\n[Last Watched]\n", style="bold green", justify="center"))
+            if anime_details:
+                details_container = Table.grid()
+                details_container.add_column()
+                
+                # Stats table
+                stats_table = Table.grid(padding=(0, 1))
+                stats_table.add_column(style="secondary", no_wrap=True, min_width=10)
+                stats_table.add_column(style="info", no_wrap=True)
+                
+                score_text = "Not found." if anime_details.get('score') in ["0", 0, None] else f"⭐ {anime_details.get('score', 'N/A')}/10"
+                stats_table.add_row("Score:", Text(score_text, style="#FFA500"))
+                stats_table.add_row("Rank:", Text(f"#{anime_details.get('rank', 'N/A')}", style="title"))
+                stats_table.add_row("Type:", anime_details.get('type', 'N/A'))
+                stats_table.add_row("Episodes:", str(anime_details.get('episodes', 'N/A')))
+                stats_table.add_row("Status:", anime_details.get('status', 'N/A'))
+                if last_watched_ep:
+                    stats_table.add_row("Last Watched:", Text(f"Episode {last_watched_ep}", style="bold green"))
+                stats_table.add_row("Favorite:", Text(fav_icon + (" Yes" if is_favorite else " No"), style="title"))
+                
+                details_container.add_row(stats_table)
+                details_container.add_row(Text(""))
+                details_container.add_row(Text("Genres", style="title", justify="center"))
+                details_container.add_row(Text(anime_details.get('genres', 'N/A'), style="secondary", justify="center"))
+                
+                content_layout["right"].update(Panel(
+                    Align.center(details_container, vertical="middle"),
+                    title=Text(f"{fav_icon} Info", style="title"),
+                    box=HEAVY,
+                    border_style=COLOR_BORDER
+                ))
+            else:
+                # Fallback if no anime_details
+                selected_ep = episodes[selected]
+                right_content = Text(f"Episode {selected_ep.display_num}\n", style="title", justify="center")
+                right_content.append("\n")
 
-            right_content.append("\n")
-            right_content.append(Text.from_markup("Press [highlight]ENTER[/highlight] to select.", justify="center"))
-            right_content.append("\n")
-            right_content.append(Text.from_markup("Press [highlight]G[/highlight] to jump.", justify="center"))
-            right_content.append("\n")
-            right_content.append(Text.from_markup("Press [highlight]L[/highlight] to go to last watched.", justify="center"))
-            
-            content_layout["right"].update(Panel(
-                Align.center(right_content, vertical="middle"),
-                title=Text("<3", style="title"),
-                box=HEAVY,
-                border_style=COLOR_BORDER
-            ))
+                if selected_ep.type and str(selected_ep.type).strip().lower() != "episode":
+                    right_content.append(f"Type: {selected_ep.type}\n", style="info", justify="center")
+                
+                if last_watched_ep is not None and str(selected_ep.display_num) == str(last_watched_ep):
+                    right_content.append(Text("\n[Last Watched]\n", style="bold green", justify="center"))
+                
+                right_content.append("\n")
+                right_content.append(Text(f"{fav_icon}\n", style="title", justify="center"))
+                right_content.append(Text("Favorite: " + ("Yes" if is_favorite else "No"), style="secondary", justify="center"))
+                
+                content_layout["right"].update(Panel(
+                    Align.center(right_content, vertical="middle"),
+                    title=Text(f"{fav_icon} Info", style="title"),
+                    box=HEAVY,
+                    border_style=COLOR_BORDER
+                ))
             return layout
 
         self.clear()
@@ -425,6 +459,10 @@ class UIManager:
                     live.update(generate_renderable(), refresh=True)
                 elif key == 'ENTER':
                     return selected
+                elif key == 'f' or key == 'F':
+                    return 'toggle_fav'
+                elif key == 'm' or key == 'M':
+                    return 'batch_mode'
                 elif key == 'g':
                     live.stop()
                     try:
@@ -467,31 +505,297 @@ class UIManager:
                     live.start()
                     live.update(generate_renderable(), refresh=True)
                 
-                # --- NEW LOGIC FOR L KEY ---
-                elif key == 'l':
-                    if last_watched_ep is not None:
-                        target_idx = -1
-                        for idx, ep in enumerate(episodes):
-                            if str(ep.display_num) == str(last_watched_ep):
-                                target_idx = idx
-                                break
-                        
-                        if target_idx != -1:
-                            selected = target_idx
-                            scroll_offset = max(0, selected - (max_display // 2))
-                            live.update(generate_renderable(), refresh=True)
-                        else:
-                            # If episode not found in list despite being in history
-                            pass
-                    else:
-                        # Optional: flash a message that no history exists
-                        pass
-                # ---------------------------
-                
                 elif key == 'b':
                     return None
                 elif key == 'q' or key == 'ESC':
                     return -1
+                
+                time.sleep(0.005)
+
+    def batch_selection_menu(self, episodes):
+        selected = 0
+        scroll_offset = 0
+        marked = set()
+        
+        def generate_renderable():
+            content = Text()
+            max_display = self.console.height - 10
+            visible_episodes = episodes[scroll_offset:scroll_offset + max_display]
+            
+            for idx, ep in enumerate(visible_episodes):
+                real_idx = idx + scroll_offset
+                is_selected = real_idx == selected
+                is_marked = real_idx in marked
+                
+                prefix = "▶" if is_selected else " "
+                mark = "[x]" if is_marked else "[ ]"
+                style = "highlight" if is_selected else "info"
+                if is_marked and not is_selected:
+                    style = "secondary"
+                
+                content.append(f"{prefix} {mark} Episode {ep.display_num}\n", style=style)
+            
+            return Panel(
+                Align.center(content, vertical="middle"),
+                title=Text(f"Batch Download ({len(marked)} selected)", style="title"),
+                box=HEAVY,
+                border_style=COLOR_BORDER,
+                subtitle=Text("SPACE Toggle | A All | N None | ENTER Download | B Back", style="secondary")
+            )
+
+        self.clear()
+        
+        with Live(Align.center(generate_renderable(), vertical="middle", height=self.console.height), console=self.console, auto_refresh=False, screen=True, refresh_per_second=10) as live:
+            while True:
+                key = get_key()
+                max_display = self.console.height - 10
+                
+                if key == 'UP' and selected > 0:
+                    selected -= 1
+                    if selected < scroll_offset:
+                        scroll_offset = selected
+                    live.update(Align.center(generate_renderable(), vertical="middle", height=self.console.height), refresh=True)
+                elif key == 'DOWN' and selected < len(episodes) - 1:
+                    selected += 1
+                    if selected >= scroll_offset + max_display:
+                        scroll_offset = selected - max_display + 1
+                    live.update(Align.center(generate_renderable(), vertical="middle", height=self.console.height), refresh=True)
+                elif key == ' ':
+                    if selected in marked:
+                        marked.remove(selected)
+                    else:
+                        marked.add(selected)
+                    live.update(Align.center(generate_renderable(), vertical="middle", height=self.console.height), refresh=True)
+                elif key == 'a' or key == 'A':
+                    marked = set(range(len(episodes)))
+                    live.update(Align.center(generate_renderable(), vertical="middle", height=self.console.height), refresh=True)
+                elif key == 'n' or key == 'N':
+                    marked.clear()
+                    live.update(Align.center(generate_renderable(), vertical="middle", height=self.console.height), refresh=True)
+                elif key == 'ENTER':
+                    return sorted(list(marked))
+                elif key == 'b' or key == 'ESC':
+                    return None
+                
+                time.sleep(0.005)
+
+    def history_menu(self, history_items):
+        selected = 0
+        scroll_offset = 0
+        
+        def generate_renderable():
+            table = Table(box=None, show_header=False, padding=(0, 1), expand=True)
+            table.add_column("Title", style="info")
+            table.add_column("Last Ep", style="secondary", justify="right", width=15)
+            table.add_column("Date", style="secondary", justify="right", width=20)
+            
+            max_display = self.console.height - 10
+            visible_items = history_items[scroll_offset:scroll_offset + max_display]
+            
+            for idx, item in enumerate(visible_items):
+                real_idx = idx + scroll_offset
+                is_selected = real_idx == selected
+                
+                title = item['title'][:50] + "..." if len(item['title']) > 50 else item['title']
+                date_str = item.get('last_updated', '').split('T')[0]
+                
+                if is_selected:
+                    table.add_row(
+                        Text(f"▶ {title}", style="highlight"),
+                        Text(f"Ep {item.get('episode', '?')}", style="highlight"),
+                        Text(date_str, style="highlight")
+                    )
+                else:
+                    table.add_row(
+                        f"  {title}",
+                        f"Ep {item.get('episode', '?')}",
+                        date_str
+                    )
+            
+            return Panel(
+                table,
+                title=Text(f"Continue Watching ({len(history_items)})", style="title"),
+                box=HEAVY,
+                border_style=COLOR_BORDER,
+                subtitle=Text("ENTER Resume | B Back", style="secondary")
+            )
+
+        self.clear()
+        
+        with Live(Align.center(generate_renderable(), vertical="middle", height=self.console.height), console=self.console, auto_refresh=False, screen=True, refresh_per_second=10) as live:
+            while True:
+                key = get_key()
+                max_display = self.console.height - 10
+                
+                if key == 'UP' and selected > 0:
+                    selected -= 1
+                    if selected < scroll_offset:
+                        scroll_offset = selected
+                    live.update(Align.center(generate_renderable(), vertical="middle", height=self.console.height), refresh=True)
+                elif key == 'DOWN' and selected < len(history_items) - 1:
+                    selected += 1
+                    if selected >= scroll_offset + max_display:
+                        scroll_offset = selected - max_display + 1
+                    live.update(Align.center(generate_renderable(), vertical="middle", height=self.console.height), refresh=True)
+                elif key == 'ENTER':
+                    return selected
+                elif key == 'b' or key == 'ESC':
+                    return None
+                
+                time.sleep(0.005)
+
+    def favorites_menu(self, fav_items):
+        selected = 0
+        scroll_offset = 0
+        
+        def generate_renderable():
+            table = Table(box=None, show_header=False, padding=(0, 1), expand=True)
+            table.add_column("Title", style="info")
+            table.add_column("Added", style="secondary", justify="right", width=20)
+            
+            max_display = self.console.height - 10
+            visible_items = fav_items[scroll_offset:scroll_offset + max_display]
+            
+            for idx, item in enumerate(visible_items):
+                real_idx = idx + scroll_offset
+                is_selected = real_idx == selected
+                
+                title = item['title'][:60] + "..." if len(item['title']) > 60 else item['title']
+                date_str = item.get('added_at', '').split('T')[0]
+                
+                if is_selected:
+                    table.add_row(
+                        Text(f"▶ {title}", style="highlight"),
+                        Text(date_str, style="highlight")
+                    )
+                else:
+                    table.add_row(
+                        f"  {title}",
+                        date_str
+                    )
+            
+            return Panel(
+                table,
+                title=Text(f"Favorites ({len(fav_items)})", style="title"),
+                box=HEAVY,
+                border_style=COLOR_BORDER,
+                subtitle=Text("ENTER Watch | R Remove | B Back", style="secondary")
+            )
+
+        self.clear()
+        
+        with Live(Align.center(generate_renderable(), vertical="middle", height=self.console.height), console=self.console, auto_refresh=False, screen=True, refresh_per_second=10) as live:
+            while True:
+                key = get_key()
+                max_display = self.console.height - 10
+                
+                if key == 'UP' and selected > 0:
+                    selected -= 1
+                    if selected < scroll_offset:
+                        scroll_offset = selected
+                    live.update(Align.center(generate_renderable(), vertical="middle", height=self.console.height), refresh=True)
+                elif key == 'DOWN' and selected < len(fav_items) - 1:
+                    selected += 1
+                    if selected >= scroll_offset + max_display:
+                        scroll_offset = selected - max_display + 1
+                    live.update(Align.center(generate_renderable(), vertical="middle", height=self.console.height), refresh=True)
+                elif key == 'ENTER':
+                    return (selected, 'watch')
+                elif key == 'r' or key == 'R':
+                    return (selected, 'remove')
+                elif key == 'b' or key == 'ESC':
+                    return None
+                
+                time.sleep(0.005)
+
+    def settings_menu(self, settings_mgr):
+        options = [
+            ("Default Quality", ["1080p", "720p", "480p"], "default_quality"),
+            ("Player", ["mpv", "vlc"], "player"),
+            ("Auto Next Episode", [True, False], "auto_next"),
+            ("Check Updates", [True, False], "check_updates"),
+            ("Theme", ["blue", "red", "green", "purple", "cyan", "yellow", "pink", "orange", "teal", "magenta", "lime", "coral", "lavender", "gold", "mint", "rose"], "theme")
+        ]
+        selected = 0
+        theme_changed = False  # Track if theme was changed
+        
+        def generate_renderable():
+            content = Text()
+            
+            for idx, (label, choices, key) in enumerate(options):
+                current_val = settings_mgr.get(key)
+                is_selected = idx == selected
+                
+                prefix = "▶" if is_selected else " "
+                style = "highlight" if is_selected else "info"
+                
+                val_str = str(current_val)
+                if isinstance(current_val, bool):
+                    val_str = "Enabled" if current_val else "Disabled"
+                
+                content.append(f"{prefix} {label}: {val_str}\n", style=style)
+            
+            return Panel(
+                Align.center(content, vertical="middle"),
+                title=Text("Settings", style="title"),
+                box=HEAVY,
+                padding=(2, 4),
+                border_style=config_module.COLOR_BORDER,
+                subtitle=Text("ENTER Toggle | B Back", style="secondary")
+            )
+
+        self.clear()
+        
+        with Live(Align.center(generate_renderable(), vertical="middle", height=self.console.height), console=self.console, auto_refresh=False, screen=True, refresh_per_second=10) as live:
+            while True:
+                key = get_key()
+                
+                if key == 'UP' and selected > 0:
+                    selected -= 1
+                    live.update(Align.center(generate_renderable(), vertical="middle", height=self.console.height), refresh=True)
+                elif key == 'DOWN' and selected < len(options) - 1:
+                    selected += 1
+                    live.update(Align.center(generate_renderable(), vertical="middle", height=self.console.height), refresh=True)
+                elif key == 'ENTER':
+                    label, choices, key_name = options[selected]
+                    current_val = settings_mgr.get(key_name)
+                    
+                    # Cycle through choices
+                    try:
+                        curr_idx = choices.index(current_val)
+                        new_val = choices[(curr_idx + 1) % len(choices)]
+                    except ValueError:
+                        new_val = choices[0]
+                        
+                    settings_mgr.set(key_name, new_val)
+                    
+                    # Reload colors if theme changed and apply immediately
+                    if key_name == "theme":
+                        theme_changed = True  # Mark that theme was changed
+                        importlib.reload(config_module)
+                        self.theme = Theme({
+                            "panel.border": config_module.COLOR_BORDER,
+                            "prompt.prompt": config_module.COLOR_PROMPT,
+                            "prompt.default": config_module.COLOR_PRIMARY_TEXT,
+                            "title": config_module.COLOR_TITLE,
+                            "secondary": config_module.COLOR_SECONDARY_TEXT,
+                            "highlight": f"{config_module.COLOR_HIGHLIGHT_FG} on {config_module.COLOR_HIGHLIGHT_BG}",
+                            "error": config_module.COLOR_ERROR,
+                            "info": config_module.COLOR_PRIMARY_TEXT,
+                            "loading": config_module.COLOR_LOADING_SPINNER,
+                        })
+                        self.console = Console(theme=self.theme)
+                    
+                    live.update(Align.center(generate_renderable(), vertical="middle", height=self.console.height), refresh=True)
+                elif key == 'b' or key == 'ESC':
+                    # If theme was changed, exit app to apply globally
+                    if theme_changed:
+                        self.console.clear()
+                        self.console.print("\n[bold cyan]Theme changed! Exiting application...[/bold cyan]")
+                        self.console.print("[dim]Please run the application again to apply the new theme.[/dim]\n")
+                        time.sleep(2)
+                        sys.exit(0)
+                    return
                 
                 time.sleep(0.005)
 
@@ -513,7 +817,7 @@ class UIManager:
                     content.append(f"  {quality.name}\n", style=quality.style)
             
             return Panel(
-                Align.center(content, vertical="middle"),
+                content,
                 title=Text(f"Episode {episode_num} - Select Quality", style="title"), 
                 box=HEAVY,
                 padding=(2, 4),

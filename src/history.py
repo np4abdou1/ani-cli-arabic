@@ -46,3 +46,17 @@ class HistoryManager:
         if data:
             return data.get('episode')
         return None
+    
+    def get_history(self):
+        """Returns all history as a list sorted by last_updated."""
+        items = []
+        for anime_id, data in self.history.items():
+            items.append({
+                'anime_id': anime_id,
+                'title': data.get('title', 'Unknown'),
+                'episode': data.get('episode', '?'),
+                'last_updated': data.get('last_updated', '')
+            })
+        # Sort by last_updated, most recent first
+        items.sort(key=lambda x: x['last_updated'], reverse=True)
+        return items

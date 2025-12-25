@@ -1,4 +1,4 @@
-CURRENT_THEME = "blue"
+CURRENT_THEME = "red"
 
 THEMES = {
     "red": {
@@ -96,6 +96,102 @@ THEMES = {
         "secondary_text": "#888888",
         "error": "#FF0000",
         "ascii": "#FF8C00"
+    },
+    "teal": {
+        "border": "#20B2AA",
+        "title": "#20B2AA",
+        "prompt": "#20B2AA",
+        "loading_spinner": "#20B2AA",
+        "highlight_fg": "#000000",
+        "highlight_bg": "#20B2AA",
+        "primary_text": "#FFFFFF",
+        "secondary_text": "#888888",
+        "error": "#FF0000",
+        "ascii": "#20B2AA"
+    },
+    "magenta": {
+        "border": "#FF00FF",
+        "title": "#FF00FF",
+        "prompt": "#FF00FF",
+        "loading_spinner": "#FF00FF",
+        "highlight_fg": "#000000",
+        "highlight_bg": "#FF00FF",
+        "primary_text": "#FFFFFF",
+        "secondary_text": "#888888",
+        "error": "#FF0000",
+        "ascii": "#FF00FF"
+    },
+    "lime": {
+        "border": "#00FF00",
+        "title": "#00FF00",
+        "prompt": "#00FF00",
+        "loading_spinner": "#00FF00",
+        "highlight_fg": "#000000",
+        "highlight_bg": "#00FF00",
+        "primary_text": "#FFFFFF",
+        "secondary_text": "#888888",
+        "error": "#FF0000",
+        "ascii": "#00FF00"
+    },
+    "coral": {
+        "border": "#FF7F50",
+        "title": "#FF7F50",
+        "prompt": "#FF7F50",
+        "loading_spinner": "#FF7F50",
+        "highlight_fg": "#000000",
+        "highlight_bg": "#FF7F50",
+        "primary_text": "#FFFFFF",
+        "secondary_text": "#888888",
+        "error": "#FF0000",
+        "ascii": "#FF7F50"
+    },
+    "lavender": {
+        "border": "#E6E6FA",
+        "title": "#E6E6FA",
+        "prompt": "#E6E6FA",
+        "loading_spinner": "#E6E6FA",
+        "highlight_fg": "#000000",
+        "highlight_bg": "#E6E6FA",
+        "primary_text": "#FFFFFF",
+        "secondary_text": "#888888",
+        "error": "#FF0000",
+        "ascii": "#E6E6FA"
+    },
+    "gold": {
+        "border": "#FFD700",
+        "title": "#FFD700",
+        "prompt": "#FFD700",
+        "loading_spinner": "#FFD700",
+        "highlight_fg": "#000000",
+        "highlight_bg": "#FFD700",
+        "primary_text": "#FFFFFF",
+        "secondary_text": "#888888",
+        "error": "#FF0000",
+        "ascii": "#FFD700"
+    },
+    "mint": {
+        "border": "#98FF98",
+        "title": "#98FF98",
+        "prompt": "#98FF98",
+        "loading_spinner": "#98FF98",
+        "highlight_fg": "#000000",
+        "highlight_bg": "#98FF98",
+        "primary_text": "#FFFFFF",
+        "secondary_text": "#888888",
+        "error": "#FF0000",
+        "ascii": "#98FF98"
+    },
+    "rose": {
+        "border": "#FF007F",
+        "title": "#FF007F",
+        "prompt": "#FF007F",
+        "loading_spinner": "#FF007F",
+        "highlight_fg": "#000000",
+        "highlight_bg": "#FF007F",
+        "primary_text": "#FFFFFF",
+        "secondary_text": "#888888",
+        "error": "#FF0000",
+        "ascii": "#FF007F"
     },
     "custom": {
         "border": "#8BD218",
