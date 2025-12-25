@@ -185,15 +185,31 @@ class _CredentialManager:
         self._ensure_db_exists()
     
     def _get_db_path(self) -> Path:
-        base_dir = Path(__file__).parent.parent
-        return base_dir / "database" / ".credentials.db"
+        # Use user home directory instead of package location
+        home_dir = Path.home()
+        db_dir = home_dir / ".ani-cli-arabic" / "database"
+        db_dir.mkdir(parents=True, exist_ok=True)
+        return db_dir / ".credentials.db"
     
     def _ensure_db_exists(self):
         if not self.db_path.exists():
-            raise FileNotFoundError(
-                f"Required credentials database not found at: {self.db_path}. "
-                "Please reinstall the application or restore the database file."
-            )
+            # Create empty database with proper structure
+            try:
+                import sqlite3
+                conn = sqlite3.connect(str(self.db_path))
+                cursor = conn.cursor()
+                cursor.execute('''
+                    CREATE TABLE IF NOT EXISTS credentials (
+                        id INTEGER PRIMARY KEY,
+                        data BLOB NOT NULL
+                    )
+                ''')
+                conn.commit()
+                conn.close()
+            except Exception as e:
+                raise FileNotFoundError(
+                    f"Could not create credentials database at: {self.db_path}. Error: {e}"
+                )
     
     def _verify_db_access(self, conn):
         cursor = conn.cursor()

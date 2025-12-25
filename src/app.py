@@ -1,5 +1,6 @@
 import sys
 import atexit
+from pathlib import Path
 from rich.align import Align
 from rich.panel import Panel
 from rich.text import Text
@@ -460,10 +461,10 @@ class AniCliArApp:
 def main():
     """Main entry point for the ani-cli-arabic package"""
     import os
-    # Ensure database directory exists
-    base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    db_dir = os.path.join(base_dir, "database")
-    os.makedirs(db_dir, exist_ok=True)
+    # Ensure database directory exists in user home, not package location
+    home_dir = Path.home()
+    db_dir = home_dir / ".ani-cli-arabic" / "database"
+    db_dir.mkdir(parents=True, exist_ok=True)
     
     app = AniCliArApp()
     app.run()
