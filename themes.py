@@ -114,7 +114,7 @@ THEMES = {
 try:
     from src.version import APP_VERSION
 except ImportError:
-    APP_VERSION = "v1.2"
+    APP_VERSION = "v-UNKNOWN"
 
 CUSTOM_ASCII_ART = f"""
    ▄████████ ███▄▄▄▄    ▄█    ▄▄▄▄███▄▄▄▄      ▄████████
