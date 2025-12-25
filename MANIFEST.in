@@ -10,6 +10,7 @@ include src/version.py
 
 # Include database directory structure
 recursive-include database *.json
+recursive-include database *.db
 
 # Exclude unnecessary files
 exclude build.bat
