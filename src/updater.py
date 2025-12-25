@@ -340,7 +340,7 @@ def check_pip_update(console):
             console.print("[cyan]Running: pip install --upgrade ani-cli-arabic[/cyan]\n")
             try:
                 result = subprocess.run(
-                    [sys.executable, '-m', 'pip', 'install', '--upgrade', 'ani-cli-arabic'],
+                    [sys.executable, '-m', 'pip', 'install', '--upgrade', 'ani-cli-arabic', '--yes'],
                     capture_output=True,
                     text=True
                 )
