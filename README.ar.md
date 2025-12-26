@@ -29,7 +29,7 @@
 
 <p align="center">
   <img src="https://img.shields.io/badge/Python-3.8+-3776AB?style=for-the-badge&logo=python&logoColor=white" />
-  <img src="https://img.shields.io/badge/License-MIT-green?style=for-the-badge" />
+  <img src="https://img.shields.io/badge/License-Custom-orange?style=for-the-badge" />
 </p>
 
 https://github.com/user-attachments/assets/22eb92a1-b57e-4126-9869-b0988cab63a6
@@ -138,6 +138,30 @@ python3 main.py
 
 ## الرخصة
 
-MIT
+رخصة خاصة مخصصة - راجع [LICENSE](LICENSE) للتفاصيل.
+
+---
+
+<div align="center">
+
+### ⚠️ تنبيه مهم
+
+</div>
+
+<div dir="rtl" align="right">
+
+> **ملخّص الترخيص:**  
+> مسموح استخدام المشروع وتعديل الكود **للاستخدام الشخصي فقط** (غير تجاري).  
+> يمكنك تعديل الواجهة/الثيمات وإضافة ميزات في الطرفية.
+> 
+> **ممنوع تماماً:**  
+> أي محاولة لاستخراج أو مشاركة مفاتيح/أسرار الوصول، أو الهندسة العكسية، أو إنشاء سكربتات/بوتات، أو أي إساءة استخدام للـ API.
+> 
+> **ملاحظة مهمة:**  
+> الـ API خاص ومغلق المصدر، وأي إساءة استخدام قد تؤدي إلى إيقاف الوصول.
+
+للحصول على إذن استخدام تجاري أو استفسارات الترخيص، تواصل مع مالك المشروع.
+
+</div>
 
 </div>

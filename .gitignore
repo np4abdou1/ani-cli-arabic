@@ -67,3 +67,6 @@ tmp/
 
 # Worker (contains secrets and build artifacts)
 worker/
+
+# Local dashboard
+dashboard/
