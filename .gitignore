@@ -64,3 +64,6 @@ config.json.bak
 temp/
 tmp/
 *.tmp
+
+# Worker (contains secrets and build artifacts)
+worker/
