@@ -17,7 +17,7 @@ from .utils import download_file
 from .history import HistoryManager
 from .settings import SettingsManager
 from .favorites import FavoritesManager
-from .updater import check_for_updates
+from .updater import check_for_updates, get_version_status
 
 class AniCliArApp:
     def __init__(self):
@@ -34,12 +34,11 @@ class AniCliArApp:
         
         self.rpc.connect()
         
-        # Check for updates on startup if enabled in settings
         if self.settings.get('check_updates'):
             try:
                 check_for_updates(self.ui.console, auto_update=True)
             except Exception:
-                pass  # Don't let update check break the app
+                pass
 
         try:
             self.main_loop()
@@ -80,6 +79,15 @@ class AniCliArApp:
             prompt_string = f" {Text('›', style=COLOR_PROMPT)} "
             pad_width = (self.ui.console.width - 30) // 2
             padding = " " * max(0, pad_width)
+            
+            try:
+                version_info = get_version_status()
+                if version_info and version_info.get('is_outdated'):
+                    status_text = f"Dev: v{version_info['current']} → Latest: v{version_info['latest_pip']} (update available)"
+                    self.ui.print(Align.center(Text(status_text, style="dim")))
+                    self.ui.print()
+            except Exception:
+                pass
 
             query = Prompt.ask(f"{padding}{prompt_string}", console=self.ui.console).strip()
             

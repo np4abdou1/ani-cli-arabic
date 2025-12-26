@@ -263,38 +263,26 @@ def apply_update_and_restart(new_file_path, console):
 
 
 def get_installation_type():
-    """
-    Detect installation type: 'pip', 'executable', or 'source'
-    """
-    # Check if bundled executable (PyInstaller sets sys.frozen)
     if getattr(sys, 'frozen', False):
         return 'executable'
     
-    # Check if running from site-packages (pip installed)
     try:
         file_path = Path(__file__).resolve()
-        # If this file is in site-packages, it's a pip install
-        if 'site-packages' in str(file_path) or 'dist-packages' in str(file_path):
-            return 'pip'
+        if file_path.parent.name == 'src':
+            project_root = file_path.parent.parent
+            if (project_root / 'main.py').exists():
+                return 'source'
     except Exception:
         pass
     
-    # Double-check with package metadata
     try:
-        # Method 1: Try importlib.metadata (Python 3.8+)
-        try:
-            from importlib.metadata import distribution
-            distribution('ani-cli-arabic')
-            return 'pip'
-        except ImportError:
-            # Method 2: Fallback to pkg_resources
-            import pkg_resources
-            pkg_resources.get_distribution('ani-cli-arabic')
+        file_path = Path(__file__).resolve()
+        path_str = str(file_path)
+        if 'site-packages' in path_str or 'dist-packages' in path_str:
             return 'pip'
     except Exception:
         pass
     
-    # Running from source (development)
     return 'source'
 
 
@@ -456,20 +444,39 @@ def check_executable_update(console):
     return False
 
 
+def get_version_status():
+    install_type = get_installation_type()
+    if install_type != 'source':
+        return None
+    
+    try:
+        release_data = get_latest_release()
+        pypi_version = get_pypi_latest_version()
+        
+        if release_data or pypi_version:
+            latest_exe_tag = release_data.get('tag_name', 'N/A') if release_data else 'N/A'
+            latest_pip_version = pypi_version or 'N/A'
+            
+            current = parse_version(__version__)
+            latest_exe = parse_version(latest_exe_tag) if latest_exe_tag != 'N/A' else (0, 0, 0)
+            latest_pip = parse_version(latest_pip_version) if latest_pip_version != 'N/A' else (0, 0, 0)
+            
+            is_outdated = (latest_exe > current) or (latest_pip > current)
+            
+            return {
+                'current': __version__,
+                'latest_exe': latest_exe_tag.lstrip('v') if latest_exe_tag != 'N/A' else 'N/A',
+                'latest_pip': latest_pip_version if latest_pip_version != 'N/A' else 'N/A',
+                'is_outdated': is_outdated
+            }
+    except Exception:
+        pass
+    
+    return None
+
+
 def check_for_updates(console=None, auto_update=True):
-    """
-    Check for updates based on installation type.
-    - pip: Check PyPI and offer to update via pip
-    - executable: Check GitHub releases and offer to download/install
-    - source: Check GitHub but don't auto-update
-    
-    Args:
-        console: Rich Console instance
-        auto_update: Whether to automatically prompt for update (default True)
-    
-    Returns:
-        True if update was found/applied, False otherwise
-    """
+    """Check for updates based on installation type."""
     if console is None:
         console = Console()
     
@@ -481,37 +488,8 @@ def check_for_updates(console=None, auto_update=True):
         elif install_type == 'executable':
             return check_executable_update(console)
         elif install_type == 'source':
-            # Running from source - just check for new releases
-            release_data = get_latest_release()
-            if release_data:
-                latest_tag = release_data.get('tag_name', '')
-                current = parse_version(__version__)
-                latest = parse_version(latest_tag)
-                
-                if latest > current:
-                    msg = Text()
-                    msg.append("Update Available\n\n", style="bold cyan")
-                    msg.append(f"Current: ", style="dim")
-                    msg.append(f"{__version__}", style="white")
-                    msg.append(f"  →  ", style="dim")
-                    msg.append(f"Latest: ", style="dim")
-                    msg.append(f"{latest_tag.lstrip('v')}\n\n", style="bold green")
-                    msg.append("Visit: ", style="dim")
-                    msg.append(RELEASES_URL, style="cyan underline")
-                    
-                    panel = Panel(
-                        msg,
-                        title="[bold white]Update Available[/bold white]",
-                        border_style="cyan",
-                        padding=(0, 2)
-                    )
-                    console.print()
-                    console.print(panel)
-                    console.print()
-                    input("Press ENTER to continue...")
-                    return True
+            pass
     except Exception:
-        # Silently fail - don't interrupt user
         pass
     
     return False
