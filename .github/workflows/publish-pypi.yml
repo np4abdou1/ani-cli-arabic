@@ -79,17 +79,23 @@ jobs:
           skip-existing: true
           verbose: true
       
-      - name: Create GitHub Release Asset Comment
+      - name: Update Release Description
         if: github.event_name == 'release'
         uses: actions/github-script@v7
         with:
           script: |
             const version = '${{ steps.get_version.outputs.VERSION }}';
-            const body = `📦 **Package published to PyPI!**\n\nInstall with:\n\`\`\`bash\npip install ani-cli-arabic==${version}\n\`\`\`\n\nor upgrade:\n\`\`\`bash\npip install --upgrade ani-cli-arabic\n\`\`\``;
+            const pypiInfo = `\n\n---\n\n📦 **Package published to PyPI!**\n\nInstall with:\n\`\`\`bash\npip install ani-cli-arabic==${version}\n\`\`\`\n\nor upgrade:\n\`\`\`bash\npip install --upgrade ani-cli-arabic\n\`\`\``;
             
-            github.rest.issues.createComment({
+            const release = await github.rest.repos.getRelease({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              issue_number: context.payload.release.id,
-              body: body
+              release_id: context.payload.release.id
+            });
+            
+            await github.rest.repos.updateRelease({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              release_id: context.payload.release.id,
+              body: release.data.body + pypiInfo
             });
