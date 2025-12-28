@@ -55,7 +55,6 @@ bin/
 *.dmg
 
 
-
 # User config backups
 user_config_backup.py
 config.json.bak
@@ -67,6 +66,6 @@ tmp/
 
 # Worker (contains secrets and build artifacts)
 worker/
-
+site/
 # Local dashboard
 dashboard/
