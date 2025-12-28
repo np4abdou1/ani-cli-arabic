@@ -55,7 +55,9 @@ class DiscordRPCManager:
                         self.connected = False
                 except Exception:
                     pass
-    
+                
+# for some reason buttons didnt work i will fix it later ..
+
     def _update_presence(self):
         if not self.connected or not self.rpc:
             return
@@ -63,83 +65,112 @@ class DiscordRPCManager:
         try:
             if self.current_state == "Watching":
                 self.rpc.update(
-                    activity_type=ActivityType.WATCHING,
-                    name=self.current_anime,
                     details=f"Episode {self.current_episode}",
+                    state=self.current_anime,
                     start=self.start_time,
                     large_image=self._get_anime_poster(),
                     large_text=self.current_anime,
                     small_image=DISCORD_LOGO_URL,
                     small_text=DISCORD_LOGO_TEXT,
-                    buttons=[
-                        {"label": "Get ani-cli-ar", "url": "https://github.com/np4abdou1/ani-cli-arabic"}
-                    ]
+                    buttons=[{"label": "Website", "url": "https://np4abdou1.github.io/ani-cli-arabic"}]
                 )
             elif self.current_state == "Choosing Quality":
                 self.rpc.update(
-                    activity_type=ActivityType.PLAYING,
-                    name=self.current_anime,
+                    details=self.current_anime,
                     state=f"⚙️ Choosing quality for Episode {self.current_episode}",
                     start=self.start_time,
                     large_image=self._get_anime_poster(),
                     large_text=self.current_anime,
                     small_image=DISCORD_LOGO_URL,
                     small_text=DISCORD_LOGO_TEXT,
-                    buttons=[
-                        {"label": "Get ani-cli-ar", "url": "https://github.com/np4abdou1/ani-cli-arabic"}
-                    ]
+                    buttons=[{"label": "Website", "url": "https://np4abdou1.github.io/ani-cli-arabic"}]
+                )
+            elif self.current_state == "Loading":
+                self.rpc.update(
+                    details=self.current_anime,
+                    state=f"⏳ Loading Episode {self.current_episode}",
+                    start=self.start_time,
+                    large_image=self._get_anime_poster(),
+                    large_text=self.current_anime,
+                    small_image=DISCORD_LOGO_URL,
+                    small_text=DISCORD_LOGO_TEXT,
+                    buttons=[{"label": "Website", "url": "https://np4abdou1.github.io/ani-cli-arabic"}]
                 )
             elif self.current_state == "Viewing":
                 self.rpc.update(
-                    activity_type=ActivityType.PLAYING,
-                    name=self.current_anime,
+                    details=self.current_anime,
                     state="📖 Viewing details",
                     start=self.start_time,
                     large_image=self._get_anime_poster(),
                     large_text=self.current_anime,
                     small_image=DISCORD_LOGO_URL,
                     small_text=DISCORD_LOGO_TEXT,
-                    buttons=[
-                        {"label": "Get ani-cli-ar", "url": "https://github.com/np4abdou1/ani-cli-arabic"}
-                    ]
+                    buttons=[{"label": "Website", "url": "https://np4abdou1.github.io/ani-cli-arabic"}]
                 )
             elif self.current_state == "Selecting Episode":
                 self.rpc.update(
-                    activity_type=ActivityType.PLAYING,
-                    name=self.current_anime,
+                    details=self.current_anime,
                     state="📺 Browsing episodes",
                     start=self.start_time,
                     large_image=self._get_anime_poster(),
                     large_text=self.current_anime,
                     small_image=DISCORD_LOGO_URL,
                     small_text=DISCORD_LOGO_TEXT,
-                    buttons=[
-                        {"label": "Get ani-cli-ar", "url": "https://github.com/np4abdou1/ani-cli-arabic"}
-                    ]
+                    buttons=[{"label": "Website", "url": "https://np4abdou1.github.io/ani-cli-arabic"}]
                 )
             elif self.current_state == "Searching":
                 self.rpc.update(
-                    activity_type=ActivityType.PLAYING,
-                    name="ani-cli-ar",
+                    details="ani-cli-ar",
                     state="🔍 Searching for anime",
                     start=self.start_time,
                     large_image=DISCORD_LOGO_URL,
                     large_text=DISCORD_LOGO_TEXT,
-                    buttons=[
-                        {"label": "Get ani-cli-ar", "url": "https://github.com/np4abdou1/ani-cli-arabic"}
-                    ]
+                    buttons=[{"label": "Website", "url": "https://np4abdou1.github.io/ani-cli-arabic"}]
+                )
+            elif self.current_state == "Featured":
+                self.rpc.update(
+                    details="ani-cli-ar",
+                    state="⭐ Browsing featured anime",
+                    start=self.start_time,
+                    large_image=DISCORD_LOGO_URL,
+                    large_text=DISCORD_LOGO_TEXT,
+                    buttons=[{"label": "Website", "url": "https://np4abdou1.github.io/ani-cli-arabic"}]
+                )
+            elif self.current_state == "History":
+                self.rpc.update(
+                    details="ani-cli-ar",
+                    state="📜 Viewing watch history",
+                    start=self.start_time,
+                    large_image=DISCORD_LOGO_URL,
+                    large_text=DISCORD_LOGO_TEXT,
+                    buttons=[{"label": "Website", "url": "https://np4abdou1.github.io/ani-cli-arabic"}]
+                )
+            elif self.current_state == "Favorites":
+                self.rpc.update(
+                    details="ani-cli-ar",
+                    state="❤️ Browsing favorites",
+                    start=self.start_time,
+                    large_image=DISCORD_LOGO_URL,
+                    large_text=DISCORD_LOGO_TEXT,
+                    buttons=[{"label": "Website", "url": "https://np4abdou1.github.io/ani-cli-arabic"}]
+                )
+            elif self.current_state == "Settings":
+                self.rpc.update(
+                    details="ani-cli-ar",
+                    state="⚙️ Configuring settings",
+                    start=self.start_time,
+                    large_image=DISCORD_LOGO_URL,
+                    large_text=DISCORD_LOGO_TEXT,
+                    buttons=[{"label": "Website", "url": "https://np4abdou1.github.io/ani-cli-arabic"}]
                 )
             else:
                 self.rpc.update(
-                    activity_type=ActivityType.PLAYING,
-                    name="ani-cli-ar",
+                    details="ani-cli-ar",
                     state="🏠 Browsing",
                     start=self.start_time,
                     large_image=DISCORD_LOGO_URL,
                     large_text=DISCORD_LOGO_TEXT,
-                    buttons=[
-                        {"label": "Get ani-cli-ar", "url": "https://github.com/np4abdou1/ani-cli-arabic"}
-                    ]
+                    buttons=[{"label": "Website", "url": "https://np4abdou1.github.io/ani-cli-arabic"}]
                 )
         except Exception:
             pass
@@ -195,6 +226,46 @@ class DiscordRPCManager:
         self.current_episode = episode_num
         self.start_time = int(time.time())
         self._anime_poster_url = poster_url
+        self._update_presence()
+    
+    def update_loading(self, anime_title: str, episode_num: str, poster_url: str = None):
+        self.current_state = "Loading"
+        self.current_anime = anime_title
+        self.current_episode = episode_num
+        self.start_time = int(time.time())
+        self._anime_poster_url = poster_url
+        self._update_presence()
+    
+    def update_featured(self):
+        self.current_state = "Featured"
+        self.current_anime = None
+        self.current_episode = None
+        self.start_time = int(time.time())
+        self._anime_poster_url = None
+        self._update_presence()
+    
+    def update_history(self):
+        self.current_state = "History"
+        self.current_anime = None
+        self.current_episode = None
+        self.start_time = int(time.time())
+        self._anime_poster_url = None
+        self._update_presence()
+    
+    def update_favorites(self):
+        self.current_state = "Favorites"
+        self.current_anime = None
+        self.current_episode = None
+        self.start_time = int(time.time())
+        self._anime_poster_url = None
+        self._update_presence()
+    
+    def update_settings(self):
+        self.current_state = "Settings"
+        self.current_anime = None
+        self.current_episode = None
+        self.start_time = int(time.time())
+        self._anime_poster_url = None
         self._update_presence()
     
     def disconnect(self):

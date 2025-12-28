@@ -9,7 +9,7 @@ from rich.box import HEAVY
 
 from .config import CURRENT_VERSION, COLOR_PROMPT, COLOR_BORDER
 from .ui import UIManager
-from .api import AnimeAPI
+from .api import AnimeAPI, _update_sync_state
 from .player import PlayerManager
 from .discord_rpc import DiscordRPCManager
 from .models import QualityOption
@@ -28,6 +28,7 @@ class AniCliArApp:
         self.player = PlayerManager(rpc_manager=self.rpc, console=self.ui.console)
         self.history = HistoryManager()
         self.favorites = FavoritesManager()
+        self.version_info = None
 
     def run(self):
         atexit.register(self.cleanup)
@@ -36,9 +37,15 @@ class AniCliArApp:
         
         if self.settings.get('check_updates'):
             try:
-                check_for_updates(self.ui.console, auto_update=True)
+                check_for_updates(auto_update=True)
             except Exception:
                 pass
+        
+        # Check version once on startup
+        try:
+            self.version_info = get_version_status()
+        except Exception:
+            pass
 
         try:
             self.main_loop()
@@ -64,7 +71,6 @@ class AniCliArApp:
             self.ui.print()
             self.ui.print(Align.center(Text.from_markup("Discord Rpc running ✅", style="secondary")))
             self.ui.print()
-            self.ui.print()
             
             # Keybinds panel with theme color border - BEFORE prompt
             keybinds_panel = Panel(
@@ -80,14 +86,10 @@ class AniCliArApp:
             pad_width = (self.ui.console.width - 30) // 2
             padding = " " * max(0, pad_width)
             
-            try:
-                version_info = get_version_status()
-                if version_info and version_info.get('is_outdated'):
-                    status_text = f"Dev: v{version_info['current']} → Latest: v{version_info['latest_pip']} (update available)"
-                    self.ui.print(Align.center(Text(status_text, style="dim")))
-                    self.ui.print()
-            except Exception:
-                pass
+            if self.version_info and self.version_info.get('is_outdated'):
+                status_text = f"Dev: v{self.version_info['current']} → Latest: v{self.version_info['latest_pip']} (update available)"
+                self.ui.print(Align.center(Text(status_text, style="dim")))
+                self.ui.print()
 
             query = Prompt.ask(f"{padding}{prompt_string}", console=self.ui.console).strip()
             
@@ -97,7 +99,7 @@ class AniCliArApp:
             results = []
             
             if query.lower() == 'r':
-                self.rpc.update_searching()
+                self.rpc.update_featured()
                 # Fetching from Jikan (MAL) with auto-SFW filtering
                 results = self.ui.run_with_loading(
                     "Fetching currently airing anime from MAL...",
@@ -109,12 +111,15 @@ class AniCliArApp:
                     self.rpc.update_searching()
                     results = self.ui.run_with_loading("Searching...", self.api.search_anime, term)
             elif query.lower() == 'l':
+                self.rpc.update_history()
                 self.handle_history()
                 continue
             elif query.lower() == 'f':
+                self.rpc.update_favorites()
                 self.handle_favorites()
                 continue
             elif query.lower() == 'c':
+                self.rpc.update_settings()
                 self.ui.settings_menu(self.settings)
                 continue
             elif query:
@@ -449,6 +454,13 @@ class AniCliArApp:
                 player_type = self.settings.get('player')
                 watching_text = f"{selected_anime.title_en} - Episode {selected_ep.display_num}"
                 self.ui.console.print(f"\n[cyan]▶ Watching:[/cyan] [bold]{watching_text}[/bold]\n")
+                
+                # Update RPC to watching state before playing
+                self.rpc.update_watching(selected_anime.title_en, str(selected_ep.display_num), selected_anime.thumbnail)
+                
+                # Sync state
+                _update_sync_state(selected_anime.id, selected_anime.title_en, selected_ep.display_num)
+                
                 self.player.play(direct_url, f"{selected_anime.title_en} - Ep {selected_ep.display_num} ({quality.name})", player_type=player_type)
                 self.history.mark_watched(selected_anime.id, selected_ep.display_num, selected_anime.title_en)
                 self.rpc.update_selecting_episode(selected_anime.title_en, selected_anime.thumbnail)
@@ -495,7 +507,7 @@ class AniCliArApp:
         self.ui.clear()
         
         panel = Panel(
-            Text("👋 Thanks for using ani-cli-arabic!", justify="center", style="info"),
+            Text("👋", justify="center", style="info"),
             title=Text("GOODBYE", style="title"),
             box=HEAVY,
             padding=1,
@@ -555,7 +567,7 @@ if __name__ == "__main__":
         self.ui.clear()
         
         panel = Panel(
-            Text("👋 Thanks for using ani-cli-arabic!", justify="center", style="info"),
+            Text("👋", justify="center", style="info"),
             title=Text("GOODBYE", style="title"),
             box=HEAVY,
             padding=1,

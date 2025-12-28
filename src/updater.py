@@ -5,23 +5,60 @@ import platform
 import subprocess
 import tempfile
 import shutil
+import time
 import requests
 from pathlib import Path
-from rich.console import Console
-from rich.panel import Panel
-from rich.text import Text
-from rich.progress import Progress, DownloadColumn, BarColumn, TransferSpeedColumn, TimeRemainingColumn
-from rich.prompt import Confirm
 
 from .version import __version__, APP_VERSION, API_RELEASES_URL, RELEASES_URL
 from .utils import is_bundled
+from .config import COLOR_PROMPT, COLOR_BORDER
 
+
+def _get_ansi_color(hex_color):
+    hex_color = hex_color.lstrip('#')
+    r, g, b = int(hex_color[:2], 16), int(hex_color[2:4], 16), int(hex_color[4:], 16)
+    return f'\033[38;2;{r};{g};{b}m'
+
+def _reset_color():
+    return '\033[0m'
+
+def _print_header(title):
+    color = _get_ansi_color(COLOR_PROMPT)
+    reset = _reset_color()
+    print(f"\n{color}{title}{reset}\n")
+
+def _print_info(text):
+    print(f"  {text}")
+
+def _print_success(text):
+    color = _get_ansi_color(COLOR_PROMPT)
+    reset = _reset_color()
+    print(f"  {color}✓{reset} {text}")
+
+def _print_error(text):
+    print(f"  ✗ {text}")
+
+def _format_bytes(bytes_val):
+    for unit in ['B', 'KB', 'MB', 'GB']:
+        if bytes_val < 1024.0:
+            return f"{bytes_val:.1f}{unit}"
+        bytes_val /= 1024.0
+    return f"{bytes_val:.1f}TB"
+
+def _format_speed(bytes_per_sec):
+    return f"{_format_bytes(bytes_per_sec)}/s"
+
+def _draw_progress_bar(progress, total, width=40):
+    if total == 0:
+        return "  [" + " " * width + "] 0%"
+    filled = int(width * progress / total)
+    percent = int(100 * progress / total)
+    color = _get_ansi_color(COLOR_PROMPT)
+    reset = _reset_color()
+    bar = color + "█" * filled + reset + "░" * (width - filled)
+    return f"  [{bar}] {percent}%"
 
 def parse_version(ver_string):
-    """
-    Parse version string like v1.2.3, v1.2, or v1 into tuple of ints.
-    Returns tuple for comparison, e.g. (1, 2, 3)
-    """
     ver_string = ver_string.strip().lower()
     if ver_string.startswith('v'):
         ver_string = ver_string[1:]
@@ -40,10 +77,6 @@ def parse_version(ver_string):
 
 
 def get_latest_release():
-    """
-    Fetch the latest release info from GitHub.
-    Returns dict with tag_name and assets or None on failure.
-    """
     try:
         resp = requests.get(API_RELEASES_URL, timeout=10)
         if resp.status_code == 200:
@@ -54,10 +87,6 @@ def get_latest_release():
 
 
 def get_download_url(release_data):
-    """
-    Find the correct download URL for the current OS.
-    Returns the browser_download_url or None.
-    """
     if not release_data or 'assets' not in release_data:
         return None
     
@@ -83,49 +112,52 @@ def get_download_url(release_data):
     return None
 
 
-def download_update(url, console):
-    """
-    Download the update file to a temporary location.
-    Returns path to downloaded file or None on failure.
-    """
+def download_update(url):
     try:
         temp_dir = tempfile.gettempdir()
         filename = os.path.basename(url)
         temp_file = os.path.join(temp_dir, filename)
         
-        from rich.progress import TextColumn, ProgressColumn
+        _print_info("Downloading update...")
         
-        with Progress(
-            TextColumn("[cyan]Downloading update..."),
-            BarColumn(),
-            TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
-            TransferSpeedColumn(),
-            TimeRemainingColumn(),
-            console=console,
-            transient=False
-        ) as progress:
-            resp = requests.get(url, stream=True, timeout=30)
-            resp.raise_for_status()
-            
-            total_size = int(resp.headers.get('content-length', 0))
-            task = progress.add_task("download", total=total_size)
-            
-            with open(temp_file, 'wb') as f:
-                for chunk in resp.iter_content(chunk_size=8192):
-                    if chunk:
-                        f.write(chunk)
-                        progress.update(task, advance=len(chunk))
+        resp = requests.get(url, stream=True, timeout=30)
+        resp.raise_for_status()
+        
+        total_size = int(resp.headers.get('content-length', 0))
+        downloaded = 0
+        start_time = time.time()
+        last_update = start_time
+        
+        with open(temp_file, 'wb') as f:
+            for chunk in resp.iter_content(chunk_size=8192):
+                if chunk:
+                    f.write(chunk)
+                    downloaded += len(chunk)
+                    
+                    # Update progress every 0.1 seconds
+                    current_time = time.time()
+                    if current_time - last_update >= 0.1:
+                        elapsed = current_time - start_time
+                        speed = downloaded / elapsed if elapsed > 0 else 0
+                        
+                        bar = _draw_progress_bar(downloaded, total_size)
+                        info = f"{_format_bytes(downloaded)} / {_format_bytes(total_size)} | {_format_speed(speed)}"
+                        
+                        # Clear line and print progress
+                        print(f"\r{bar} {info}", end='', flush=True)
+                        last_update = current_time
+        
+        # Final progress update
+        print(f"\r{_draw_progress_bar(total_size, total_size)} {_format_bytes(total_size)} / {_format_bytes(total_size)}")
+        print()
         
         return temp_file
     except Exception as e:
-        console.print(f"[red]Download failed: {e}[/red]")
+        _print_error(f"Download failed: {e}")
         return None
 
 
-def apply_update_and_restart(new_file_path, console):
-    """
-    Replace the current executable with the new one and restart.
-    """
+def apply_update_and_restart(new_file_path):
     try:
         current_exe = sys.executable
         current_path = Path(current_exe)
@@ -222,8 +254,8 @@ def apply_update_and_restart(new_file_path, console):
                 creationflags=subprocess.CREATE_NEW_CONSOLE
             )
             
-            console.print("\n[green]✓ Update will be applied. Restarting in a new window...[/green]\n")
-            import time
+            _print_success("Update will be applied. Restarting in a new window...")
+            print()
             time.sleep(0.5)
             sys.exit(0)
         
@@ -249,14 +281,15 @@ def apply_update_and_restart(new_file_path, console):
             
             os.chmod(update_script, 0o755)
             subprocess.Popen(['/bin/bash', update_script])
-            console.print("\n[green]✓ Update applied. Restarting...[/green]\n")
-            import time
+            _print_success("Update applied. Restarting...")
+            print()
             time.sleep(0.5)
             sys.exit(0)
         
     except Exception as e:
-        console.print(f"[red]Failed to apply update: {e}[/red]")
-        console.print("[yellow]Please manually replace the executable.[/yellow]")
+        _print_error(f"Failed to apply update: {e}")
+        _print_info("Please manually replace the executable.")
+        return False
         return False
     
     return True
@@ -287,10 +320,6 @@ def get_installation_type():
 
 
 def get_pypi_latest_version():
-    """
-    Fetch the latest version from PyPI
-    Returns version string or None
-    """
     try:
         resp = requests.get('https://pypi.org/pypi/ani-cli-arabic/json', timeout=10)
         if resp.status_code == 200:
@@ -301,10 +330,7 @@ def get_pypi_latest_version():
     return None
 
 
-def check_pip_update(console):
-    """
-    Check PyPI for updates when installed via pip and auto-update
-    """
+def check_pip_update():
     try:
         latest_version = get_pypi_latest_version()
         if not latest_version:
@@ -314,27 +340,13 @@ def check_pip_update(console):
         latest = parse_version(latest_version)
         
         if latest > current:
-            msg = Text()
-            msg.append("Update Available\n\n", style="bold cyan")
-            msg.append(f"Current: ", style="dim")
-            msg.append(f"{__version__}", style="white")
-            msg.append(f"  →  ", style="dim")
-            msg.append(f"Latest: ", style="dim")
-            msg.append(f"{latest_version}\n\n", style="bold green")
-            msg.append("Installing update...", style="cyan")
-            
-            panel = Panel(
-                msg,
-                title="[bold white]PyPI Package Update[/bold white]",
-                border_style="cyan",
-                padding=(0, 2)
-            )
-            console.print()
-            console.print(panel)
-            console.print()
+            _print_header("Update Available")
+            _print_info(f"Current: {__version__}  →  Latest: {latest_version}")
+            print()
+            _print_info("Installing update...")
+            print()
             
             # Auto-update without asking
-            console.print("[cyan]Updating package...[/cyan]\n")
             try:
                 result = subprocess.run(
                     [sys.executable, '-m', 'pip', 'install', '--upgrade', 'ani-cli-arabic'],
@@ -343,8 +355,8 @@ def check_pip_update(console):
                 )
                 
                 if result.returncode == 0:
-                    console.print("[green]✓ Update successful! Restarting application...[/green]\n")
-                    import time
+                    _print_success("Update successful! Restarting application...")
+                    print()
                     time.sleep(1)
                     
                     # Restart using the entry point command
@@ -363,12 +375,14 @@ def check_pip_update(console):
                     
                     sys.exit(0)
                 else:
-                    console.print(f"[red]Update failed: {result.stderr}[/red]\n")
-                    console.print("[yellow]Please try manually: pip install --upgrade ani-cli-arabic[/yellow]\n")
+                    _print_error(f"Update failed: {result.stderr}")
+                    _print_info("Please try manually: pip install --upgrade ani-cli-arabic")
+                    print()
                     input("Press ENTER to continue...")
             except Exception as e:
-                console.print(f"[red]Update failed: {e}[/red]\n")
-                console.print("[yellow]Please try manually: pip install --upgrade ani-cli-arabic[/yellow]\n")
+                _print_error(f"Update failed: {e}")
+                _print_info("Please try manually: pip install --upgrade ani-cli-arabic")
+                print()
                 input("Press ENTER to continue...")
             
             return True
@@ -378,10 +392,7 @@ def check_pip_update(console):
     return False
 
 
-def check_executable_update(console):
-    """
-    Check GitHub releases for executable updates
-    """
+def check_executable_update():
     try:
         release_data = get_latest_release()
         if not release_data:
@@ -398,45 +409,30 @@ def check_executable_update(console):
             system = platform.system().lower()
             system_name = "Windows" if system == "windows" else "Linux"
             
-            msg = Text()
-            msg.append("Update Available\n\n", style="bold cyan")
-            msg.append(f"Current: ", style="dim")
-            msg.append(f"{__version__}", style="white")
-            msg.append(f"  →  ", style="dim")
-            msg.append(f"Latest: ", style="dim")
-            msg.append(f"{latest_tag.lstrip('v')}\n", style="bold green")
-            msg.append(f"Platform: ", style="dim")
-            msg.append(f"{system_name}\n\n", style="white")
-            msg.append("Downloading update...", style="cyan")
-            
-            panel = Panel(
-                msg,
-                title="[bold white]Executable Update[/bold white]",
-                border_style="cyan",
-                padding=(0, 2)
-            )
-            console.print()
-            console.print(panel)
-            console.print()
+            _print_header("Update Available")
+            _print_info(f"Current: {__version__}  →  Latest: {latest_tag.lstrip('v')}")
+            _print_info(f"Platform: {system_name}")
+            print()
             
             # Get download url
             download_url = get_download_url(release_data)
             if not download_url:
-                console.print(f"[red]Could not find {system_name} executable in release[/red]\n")
+                _print_error(f"Could not find {system_name} executable in release")
+                print()
                 input("Press ENTER to continue...")
                 return False
             
             # Download the update
-            new_file = download_update(download_url, console)
+            new_file = download_update(download_url)
             if not new_file:
                 input("Press ENTER to continue...")
                 return False
             
-            console.print("[green]✓ Download complete[/green]")
-            console.print()
+            _print_success("Download complete")
+            print()
             
             # Apply update and restart
-            return apply_update_and_restart(new_file, console)
+            return apply_update_and_restart(new_file)
         
     except Exception:
         pass
@@ -476,17 +472,13 @@ def get_version_status():
 
 
 def check_for_updates(console=None, auto_update=True):
-    """Check for updates based on installation type."""
-    if console is None:
-        console = Console()
-    
     install_type = get_installation_type()
     
     try:
         if install_type == 'pip':
-            return check_pip_update(console)
+            return check_pip_update()
         elif install_type == 'executable':
-            return check_executable_update(console)
+            return check_executable_update()
         elif install_type == 'source':
             pass
     except Exception:
