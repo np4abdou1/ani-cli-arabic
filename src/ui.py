@@ -175,10 +175,13 @@ class UIManager:
             
             if vertical_pad > 0:
                 layout.split_column(
-                    Layout(name="top_pad", size=vertical_pad),
+                    Layout(size=vertical_pad),
                     Layout(name="content", size=target_height),
-                    Layout(name="bottom_pad", size=vertical_pad)
+                    Layout(size=vertical_pad)
                 )
+                children = list(layout["root"].children)
+                children[0].update(Text(""))
+                children[2].update(Text(""))
                 content_area = layout["content"]
             else:
                 content_area = layout
@@ -316,10 +319,13 @@ class UIManager:
             
             if vertical_pad > 0:
                 layout.split_column(
-                    Layout(name="top_pad", size=vertical_pad),
+                    Layout(size=vertical_pad),
                     Layout(name="content", size=target_height),
-                    Layout(name="bottom_pad", size=vertical_pad)
+                    Layout(size=vertical_pad)
                 )
+                children = list(layout["root"].children)
+                children[0].update(Text(""))
+                children[2].update(Text(""))
                 content_area = layout["content"]
             else:
                 content_area = layout
