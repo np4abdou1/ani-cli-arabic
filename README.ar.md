@@ -51,19 +51,6 @@ https://github.com/user-attachments/assets/8b57a95a-2949-44d2-b786-bd1c035e0060
 
 ---
 
-<div align="center">
-
-### <span style="color: red;">⚠️ اتفاقية الاستخدام</span>
-
-</div>
-
-> <span style="color: red;">**باستخدام هذا البرنامج فإنك توافق على:**</span>  
-> <span style="color: red;">• جمع بيانات مجهولة لمراقبة الاستخدام والمستخدمين</span>  
-> <span style="color: red;">• عدم استخدام البرنامج لأغراض تجارية</span>  
-> <span style="color: red;">• عدم إساءة استخدام الـ API</span>
-
----
-
 <div dir="rtl" align="right">
 
 ## المميزات
@@ -173,6 +160,12 @@ python3 main.py
 ### ⚠️ تنبيه مهم
 
 </div>
+
+> [!IMPORTANT]
+> **باستخدام هذا البرنامج فإنك توافق على:**
+> - جمع بيانات مجهولة لمراقبة الاستخدام والمستخدمين
+> - عدم استخدام البرنامج لأغراض تجارية
+> - عدم إساءة استخدام الـ API
 
 <div dir="rtl" align="right">
 
