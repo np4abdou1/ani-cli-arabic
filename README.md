@@ -1,10 +1,6 @@
 <div align="center">
 
-<a href="README.ar.md">
-  <img src="https://img.shields.io/badge/Language-Arabic-green?style=for-the-badge&logo=google-translate&logoColor=white" alt="Arabic">
-</a>
-
-# ani-cli-ar
+# Ani-cli-ar \ https://github.com/user-attachments/assets/1dad5f85-026f-421b-ad19-7e37366b174f
 
 Terminal-based anime streaming with Arabic subtitles
 
@@ -27,6 +23,11 @@ Terminal-based anime streaming with Arabic subtitles
   <img src="https://img.shields.io/badge/Python-3.8+-3776AB?style=for-the-badge&logo=python&logoColor=white" />
   <img src="https://img.shields.io/badge/License-Custom-orange?style=for-the-badge" />
 </p>
+
+<p>لإختيار اللغة العربية اضغط على الزر:</p>
+<a href="README.ar.md">
+  <img src="https://img.shields.io/badge/Language-Arabic-green?style=for-the-badge&logo=google-translate&logoColor=white" alt="Arabic">
+</a>
 
 <p align="center">
   <i>Inspired by</i> <a href="https://github.com/pystardust/ani-cli">ani-cli</a>
