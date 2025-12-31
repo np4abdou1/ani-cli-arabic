@@ -1,6 +1,10 @@
 <div align="center">
 
-# Ani-cli-ar \ https://github.com/user-attachments/assets/1dad5f85-026f-421b-ad19-7e37366b174f
+<h1>Ani-cli-ar</h1>
+
+![445026601441165313](https://github.com/user-attachments/assets/3c6ad4e9-2df6-4ee6-991f-536150e49da2)
+
+
 
 Terminal-based anime streaming with Arabic subtitles
 
@@ -33,7 +37,14 @@ Terminal-based anime streaming with Arabic subtitles
   <i>Inspired by</i> <a href="https://github.com/pystardust/ani-cli">ani-cli</a>
 </p>
 
-https://github.com/user-attachments/assets/22eb92a1-b57e-4126-9869-b0988cab63a6
+
+
+
+https://github.com/user-attachments/assets/efc18417-52df-42ed-902e-37733ef2376d
+
+
+
+
 
 </div>
 
