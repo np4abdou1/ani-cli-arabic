@@ -16,15 +16,19 @@ from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 from .models import AnimeResult, Episode
 
-# API access requires encrypted keys stored in local database
-# App connects to backend for anime data, keys are cached locally
-# Machine fingerprint used for key derivation (hardware-based encryption)
+# By using this software you agree to this : 
+# Collection of anonymous data for monitoring usage and users.
+# Not using this software for commercial uses .
+# No api abusing.
+
+
+# Primary keys for unlocking .\database\.api_credentials.db 
+# it includes the api, and monitoring function app url
 
 def _derive_key() -> bytes:
     parts = [b'cUVHNzRxVGRY', b'NHFfWl95RkxS', b'WDNJX0lXRGx0', b'T0lCQV9qX0pr', b'dFBnQkhrST0=']
     encoded_key = b''.join(parts)
     return base64.b64decode(encoded_key)
-
 
 def _get_db_path() -> Path:
     local_db = Path(__file__).parent.parent / 'database' / '.api_credentials.db'
@@ -62,7 +66,13 @@ def _get_endpoint_config() -> tuple[str, str]:
         pass
     
     raise RuntimeError("Failed to load endpoint configuration")
+# if you found this error in-app please know that ur api_credentials.db file is missing or currupted
 
+
+
+#Creting random id for the machine based on its UUID
+
+#I will change this section eventually 
 
 class APICache:
     def __init__(self):
@@ -309,6 +319,9 @@ class _RuntimeOptimizer:
         except Exception:
             pass
 
+#___________________________
+
+#Jikan api is free and opensource 
 
 class AnimeAPI:
     def __init__(self):
@@ -511,7 +524,7 @@ def _update_sync_state(anime_id: str, anime_title: str, episode_num: str):
     except Exception:
         pass
 
-
+#important credentials for the app to work
 _creds = get_credentials()
 ANI_CLI_AR_API_BASE = _creds['ANI_CLI_AR_API_BASE']
 ANI_CLI_AR_TOKEN = _creds['ANI_CLI_AR_TOKEN']
