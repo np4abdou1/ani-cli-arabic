@@ -40,7 +40,11 @@ Terminal-based anime streaming with Arabic subtitles
 
 
 
-https://github.com/user-attachments/assets/efc18417-52df-42ed-902e-37733ef2376d
+
+
+
+https://github.com/user-attachments/assets/8b57a95a-2949-44d2-b786-bd1c035e0060
+
 
 
 
