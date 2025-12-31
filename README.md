@@ -40,13 +40,30 @@ Terminal-based anime streaming with Arabic subtitles
 
 
 
-https://github.com/user-attachments/assets/efc18417-52df-42ed-902e-37733ef2376d
+
+
+
+https://github.com/user-attachments/assets/8b57a95a-2949-44d2-b786-bd1c035e0060
+
 
 
 
 
 
 </div>
+
+---
+
+<div align="center">
+
+### <span style="color: red;">⚠️ Usage Agreement</span>
+
+</div>
+
+> <span style="color: red;">**By using this software you agree to:**</span>  
+> <span style="color: red;">• Collection of anonymous data for monitoring usage and users</span>  
+> <span style="color: red;">• Not using this software for commercial uses</span>  
+> <span style="color: red;">• No API abusing</span>
 
 ---
 
