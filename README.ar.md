@@ -1,12 +1,10 @@
 <div align="center">
 
-<a href="README.md">
-  <img src="https://img.shields.io/badge/Language-English-blue?style=for-the-badge&logo=google-translate&logoColor=white" alt="English">
-</a>
+<h1>Ani-cli-ar</h1>
 
-<br><br>
+![445026601441165313](https://github.com/user-attachments/assets/3c6ad4e9-2df6-4ee6-991f-536150e49da2)
 
-# ani-cli-ar
+
 
 <p dir="rtl" align="center">
 مشاهدة الأنمي عبر التيرمينال مع ترجمة عربية
@@ -32,9 +30,37 @@
   <img src="https://img.shields.io/badge/License-Custom-orange?style=for-the-badge" />
 </p>
 
-https://github.com/user-attachments/assets/22eb92a1-b57e-4126-9869-b0988cab63a6
+<p dir="rtl">لإختيار اللغة الإنجليزية اضغط على الزر:</p>
+<a href="README.md">
+  <img src="https://img.shields.io/badge/Language-English-blue?style=for-the-badge&logo=google-translate&logoColor=white" alt="English">
+</a>
+
+<p align="center">
+  <i>Inspired by</i> <a href="https://github.com/pystardust/ani-cli">ani-cli</a>
+</p>
+
+
+
+
+
+
+
+https://github.com/user-attachments/assets/8b57a95a-2949-44d2-b786-bd1c035e0060
 
 </div>
+
+---
+
+<div align="center">
+
+### <span style="color: red;">⚠️ اتفاقية الاستخدام</span>
+
+</div>
+
+> <span style="color: red;">**باستخدام هذا البرنامج فإنك توافق على:**</span>  
+> <span style="color: red;">• جمع بيانات مجهولة لمراقبة الاستخدام والمستخدمين</span>  
+> <span style="color: red;">• عدم استخدام البرنامج لأغراض تجارية</span>  
+> <span style="color: red;">• عدم إساءة استخدام الـ API</span>
 
 ---
 
