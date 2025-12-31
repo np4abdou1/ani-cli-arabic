@@ -1,6 +1,7 @@
 <div align="center">
 
-# Ani-cli-ar \ https://github.com/user-attachments/assets/1dad5f85-026f-421b-ad19-7e37366b174f
+Ani-cli-ar \ ![445026601441165313](https://github.com/user-attachments/assets/e58084ae-87d4-445d-9669-df9ceb2aaa67)
+
 
 Terminal-based anime streaming with Arabic subtitles
 
