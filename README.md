@@ -37,7 +37,11 @@ Terminal-based anime streaming with Arabic subtitles
   <i>Inspired by</i> <a href="https://github.com/pystardust/ani-cli">ani-cli</a>
 </p>
 
-https://github.com/user-attachments/assets/22eb92a1-b57e-4126-9869-b0988cab63a6
+
+
+https://github.com/user-attachments/assets/03637f0a-f35e-425d-a489-a27070512238
+
+
 
 </div>
 
