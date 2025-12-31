@@ -54,19 +54,6 @@ https://github.com/user-attachments/assets/8b57a95a-2949-44d2-b786-bd1c035e0060
 
 ---
 
-<div align="center">
-
-### <span style="color: red;">⚠️ Usage Agreement</span>
-
-</div>
-
-> <span style="color: red;">**By using this software you agree to:**</span>  
-> <span style="color: red;">• Collection of anonymous data for monitoring usage and users</span>  
-> <span style="color: red;">• Not using this software for commercial uses</span>  
-> <span style="color: red;">• No API abusing</span>
-
----
-
 ## Features
 
 - Stream anime in 1080p, 720p, or 480p
@@ -174,6 +161,12 @@ Custom Proprietary License - See [LICENSE](LICENSE) for details.
 ### ⚠️ Important Notice
 
 </div>
+
+> [!IMPORTANT]
+> **By using this software you agree to:**
+> - Collection of anonymous data for monitoring usage and users
+> - Not using this software for commercial uses
+> - No API abusing
 
 > **License Terms:**  
 > This software is licensed for **personal, non-commercial use only**. You may modify the frontend/UI, but **API abuse or reverse-engineering is strictly prohibited**. Commercial use requires prior written permission.  
