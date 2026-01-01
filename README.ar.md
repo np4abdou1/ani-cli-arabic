@@ -35,9 +35,7 @@
   <img src="https://img.shields.io/badge/Language-English-blue?style=for-the-badge&logo=google-translate&logoColor=white" alt="English">
 </a>
 
-<p align="center">
-  <i>Inspired by</i> <a href="https://github.com/pystardust/ani-cli">ani-cli</a>
-</p>
+<br>
 
 
 
