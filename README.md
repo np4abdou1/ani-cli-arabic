@@ -33,9 +33,7 @@ Terminal-based anime streaming with Arabic subtitles
   <img src="https://img.shields.io/badge/Language-Arabic-green?style=for-the-badge&logo=google-translate&logoColor=white" alt="Arabic">
 </a>
 
-<p align="center">
-  <i>Inspired by</i> <a href="https://github.com/pystardust/ani-cli">ani-cli</a>
-</p>
+
 
 
 
