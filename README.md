@@ -33,7 +33,9 @@ Terminal-based anime streaming with Arabic subtitles
   <img src="https://img.shields.io/badge/Language-Arabic-green?style=for-the-badge&logo=google-translate&logoColor=white" alt="Arabic">
 </a>
 
+<br>
 
+<h3>SHOWCASE</h3>
 
 
 
