@@ -1,5 +1,6 @@
 import os
 import sys
+import time
 import shutil
 import subprocess
 import requests
@@ -56,13 +57,11 @@ class PlayerManager:
             if self.console:
                 from rich.text import Text
                 self.console.print(Text(f"{player_type.upper()} executable not found. Please install it or check path.", style="bold red"))
-                import time
                 time.sleep(2)
         except Exception as e:
             if self.console:
                 from rich.text import Text
                 self.console.print(Text(f"Error launching player: {str(e)}", style="bold red"))
-                import time
                 time.sleep(2)
 
     def _play_vlc(self, url: str, title: str):
@@ -118,7 +117,6 @@ class PlayerManager:
             '--cache-secs=30',
             '--hwdec=auto-safe',
             '--vo=gpu',
-            '--gpu-api=d3d11',
             '--profile=gpu-hq',
             '--scale=ewa_lanczossharp',
             '--cscale=ewa_lanczossharp',
@@ -144,6 +142,9 @@ class PlayerManager:
             '--title=' + title,
             url
         ]
+
+        if sys.platform == 'win32':
+            mpv_args.append('--gpu-api=d3d11')
         
         result = subprocess.run(
             mpv_args,
