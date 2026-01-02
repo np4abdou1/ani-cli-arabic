@@ -2,7 +2,7 @@
 # THIS IS THE SINGLE SOURCE OF TRUTH FOR VERSION
 # All other files (pyproject.toml, workflows, etc.) read from here
 
-__version__ = "1.6.2"
+__version__ = "1.7.1"
 
 APP_VERSION = f"v{__version__}"
 GITHUB_REPO = "np4abdou1/ani-cli-arabic"
