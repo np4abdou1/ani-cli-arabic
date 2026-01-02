@@ -72,8 +72,6 @@ a = Analysis(
     binaries={binaries},
     datas=[
         (str(script_dir / 'src'), 'src'),
-        (str(script_dir / 'themes.py'), '.'),
-        (str(script_dir / 'database'), 'database'),
     ],
     hiddenimports=[
         'pypresence',
