@@ -31,7 +31,6 @@ setup(
     packages=find_packages(),
     package_data={
         '': ['*.json', '*.db'],
-        'database': ['*.db', '*.json'],
     },
     include_package_data=True,
     install_requires=[
@@ -50,7 +49,6 @@ setup(
     classifiers=[
         "Development Status :: 4 - Beta",
         "Intended Audience :: End Users/Desktop",
-        "License :: OSI Approved :: MIT License",
         "Operating System :: OS Independent",
         "Programming Language :: Python :: 3",
         "Programming Language :: Python :: 3.8",

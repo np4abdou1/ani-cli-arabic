@@ -7,7 +7,7 @@ name = "ani-cli-arabic"
 dynamic = ["version"]
 description = "Terminal-based anime streaming with Arabic subtitles"
 readme = "README.md"
-license = {text = "MIT"}
+license = "MIT"
 authors = [
     {name = "np4abdou1"}
 ]
@@ -18,7 +18,6 @@ keywords = ["anime", "streaming", "cli", "arabic", "subtitles", "terminal"]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: End Users/Desktop",
-    "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.8",
@@ -48,7 +47,7 @@ ani-cli-arabic = "src.app:main"
 ani-cli-ar = "src.app:main"
 
 [tool.setuptools]
-packages = ["src", "database"]
+packages = ["src"]
 include-package-data = true
 
 [tool.setuptools.dynamic]
@@ -56,4 +55,3 @@ version = {attr = "src.version.__version__"}
 
 [tool.setuptools.package-data]
 "*" = ["*.json", "*.txt", "*.db"]
-"database" = ["*.db", "*.json"]
