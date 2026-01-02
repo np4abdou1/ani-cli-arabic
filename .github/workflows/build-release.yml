@@ -130,10 +130,10 @@ jobs:
           $version = "${{ inputs.version }}"
           
           # Build without MPV
-          pyinstaller --onefile --name "ani-cli-arabic-windows-x64-$version" --console --clean --noconfirm --distpath . --workpath build --specpath build --icon "$currentDir\assets\icon.ico" --version-file "$currentDir\version_info.txt" --add-data "$currentDir\src;src" --add-data "$currentDir\themes.py;." --add-data "$currentDir\database;database" --hidden-import pypresence --hidden-import rich --hidden-import requests --hidden-import cryptography --hidden-import cryptography.fernet main.py
+          pyinstaller --onefile --name "ani-cli-arabic-windows-x64-$version" --console --clean --noconfirm --distpath . --workpath build --specpath build --icon "$currentDir\assets\icon.ico" --version-file "$currentDir\version_info.txt" --add-data "$currentDir\src;src" --hidden-import pypresence --hidden-import rich --hidden-import requests --hidden-import cryptography --hidden-import cryptography.fernet main.py
           
           # Build with MPV
-          pyinstaller --onefile --name "ani-cli-arabic-windows-x64-$version-with-mpv" --console --clean --noconfirm --distpath . --workpath build --specpath build --icon "$currentDir\assets\icon.ico" --version-file "$currentDir\version_info.txt" --add-data "$currentDir\src;src" --add-data "$currentDir\themes.py;." --add-data "$currentDir\database;database" --add-binary "$currentDir\mpv_bundle.exe;mpv" --hidden-import pypresence --hidden-import rich --hidden-import requests --hidden-import cryptography --hidden-import cryptography.fernet main.py
+          pyinstaller --onefile --name "ani-cli-arabic-windows-x64-$version-with-mpv" --console --clean --noconfirm --distpath . --workpath build --specpath build --icon "$currentDir\assets\icon.ico" --version-file "$currentDir\version_info.txt" --add-data "$currentDir\src;src" --add-binary "$currentDir\mpv_bundle.exe;mpv" --hidden-import pypresence --hidden-import rich --hidden-import requests --hidden-import cryptography --hidden-import cryptography.fernet main.py
 
       - name: Upload to release
         env:
@@ -182,11 +182,11 @@ jobs:
           VERSION="${{ inputs.version }}"
           
           # Build without MPV
-          pyinstaller --onefile --name "ani-cli-arabic-linux-x64-$VERSION" --console --clean --noconfirm --distpath . --workpath build --specpath build --add-data "$PWD/src:src" --add-data "$PWD/themes.py:." --add-data "$PWD/database:database" --hidden-import pypresence --hidden-import rich --hidden-import requests --hidden-import cryptography --hidden-import cryptography.fernet main.py
+          pyinstaller --onefile --name "ani-cli-arabic-linux-x64-$VERSION" --console --clean --noconfirm --distpath . --workpath build --specpath build --add-data "$PWD/src:src" --hidden-import pypresence --hidden-import rich --hidden-import requests --hidden-import cryptography --hidden-import cryptography.fernet main.py
           
           # Build with MPV
           MPV_PATH=$(which mpv)
-          pyinstaller --onefile --name "ani-cli-arabic-linux-x64-$VERSION-with-mpv" --console --clean --noconfirm --distpath . --workpath build --specpath build --add-data "$PWD/src:src" --add-data "$PWD/themes.py:." --add-data "$PWD/database:database" --add-binary "${MPV_PATH}:mpv" --hidden-import pypresence --hidden-import rich --hidden-import requests --hidden-import cryptography --hidden-import cryptography.fernet main.py
+          pyinstaller --onefile --name "ani-cli-arabic-linux-x64-$VERSION-with-mpv" --console --clean --noconfirm --distpath . --workpath build --specpath build --add-data "$PWD/src:src" --add-binary "${MPV_PATH}:mpv" --hidden-import pypresence --hidden-import rich --hidden-import requests --hidden-import cryptography --hidden-import cryptography.fernet main.py
 
       - name: Upload to release
         env:
