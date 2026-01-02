@@ -164,8 +164,7 @@ MIT License - See [LICENSE](LICENSE) for details.
 
 > [!IMPORTANT]
 > **By using this software you agree to:**
-> - Collection of anonymous data for monitoring usage (app start, video play) to improve the application.
-> - No API abusing.
+> - Collection of anonymous data for monitoring users for the github Page stats banner.
 
 > **License Terms:**  
 > This software is licensed under the **MIT License**. You are free to use, modify, and distribute it.
