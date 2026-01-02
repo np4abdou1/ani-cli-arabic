@@ -16,51 +16,7 @@ from rich.theme import Theme
 from rich.box import HEAVY
 from rich.spinner import Spinner
 
-EPISODE_ASCII_ART = r"""
-⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣠⣶⣿⣟⠷⣄⠀⠀⠀⠀⠀⠀⠀⣀⣴⣾⢿⣿⣿⠰⠀⠀⠀⣀⡴⣫⠴⡁⠀⠀⠀⣀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣀⣀⡀
-⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⡾⠟⠛⠿⣻⣷⡀⢂⠀⠀⠀⠀⣠⣾⡟⢡⣴⣾⡿⢣⠁⠀⢀⣴⣿⠟⠫⣑⣴⣶⣿⣿⣷⣏⡑⠂⠀⠀⠀⠀⢀⣴⣿⡏⠀⠀
-⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣞⠁⣾⣷⢂⢻⣿⡅⢂⣠⢀⣤⣾⣿⣯⢰⣿⡛⠭⣘⣴⣿⣿⡿⠟⢁⡮⢟⣻⣿⡿⢿⣿⡿⣿⣧⣂⠀⣀⣠⣶⣿⣿⣿⣿⡄⠀
-⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣿⣦⣿⠟⢠⣿⣿⠁⣢⣿⢧⣿⣿⣿⣿⣷⣷⡶⣳⣭⣭⣩⣬⣤⣾⡟⣾⣿⣿⠿⣿⣷⣦⣙⠻⣿⣿⣿⣿⣿⣿⣿⣿⠿⢏⠁⠀
-⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⢉⣡⣾⣿⣿⣿⣿⠿⣟⣾⣿⢳⣨⣿⣿⡛⢇⣽⣿⣿⣿⣿⣿⣿⣧⠹⣿⣿⣶⠈⢿⣿⣿⣧⡉⢿⣿⣿⣽⣿⡷⢋⡈⣀⠀⠀
-⠀⠀⠀⠀⡆⠀⠀⠀⠘⣦⡄⠀⠀⣰⣿⣿⣿⣿⢿⣻⣿⣿⣿⣿⣟⠘⣿⣿⣿⣿⣿⣿⣿⣿⣻⣽⣿⡿⣿⣷⣌⠉⠍⠃⢸⣿⣿⣿⡷⡈⢿⣿⣿⡏⣲⣿⡷⢍⣨⢒
-⠀⠀⠨⠙⠃⠀⠀⠀⢸⣷⡏⠀⠸⣱⣾⣿⣷⣿⣿⣿⢻⣭⣛⡝⣉⣠⣿⣿⣿⣻⣿⣿⣽⣿⣿⢿⡷⡙⣿⣿⠿⣿⣿⣿⣿⣿⣿⣻⡟⢠⢹⣿⠯⢱⣴⡾⣱⡿⢿⣿
-⠀⠀⠀⠀⠀⠀⠀⠀⢸⣿⡃⠄⣠⣿⣿⡟⣿⣿⣿⣿⠘⡜⢿⣿⣿⣿⣿⣿⣿⣿⠄⡻⢿⣿⣿⢛⡧⠀⣿⣿⣧⠛⢻⡛⠿⠿⠿⠟⠃⠄⢸⣿⠃⣿⣿⣣⠇⡸⢸⣿
-⠀⠀⠀⠀⠀⠀⠀⠀⡏⢿⡅⢀⠙⢿⠇⣸⣿⣿⡷⠋⡀⠈⠀⡉⢛⠻⣛⡿⣽⠏⠀⠀⠘⣿⡏⠰⠂⢁⣿⣧⡙⠿⣶⣌⠁⠊⠀⠂⢁⣠⣾⢁⠞⣿⣿⣿⡾⢃⣾⣿
-⠀⠀⠀⠀⠀⠀⠀⠀⠜⠸⣿⣶⣤⡾⡀⣏⣿⡗⠠⠑⢀⣴⣿⣶⣄⡁⢈⠀⠁⠀⣰⢎⢸⡟⠀⠡⠀⣺⣿⣿⡟⣰⣤⣤⣤⣴⣾⣿⣿⣿⣿⣼⣼⣿⣟⣶⣶⡿⠛⢉
-⠀⠀⠀⠀⠀⠀⠀⠀⠈⢂⠌⠛⠊⠑⢠⠃⡿⠀⠄⣰⣿⣿⣿⣿⣿⠏⢀⡰⢶⣫⠗⠫⠎⠀⢈⣀⠐⢈⠻⡼⣗⠰⡿⣿⠁⡿⢋⡝⠶⣛⠿⢻⠿⠟⣡⢿⢫⣴⣿⣿
-⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣈⡤⢐⠀⠤⠘⡐⠀⢰⣯⢟⡩⣬⠛⢊⡎⡀⠩⣤⣄⣤⣥⡀⣴⢾⣻⣟⣄⠈⡕⢃⠸⢡⠋⡀⠁⠃⠌⠴⣁⠚⢤⡠⡴⣽⡿⣼⣿⣿⣿
-⠀⠀⠀⠀⠀⠀⠀⠀⣠⡾⠟⠙⠂⠀⠂⠄⠐⠀⡞⣭⢆⠾⠜⣼⠟⢀⠀⣠⣿⣿⣿⣿⢻⣭⣿⣳⢟⡾⠀⠐⠀⢀⠆⠊⣤⠞⠋⠛⠱⡄⠩⢄⠳⣱⢎⡵⣛⣟⡿⠟
-⠀⠀⠀⠀⠈⠔⠲⠛⠙⠁⢀⡀⠄⠀⠁⡀⣺⠑⠆⣿⣈⠻⠛⠁⠀⣲⣽⣾⣿⣿⢏⣥⢏⣼⣟⣧⠿⠁⠀⠀⠀⠌⢠⡞⠁⠀⠀⠀⠀⡇⡘⠤⢃⡉⡙⠛⠛⢉⡐⡌
-⠀⠀⠀⠀⠀⠀⠑⠂⠒⠈⠂⠐⠠⠀⠀⢠⠐⠧⠂⡷⠉⠒⠀⡀⢄⠛⠿⢛⣋⡴⢛⣵⠾⠿⣽⡚⢠⢀⡤⢶⠀⠀⡟⠲⠀⠀⠀⠂⢡⠇⠀⡉⠀⠁⠱⢪⠤⡃⠘⠈
-⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢠⣶⡈⢸⠧⠈⠃⢐⣽⣴⣿⣟⣯⣟⣯⣯⣭⣶⠿⠋⢀⠀⠱⣣⢗⡣⡼⢯⡁⢀⠠⠀⠁⠀⠀⠌⡼⠁⢠⢐⡡⠎⡄⠈⢧⡁⢎⡱
-⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⠟⡙⠇⠀⠇⢠⢶⣛⠞⣻⣿⣾⡿⠿⠛⣋⣡⣦⢶⣿⠆⡀⠐⣯⣛⢶⡻⣽⠀⡀⠀⢂⣀⣄⡤⠞⠁⡘⢄⠲⡐⢣⡘⠁⢆⡱⢊⡵
-⠀⠀⠀⠀⠀⠀⠀⠠⠤⢤⣶⣻⣞⠇⠀⢂⢸⡆⠳⣄⣥⠿⠋⣡⣴⣾⣿⣿⡿⠻⢈⠫⡀⠀⢸⢧⣛⡾⣹⢳⠀⠀⠈⠓⠉⠂⠀⡀⢀⠠⠌⢢⠱⡡⠜⡱⡊⡔⠋⠐
-⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⠁⠄⠂⠀⠀⡘⡭⢶⠝⣁⣴⣿⣿⡿⢟⣛⣼⣶⣽⣆⢷⣔⢠⡛⣧⢻⡜⣧⠋⠀⠀⠐⠀⠀⠀⠀⡐⢀⠂⠘⡄⢣⠡⣋⠔⠃⢆⠀⠀
-⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢄⡴⠁⢃⠉⣄⢿⣿⢋⣥⣶⣿⣿⣿⣿⣿⡟⢘⡵⣫⢲⣭⢳⡽⡎⠁⢀⠂⠀⠀⠀⠀⠂⠄⠂⠈⠄⠸⡁⠆⢐⠂⠀⠀⠀⠀
-⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠰⠻⣌⠎⢱⣿⣿⣿⣿⣿⡟⢏⣋⡴⣏⠷⣭⢳⣎⠿⡜⠁⠀⠀⠠⠈⡐⠈⠀⠀⠀⠈⠀⠌⠀⠄⡀⠃⠀⠀⠀⠀⢠
-⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢏⡹⡎⢿⣿⣏⣿⠾⢁⣶⡏⠎⠷⠉⠿⠈⠇⠈⠁⠀⠀⠀⡈⠀⠰⠀⠀⠀⠀⠆⠁⠀⢀⠈⠰⠀⠀⠀⠀⠀⠀⣇
-⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠻⣽⠲⠜⠬⣖⠽⠋⠀⢀⢀⠠⡀⠀⠂⠀⠀⠀⠀⠀⠐⠠⠈⢀⠐⠀⣲⢌⠠⢈⠐⠀⢈⠀⠀⠀⠀⠀⠀⠘⢤
-⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠩⣇⣿⣿⠆⣤⠶⠹⠉⠊⠀⠀⠀⠀⠀⠀⠀⠀⡐⢠⣶⠀⠀⡀⢀⣟⢪⠷⡄⠌⠠⠀⠀⠀⠀⠀⠀⠀⡘⠤
-⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⢻⣿⣜⠃⠁⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣐⡼⣳⡿⠀⢀⠀⡸⠆⠘⢋⡉⠴⣀⣖⣰⠢⡄⢄⠀⠐⠈⣐
-⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⠂⠀⠀⣠⠴⠂⠀⠀⠀⠀⠀⣀⣲⡽⣳⢿⡇⠀⠂⡰⠏⣡⡘⢤⣾⣷⣿⡿⠁⠠⠐⣈⣢⣴⣿⣿
-⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⣀⣤⡠⢄⠀⠀⠀⡠⠔⠋⠀⠀⠀⠀⢠⡔⣀⣡⢾⡱⢯⡽⣿⠂⠁⢀⣡⣾⣵⣿⣿⡿⠟⠿⢻⢿⣿⣿⣿⣿⣿⡻⣿
-⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⣴⡿⣿⣻⡇⠌⢀⠔⠉⠀⠀⠀⠀⠀⣀⠠⠸⣜⡻⣟⢧⡻⢍⢿⠏⠀⢰⣛⠿⠻⠿⠛⣫⣴⣿⣿⣿⣳⡜⢿⣿⣿⣿⡗⡸
-⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢜⡷⣿⣻⡝⠀⠄⠂⠀⠀⠀⠀⠀⠐⠀⠀⠀⢰⡌⠓⠹⠊⠁⠸⠂⠀⠄⠛⠽⢻⣿⣿⣷⣿⣿⣿⣿⣿⣿⣿⡘⣿⠿⡝⡰⢱
-⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣠⣿⢻⡽⠃⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢸⡳⢆⠀⠀⠠⠁⠀⡐⠨⢄⢀⣠⣴⣯⣿⡿⣻⣽⣷⠿⣻⣿⣿⣄⠚⡔⣡⠣
-⠀⠀⠀⢀⣤⡴⣞⡶⡆⠀⠀⠀⣰⣟⡇⠹⠀⠀⠀⠀⠀⠀⡀⠂⠀⠀⠀⣠⠴⠀⣠⢿⣍⡏⠂⣀⠦⢠⡴⣶⢮⠄⢸⢧⣟⣿⣿⣿⣶⣌⠘⣰⣿⣿⣿⢿⣆⠜⡠⢓
-⠀⢀⣶⣻⢮⠟⠭⢳⠏⡀⠀⢀⡽⡾⠅⠀⠀⠀⠀⣀⡤⠌⠀⠀⠀⠠⢉⡀⢀⡐⣧⠟⠈⠀⠘⣡⠀⣷⡹⣿⣯⠀⠸⣧⢿⣖⣿⣿⣿⣿⣎⢟⣾⣽⣿⣿⣿⣮⠐⡣
-⢠⣟⣮⢗⠋⣠⠂⢹⡞⣵⣲⢯⡿⠁⠀⠀⣤⣶⣻⡝⠀⠀⠀⣀⡴⢯⣅⠉⡙⠹⠉⠀⠀⣀⣒⠁⠘⣶⣹⢿⣿⡄⠁⢻⡞⣿⣿⣿⣾⣿⣿⡜⡿⣿⣿⣻⣿⡿⡇⡱
-⢼⣫⢞⡽⠚⠁⢠⡾⣽⣳⢯⣏⣗⠀⠰⣟⡷⣏⡷⠈⢀⡤⢲⢤⡒⢦⣍⠓⠀⣀⠤⠐⢡⢏⡼⡀⠈⢧⣏⢿⣻⣷⠈⠠⣟⡳⢯⡽⣹⢮⣟⡽⡈⠳⣻⢿⣿⣟⡇⠐
-⠀⠉⠈⣀⣰⣞⣯⡟⣷⣫⠿⣼⡞⡯⢠⢿⣹⠝⠁⠃⣎⡜⡣⠊⠕⠚⠉⠂⠁⠀⢀⡤⢸⣚⡴⣳⠈⠐⣞⢯⡽⣿⣧⠐⠈⡟⣡⣿⣿⣿⣿⣿⣽⡛⣭⣿⣟⠧⠀⠀
-⠀⠀⢠⡟⣧⡟⣮⡟⢳⣽⠛⡅⠉⠒⠂⠂⠃⠀⠀⠁⢠⠀⠀⣬⣴⣾⠁⠀⠀⠀⢹⣤⠘⡆⣽⡟⡇⠀⡌⣷⢻⡟⣿⣦⠁⢠⢹⣿⣿⣿⢸⡟⢳⠁⡞⣼⢫⡟⢠⠀
-⣀⣄⠾⣽⡹⣞⡇⡼⢯⣳⠤⠐⣠⣾⡛⠁⠀⢀⡄⡀⠀⠀⢁⡂⠝⠂⠀⠀⠀⠁⠰⣯⠀⡇⢸⡿⣽⠄⠐⡽⣚⣿⡿⣿⣂⠀⢸⠛⠿⠛⠀⠋⠁⣰⢳⡹⢞⡂⠌⡐
-⡻⠘⣉⢶⡻⡵⠂⠀⠋⢀⣴⡻⣝⠆⠀⠀⠀⠁⠈⡁⠁⠀⣿⡽⡆⠁⠤⡀⠈⠄⠁⣿⠃⡰⢈⡽⣛⢆⠨⡳⣭⢻⣿⣟⣿⡝⣏⠷⣤⣀⣀⡠⢞⡵⣫⠝⠃⠀⡐⠠
-⠁⢬⣛⡎⠁⠀⠀⠀⢸⠛⣸⢳⠉⠀⠀⡴⢩⢍⢣⢭⠁⢸⣗⡻⠀⠀⠀⠑⢄⠐⠠⢸⠧⡱⢈⠶⣩⢞⡠⢗⡥⠙⢺⢟⣯⢟⡼⣓⠆⠳⠬⠳⠍⠒⠁⠀⡐⠠⢀⠁
-⠈⢲⡍⠀⠀⠀⠀⠀⠀⣸⢧⠃⠀⠀⢸⡐⢣⠎⡎⠖⠀⣾⡹⡇⠀⠀⢤⢲⡠⢳⡀⠈⡳⠅⠸⣍⢻⢿⡰⢫⡜⡂⠘⠎⡜⣎⠶⠁⠀⠂⠀⠄⠀⠄⠂⠁⡀⠂⠄⠂
-⢂⠁⡎⠀⠀⠀⠀⠀⢐⣏⠆⠀⠀⠀⠀⠹⣄⠢⣄⠈⠠⣗⢿⠁⠀⣜⢣⡳⢜⡣⠄⢡⠘⡁⠘⠨⠌⠩⠓⠣⠜⠡⠀⠀⠀⠀⠀⠀⠈⠀⠀⠀⢀⠂⢈⠀⠄⡁⠐⠠
-⠠⠈⣅⠀⠀⠀⠀⠀⡞⠄⠀⠀⠀⠀⠀⠀⠊⠱⠌⡆⠸⣝⡾⠀⠀⣏⠶⣙⢮⡱⡌⠀⠁⠠⠀⠂⠈⠀⠀⠀⠀⠄⠀⠄⠀⠀⠀⠀⠀⠀⠀⠈⢀⠀⠂⠀⡐⠀⣌⠐
-⠀⠀⠈⡉⢀⠀⠀⢀⠋⠀⠀⠀⠀⠀⠀⠀⠀⠀⠁⠀⢸⣏⡞⠀⠀⠊⢁⡴⣣⢷⠩⠆⠠⢀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⠀⠐⠀⠀⠁⠀⠈⡀⠄⠂⢁⢰⢧⣛⣧⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
-"""
+
 
 
 from .config import (
@@ -68,7 +24,7 @@ from .config import (
     COLOR_SECONDARY_TEXT, COLOR_HIGHLIGHT_FG, COLOR_HIGHLIGHT_BG,
     COLOR_ERROR, COLOR_LOADING_SPINNER, COLOR_ASCII, HEADER_ART
 )
-from .utils import get_key
+from .utils import get_key, RawTerminal
 from . import config as config_module
 
 class UIManager:
@@ -87,6 +43,7 @@ class UIManager:
         self.console = Console(theme=self.theme)
 
     def clear(self):
+        os.system('cls' if os.name == 'nt' else 'clear')
         self.console.clear()
 
     def print(self, *args, **kwargs):
@@ -243,10 +200,22 @@ class UIManager:
             stats_table = Table.grid(padding=(0, 1), expand=False)
             stats_table.add_column(style="secondary", no_wrap=True, min_width=12)
             stats_table.add_column(style="info", no_wrap=True)
-            score_text = "Not found." if selected_anime.score == "0" or selected_anime.score == 0 else f"⭐ {selected_anime.score}/10"
+            
+            score_val = selected_anime.score
+            if score_val in ["0", 0, "N/A", "None", None]:
+                score_text = "Not found."
+            else:
+                score_text = f"⭐ {score_val}/10"
+            
+            rank_val = selected_anime.rank
+            rank_text = "N/A" if rank_val in ["N/A", "None", None] else f"#{rank_val}"
+
+            pop_val = selected_anime.popularity
+            pop_text = "N/A" if pop_val in ["N/A", "None", None] else f"#{pop_val}"
+
             stats_table.add_row("Score:", Text(score_text, style="#FFA500"))
-            stats_table.add_row("Rank:", Text(f"#{selected_anime.rank}", style="title"))
-            stats_table.add_row("Popularity:", Text(f"#{selected_anime.popularity}", style="title"))
+            stats_table.add_row("Rank:", Text(rank_text, style="title"))
+            stats_table.add_row("Popularity:", Text(pop_text, style="title"))
             stats_table.add_row("Rating:", selected_anime.rating)
             stats_table.add_row("Type:", selected_anime.type)
             stats_table.add_row("Episodes:", selected_anime.episodes)
@@ -277,29 +246,30 @@ class UIManager:
 
         self.clear()
         
-        with Live(generate_renderable(), console=self.console, auto_refresh=False, screen=True, refresh_per_second=10) as live:
-            while True:
-                key = get_key()
-                max_display = target_height - 11 - 3 - 2
-                
-                if key == 'UP' and selected > 0:
-                    selected -= 1
-                    if selected < scroll_offset:
-                        scroll_offset = selected
-                    live.update(generate_renderable(), refresh=True)
-                elif key == 'DOWN' and selected < len(results) - 1:
-                    selected += 1
-                    if selected >= scroll_offset + max_display:
-                        scroll_offset = selected - max_display + 1
-                    live.update(generate_renderable(), refresh=True)
-                elif key == 'ENTER':
-                    return selected
-                elif key == 'b':
-                    return None
-                elif key == 'q' or key == 'ESC':
-                    return -1
-                
-                time.sleep(0.005)
+        with RawTerminal():
+            with Live(generate_renderable(), console=self.console, auto_refresh=False, screen=True, refresh_per_second=10) as live:
+                while True:
+                    key = get_key()
+                    max_display = target_height - 11 - 3 - 2
+                    
+                    if key == 'UP' and selected > 0:
+                        selected -= 1
+                        if selected < scroll_offset:
+                            scroll_offset = selected
+                        live.update(generate_renderable(), refresh=True)
+                    elif key == 'DOWN' and selected < len(results) - 1:
+                        selected += 1
+                        if selected >= scroll_offset + max_display:
+                            scroll_offset = selected - max_display + 1
+                        live.update(generate_renderable(), refresh=True)
+                    elif key == 'ENTER':
+                        return selected
+                    elif key == 'b':
+                        return None
+                    elif key == 'q' or key == 'ESC':
+                        return -1
+                    
+                    time.sleep(0.005)
 
     def episode_selection_menu(self, anime_title, episodes, rpc_manager=None, anime_poster=None, last_watched_ep=None, is_favorite=False, anime_details=None):
         selected = 0
@@ -401,9 +371,17 @@ class UIManager:
                 stats_table.add_column(style="secondary", no_wrap=True, min_width=10)
                 stats_table.add_column(style="info", no_wrap=True)
                 
-                score_text = "Not found." if anime_details.get('score') in ["0", 0, None] else f"⭐ {anime_details.get('score', 'N/A')}/10"
+                score_val = anime_details.get('score')
+                if score_val in ["0", 0, "N/A", "None", None]:
+                    score_text = "Not found."
+                else:
+                    score_text = f"⭐ {score_val}/10"
+
+                rank_val = anime_details.get('rank')
+                rank_text = "N/A" if rank_val in ["N/A", "None", None] else f"#{rank_val}"
+
                 stats_table.add_row("Score:", Text(score_text, style="#FFA500"))
-                stats_table.add_row("Rank:", Text(f"#{anime_details.get('rank', 'N/A')}", style="title"))
+                stats_table.add_row("Rank:", Text(rank_text, style="title"))
                 stats_table.add_row("Type:", anime_details.get('type', 'N/A'))
                 stats_table.add_row("Episodes:", str(anime_details.get('episodes', 'N/A')))
                 stats_table.add_row("Status:", anime_details.get('status', 'N/A'))
@@ -448,75 +426,76 @@ class UIManager:
 
         self.clear()
 
-        with Live(generate_renderable(), console=self.console, auto_refresh=False, screen=True, refresh_per_second=10) as live:
-            while True:
-                key = get_key()
-                max_display = target_height - 3 - 3 - 2
-                
-                if key == 'UP' and selected > 0:
-                    selected -= 1
-                    if selected < scroll_offset:
-                        scroll_offset = selected
-                    live.update(generate_renderable(), refresh=True)
-                elif key == 'DOWN' and selected < len(episodes) - 1:
-                    selected += 1
-                    if selected >= scroll_offset + max_display:
-                        scroll_offset = selected - max_display + 1
-                    live.update(generate_renderable(), refresh=True)
-                elif key == 'ENTER':
-                    return selected
-                elif key == 'f' or key == 'F':
-                    return 'toggle_fav'
-                elif key == 'm' or key == 'M':
-                    return 'batch_mode'
-                elif key == 'g':
-                    live.stop()
-                    try:
-                        prompt_panel = Panel(
-                            Text("Jump to episode number:", style="info", justify="center"), 
-                            box=HEAVY, 
-                            border_style=COLOR_BORDER,
-                        )
-
-                        self.console.print(Align.center(prompt_panel, vertical="middle", height=7))
-                        
-                        prompt_string = f" {Text('›', style=COLOR_PROMPT)} "
-                        pad_width = (self.console.width - 30) // 2
-                        padding = " " * max(0, pad_width)
-
-                        ep_input = Prompt.ask(f"{padding}{prompt_string}", console=self.console)
-                        
-                        try:
-                            ep_num_float = float(ep_input)
-                            target_idx = -1
-                            for idx, ep in enumerate(episodes):
-                                if float(ep.display_num) == ep_num_float:
-                                    target_idx = idx
-                                    break
-                            
-                            if target_idx != -1:
-                                selected = target_idx
-                                scroll_offset = max(0, selected - (max_display // 2))
-                            else:
-                                self.console.print(Text(f"Episode {ep_input} not found.", style="error"))
-                                time.sleep(1)
-                        except ValueError:
-                            self.console.print(Text("Invalid number.", style="error"))
-                            time.sleep(1)
-
-                    except Exception:
-                        pass
+        with RawTerminal():
+            with Live(generate_renderable(), console=self.console, auto_refresh=False, screen=True, refresh_per_second=10) as live:
+                while True:
+                    key = get_key()
+                    max_display = target_height - 3 - 3 - 2
                     
-                    self.clear()
-                    live.start()
-                    live.update(generate_renderable(), refresh=True)
+                    if key == 'UP' and selected > 0:
+                        selected -= 1
+                        if selected < scroll_offset:
+                            scroll_offset = selected
+                        live.update(generate_renderable(), refresh=True)
+                    elif key == 'DOWN' and selected < len(episodes) - 1:
+                        selected += 1
+                        if selected >= scroll_offset + max_display:
+                            scroll_offset = selected - max_display + 1
+                        live.update(generate_renderable(), refresh=True)
+                    elif key == 'ENTER':
+                        return selected
+                    elif key == 'f' or key == 'F':
+                        return 'toggle_fav'
+                    elif key == 'm' or key == 'M':
+                        return 'batch_mode'
+                    elif key == 'g':
+                        live.stop()
+                        try:
+                            prompt_panel = Panel(
+                                Text("Jump to episode number:", style="info", justify="center"), 
+                                box=HEAVY, 
+                                border_style=COLOR_BORDER,
+                            )
+
+                            self.console.print(Align.center(prompt_panel, vertical="middle", height=7))
+                            
+                            prompt_string = f" {Text('›', style=COLOR_PROMPT)} "
+                            pad_width = (self.console.width - 30) // 2
+                            padding = " " * max(0, pad_width)
+
+                            ep_input = Prompt.ask(f"{padding}{prompt_string}", console=self.console)
+                            
+                            try:
+                                ep_num_float = float(ep_input)
+                                target_idx = -1
+                                for idx, ep in enumerate(episodes):
+                                    if float(ep.display_num) == ep_num_float:
+                                        target_idx = idx
+                                        break
+                                
+                                if target_idx != -1:
+                                    selected = target_idx
+                                    scroll_offset = max(0, selected - (max_display // 2))
+                                else:
+                                    self.console.print(Text(f"Episode {ep_input} not found.", style="error"))
+                                    time.sleep(1)
+                            except ValueError:
+                                self.console.print(Text("Invalid number.", style="error"))
+                                time.sleep(1)
+
+                        except Exception:
+                            pass
+                        
+                        self.clear()
+                        live.start()
+                        live.update(generate_renderable(), refresh=True)
                 
-                elif key == 'b':
-                    return None
-                elif key == 'q' or key == 'ESC':
-                    return -1
+                    elif key == 'b':
+                        return None
+                    elif key == 'q' or key == 'ESC':
+                        return -1
                 
-                time.sleep(0.005)
+                time.sleep(0.05)
 
     def batch_selection_menu(self, episodes):
         selected = 0
@@ -551,39 +530,40 @@ class UIManager:
 
         self.clear()
         
-        with Live(Align.center(generate_renderable(), vertical="middle", height=self.console.height), console=self.console, auto_refresh=False, screen=True, refresh_per_second=10) as live:
-            while True:
-                key = get_key()
-                max_display = self.console.height - 10
-                
-                if key == 'UP' and selected > 0:
-                    selected -= 1
-                    if selected < scroll_offset:
-                        scroll_offset = selected
-                    live.update(Align.center(generate_renderable(), vertical="middle", height=self.console.height), refresh=True)
-                elif key == 'DOWN' and selected < len(episodes) - 1:
-                    selected += 1
-                    if selected >= scroll_offset + max_display:
-                        scroll_offset = selected - max_display + 1
-                    live.update(Align.center(generate_renderable(), vertical="middle", height=self.console.height), refresh=True)
-                elif key == ' ':
-                    if selected in marked:
-                        marked.remove(selected)
-                    else:
-                        marked.add(selected)
-                    live.update(Align.center(generate_renderable(), vertical="middle", height=self.console.height), refresh=True)
-                elif key == 'a' or key == 'A':
-                    marked = set(range(len(episodes)))
-                    live.update(Align.center(generate_renderable(), vertical="middle", height=self.console.height), refresh=True)
-                elif key == 'n' or key == 'N':
-                    marked.clear()
-                    live.update(Align.center(generate_renderable(), vertical="middle", height=self.console.height), refresh=True)
-                elif key == 'ENTER':
-                    return sorted(list(marked))
-                elif key == 'b' or key == 'ESC':
-                    return None
-                
-                time.sleep(0.005)
+        with RawTerminal():
+            with Live(Align.center(generate_renderable(), vertical="middle", height=self.console.height), console=self.console, auto_refresh=False, screen=True, refresh_per_second=10) as live:
+                while True:
+                    key = get_key()
+                    max_display = self.console.height - 10
+                    
+                    if key == 'UP' and selected > 0:
+                        selected -= 1
+                        if selected < scroll_offset:
+                            scroll_offset = selected
+                        live.update(Align.center(generate_renderable(), vertical="middle", height=self.console.height), refresh=True)
+                    elif key == 'DOWN' and selected < len(episodes) - 1:
+                        selected += 1
+                        if selected >= scroll_offset + max_display:
+                            scroll_offset = selected - max_display + 1
+                        live.update(Align.center(generate_renderable(), vertical="middle", height=self.console.height), refresh=True)
+                    elif key == ' ':
+                        if selected in marked:
+                            marked.remove(selected)
+                        else:
+                            marked.add(selected)
+                        live.update(Align.center(generate_renderable(), vertical="middle", height=self.console.height), refresh=True)
+                    elif key == 'a' or key == 'A':
+                        marked = set(range(len(episodes)))
+                        live.update(Align.center(generate_renderable(), vertical="middle", height=self.console.height), refresh=True)
+                    elif key == 'n' or key == 'N':
+                        marked.clear()
+                        live.update(Align.center(generate_renderable(), vertical="middle", height=self.console.height), refresh=True)
+                    elif key == 'ENTER':
+                        return sorted(list(marked))
+                    elif key == 'b' or key == 'ESC':
+                        return None
+                    
+                    time.sleep(0.05)
 
     def history_menu(self, history_items):
         selected = 0
@@ -628,27 +608,28 @@ class UIManager:
 
         self.clear()
         
-        with Live(Align.center(generate_renderable(), vertical="middle", height=self.console.height), console=self.console, auto_refresh=False, screen=True, refresh_per_second=10) as live:
-            while True:
-                key = get_key()
-                max_display = self.console.height - 10
-                
-                if key == 'UP' and selected > 0:
-                    selected -= 1
-                    if selected < scroll_offset:
-                        scroll_offset = selected
-                    live.update(Align.center(generate_renderable(), vertical="middle", height=self.console.height), refresh=True)
-                elif key == 'DOWN' and selected < len(history_items) - 1:
-                    selected += 1
-                    if selected >= scroll_offset + max_display:
-                        scroll_offset = selected - max_display + 1
-                    live.update(Align.center(generate_renderable(), vertical="middle", height=self.console.height), refresh=True)
-                elif key == 'ENTER':
-                    return selected
-                elif key == 'b' or key == 'ESC':
-                    return None
-                
-                time.sleep(0.005)
+        with RawTerminal():
+            with Live(Align.center(generate_renderable(), vertical="middle", height=self.console.height), console=self.console, auto_refresh=False, screen=True, refresh_per_second=10) as live:
+                while True:
+                    key = get_key()
+                    max_display = self.console.height - 10
+                    
+                    if key == 'UP' and selected > 0:
+                        selected -= 1
+                        if selected < scroll_offset:
+                            scroll_offset = selected
+                        live.update(Align.center(generate_renderable(), vertical="middle", height=self.console.height), refresh=True)
+                    elif key == 'DOWN' and selected < len(history_items) - 1:
+                        selected += 1
+                        if selected >= scroll_offset + max_display:
+                            scroll_offset = selected - max_display + 1
+                        live.update(Align.center(generate_renderable(), vertical="middle", height=self.console.height), refresh=True)
+                    elif key == 'ENTER':
+                        return selected
+                    elif key == 'b' or key == 'ESC':
+                        return None
+                    
+                    time.sleep(0.05)
 
     def favorites_menu(self, fav_items):
         selected = 0
@@ -690,29 +671,30 @@ class UIManager:
 
         self.clear()
         
-        with Live(Align.center(generate_renderable(), vertical="middle", height=self.console.height), console=self.console, auto_refresh=False, screen=True, refresh_per_second=10) as live:
-            while True:
-                key = get_key()
-                max_display = self.console.height - 10
-                
-                if key == 'UP' and selected > 0:
-                    selected -= 1
-                    if selected < scroll_offset:
-                        scroll_offset = selected
-                    live.update(Align.center(generate_renderable(), vertical="middle", height=self.console.height), refresh=True)
-                elif key == 'DOWN' and selected < len(fav_items) - 1:
-                    selected += 1
-                    if selected >= scroll_offset + max_display:
-                        scroll_offset = selected - max_display + 1
-                    live.update(Align.center(generate_renderable(), vertical="middle", height=self.console.height), refresh=True)
-                elif key == 'ENTER':
-                    return (selected, 'watch')
-                elif key == 'r' or key == 'R':
-                    return (selected, 'remove')
-                elif key == 'b' or key == 'ESC':
-                    return None
-                
-                time.sleep(0.005)
+        with RawTerminal():
+            with Live(Align.center(generate_renderable(), vertical="middle", height=self.console.height), console=self.console, auto_refresh=False, screen=True, refresh_per_second=10) as live:
+                while True:
+                    key = get_key()
+                    max_display = self.console.height - 10
+                    
+                    if key == 'UP' and selected > 0:
+                        selected -= 1
+                        if selected < scroll_offset:
+                            scroll_offset = selected
+                        live.update(Align.center(generate_renderable(), vertical="middle", height=self.console.height), refresh=True)
+                    elif key == 'DOWN' and selected < len(fav_items) - 1:
+                        selected += 1
+                        if selected >= scroll_offset + max_display:
+                            scroll_offset = selected - max_display + 1
+                        live.update(Align.center(generate_renderable(), vertical="middle", height=self.console.height), refresh=True)
+                    elif key == 'ENTER':
+                        return (selected, 'watch')
+                    elif key == 'r' or key == 'R':
+                        return (selected, 'remove')
+                    elif key == 'b' or key == 'ESC':
+                        return None
+                    
+                    time.sleep(0.05)
 
     def settings_menu(self, settings_mgr):
         options = [
@@ -752,58 +734,59 @@ class UIManager:
 
         self.clear()
         
-        with Live(Align.center(generate_renderable(), vertical="middle", height=self.console.height), console=self.console, auto_refresh=False, screen=True, refresh_per_second=10) as live:
-            while True:
-                key = get_key()
-                
-                if key == 'UP' and selected > 0:
-                    selected -= 1
-                    live.update(Align.center(generate_renderable(), vertical="middle", height=self.console.height), refresh=True)
-                elif key == 'DOWN' and selected < len(options) - 1:
-                    selected += 1
-                    live.update(Align.center(generate_renderable(), vertical="middle", height=self.console.height), refresh=True)
-                elif key == 'ENTER':
-                    label, choices, key_name = options[selected]
-                    current_val = settings_mgr.get(key_name)
+        with RawTerminal():
+            with Live(Align.center(generate_renderable(), vertical="middle", height=self.console.height), console=self.console, auto_refresh=False, screen=True, refresh_per_second=10) as live:
+                while True:
+                    key = get_key()
                     
-                    # Cycle through choices
-                    try:
-                        curr_idx = choices.index(current_val)
-                        new_val = choices[(curr_idx + 1) % len(choices)]
-                    except ValueError:
-                        new_val = choices[0]
+                    if key == 'UP' and selected > 0:
+                        selected -= 1
+                        live.update(Align.center(generate_renderable(), vertical="middle", height=self.console.height), refresh=True)
+                    elif key == 'DOWN' and selected < len(options) - 1:
+                        selected += 1
+                        live.update(Align.center(generate_renderable(), vertical="middle", height=self.console.height), refresh=True)
+                    elif key == 'ENTER':
+                        label, choices, key_name = options[selected]
+                        current_val = settings_mgr.get(key_name)
                         
-                    settings_mgr.set(key_name, new_val)
+                        # Cycle through choices
+                        try:
+                            curr_idx = choices.index(current_val)
+                            new_val = choices[(curr_idx + 1) % len(choices)]
+                        except ValueError:
+                            new_val = choices[0]
+                            
+                        settings_mgr.set(key_name, new_val)
+                        
+                        # Reload colors if theme changed and apply immediately
+                        if key_name == "theme":
+                            theme_changed = True  # Mark that theme was changed
+                            importlib.reload(config_module)
+                            self.theme = Theme({
+                                "panel.border": config_module.COLOR_BORDER,
+                                "prompt.prompt": config_module.COLOR_PROMPT,
+                                "prompt.default": config_module.COLOR_PRIMARY_TEXT,
+                                "title": config_module.COLOR_TITLE,
+                                "secondary": config_module.COLOR_SECONDARY_TEXT,
+                                "highlight": f"{config_module.COLOR_HIGHLIGHT_FG} on {config_module.COLOR_HIGHLIGHT_BG}",
+                                "error": config_module.COLOR_ERROR,
+                                "info": config_module.COLOR_PRIMARY_TEXT,
+                                "loading": config_module.COLOR_LOADING_SPINNER,
+                            })
+                            self.console = Console(theme=self.theme)
+                        
+                        live.update(Align.center(generate_renderable(), vertical="middle", height=self.console.height), refresh=True)
+                    elif key == 'b' or key == 'ESC':
+                        # If theme was changed, exit app to apply globally
+                        if theme_changed:
+                            self.console.clear()
+                            self.console.print("\n[bold cyan]Theme changed! Exiting application...[/bold cyan]")
+                            self.console.print("[dim]Please run the application again to apply the new theme.[/dim]\n")
+                            time.sleep(2)
+                            sys.exit(0)
+                        return
                     
-                    # Reload colors if theme changed and apply immediately
-                    if key_name == "theme":
-                        theme_changed = True  # Mark that theme was changed
-                        importlib.reload(config_module)
-                        self.theme = Theme({
-                            "panel.border": config_module.COLOR_BORDER,
-                            "prompt.prompt": config_module.COLOR_PROMPT,
-                            "prompt.default": config_module.COLOR_PRIMARY_TEXT,
-                            "title": config_module.COLOR_TITLE,
-                            "secondary": config_module.COLOR_SECONDARY_TEXT,
-                            "highlight": f"{config_module.COLOR_HIGHLIGHT_FG} on {config_module.COLOR_HIGHLIGHT_BG}",
-                            "error": config_module.COLOR_ERROR,
-                            "info": config_module.COLOR_PRIMARY_TEXT,
-                            "loading": config_module.COLOR_LOADING_SPINNER,
-                        })
-                        self.console = Console(theme=self.theme)
-                    
-                    live.update(Align.center(generate_renderable(), vertical="middle", height=self.console.height), refresh=True)
-                elif key == 'b' or key == 'ESC':
-                    # If theme was changed, exit app to apply globally
-                    if theme_changed:
-                        self.console.clear()
-                        self.console.print("\n[bold cyan]Theme changed! Exiting application...[/bold cyan]")
-                        self.console.print("[dim]Please run the application again to apply the new theme.[/dim]\n")
-                        time.sleep(2)
-                        sys.exit(0)
-                    return
-                
-                time.sleep(0.005)
+                    time.sleep(0.05)
 
     def quality_selection_menu(self, anime_title, episode_num, available_qualities, rpc_manager=None, anime_poster=None):
         if rpc_manager:
@@ -833,26 +816,27 @@ class UIManager:
 
         self.clear()
         
-        with Live(Align.center(generate_renderable(), vertical="middle", height=self.console.height), console=self.console, auto_refresh=False, screen=True, refresh_per_second=10) as live:
-            while True:
-                key = get_key()
-                
-                if key == 'UP' and selected > 0:
-                    selected -= 1
-                    live.update(Align.center(generate_renderable(), vertical="middle", height=self.console.height), refresh=True)
-                elif key == 'DOWN' and selected < len(available_qualities) - 1:
-                    selected += 1
-                    live.update(Align.center(generate_renderable(), vertical="middle", height=self.console.height), refresh=True)
-                elif key == 'ENTER':
-                    return (selected, 'watch')
-                elif key == 'd' or key == 'D':
-                    return (selected, 'download')
-                elif key == 'b':
-                    return None
-                elif key == 'q' or key == 'ESC':
-                    return -1
-                
-                time.sleep(0.005)
+        with RawTerminal():
+            with Live(Align.center(generate_renderable(), vertical="middle", height=self.console.height), console=self.console, auto_refresh=False, screen=True, refresh_per_second=10) as live:
+                while True:
+                    key = get_key()
+                    
+                    if key == 'UP' and selected > 0:
+                        selected -= 1
+                        live.update(Align.center(generate_renderable(), vertical="middle", height=self.console.height), refresh=True)
+                    elif key == 'DOWN' and selected < len(available_qualities) - 1:
+                        selected += 1
+                        live.update(Align.center(generate_renderable(), vertical="middle", height=self.console.height), refresh=True)
+                    elif key == 'ENTER':
+                        return (selected, 'watch')
+                    elif key == 'd' or key == 'D':
+                        return (selected, 'download')
+                    elif key == 'b':
+                        return None
+                    elif key == 'q' or key == 'ESC':
+                        return -1
+                    
+                    time.sleep(0.05)
 
     def post_watch_menu(self):
         options = ["Next Episode", "Previous Episode", "Replay", "Back to List"]
@@ -876,16 +860,19 @@ class UIManager:
             )
 
         self.clear()
-        with Live(Align.center(generate_renderable(), vertical="middle", height=self.console.height), console=self.console, screen=True) as live:
-            while True:
-                key = get_key()
-                if key == 'UP' and selected > 0:
-                    selected -= 1
-                    live.update(Align.center(generate_renderable(), vertical="middle", height=self.console.height))
-                elif key == 'DOWN' and selected < len(options) - 1:
-                    selected += 1
-                    live.update(Align.center(generate_renderable(), vertical="middle", height=self.console.height))
-                elif key == 'ENTER':
-                    return options[selected]
-                elif key == 'q' or key == 'b' or key == 'ESC':
-                    return "Back to List"
+        with RawTerminal():
+            with Live(Align.center(generate_renderable(), vertical="middle", height=self.console.height), console=self.console, auto_refresh=False, screen=True, refresh_per_second=10) as live:
+                while True:
+                    key = get_key()
+                    if key == 'UP' and selected > 0:
+                        selected -= 1
+                        live.update(Align.center(generate_renderable(), vertical="middle", height=self.console.height), refresh=True)
+                    elif key == 'DOWN' and selected < len(options) - 1:
+                        selected += 1
+                        live.update(Align.center(generate_renderable(), vertical="middle", height=self.console.height), refresh=True)
+                    elif key == 'ENTER':
+                        return options[selected]
+                    elif key == 'q' or key == 'b' or key == 'ESC':
+                        return "Back to List"
+                    
+                    time.sleep(0.05)

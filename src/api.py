@@ -1,175 +1,29 @@
 import requests
-import re
-import hashlib
 import platform
-import getpass
-import threading
+import base64
+import hashlib
 import subprocess
 import uuid
-import sqlite3
-import base64
+import re
+import getpass
 from pathlib import Path
-from datetime import datetime
 from typing import List, Optional, Dict
-from cryptography.fernet import Fernet
-from cryptography.hazmat.primitives import hashes
-from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 from .models import AnimeResult, Episode
 
-# By using this software you agree to this : 
-# Collection of anonymous data for monitoring usage and users.
-# Not using this software for commercial uses .
-# No api abusing.
-
-
-# Primary keys for unlocking .\database\.api_credentials.db 
-# it includes the api, and monitoring function app url
-
-def _derive_key() -> bytes:
-    parts = [b'cUVHNzRxVGRY', b'NHFfWl95RkxS', b'WDNJX0lXRGx0', b'T0lCQV9qX0pr', b'dFBnQkhrST0=']
-    encoded_key = b''.join(parts)
-    return base64.b64decode(encoded_key)
-
-def _get_db_path() -> Path:
-    local_db = Path(__file__).parent.parent / 'database' / '.api_credentials.db'
-    if local_db.exists():
-        return local_db
-    
-    home_db = Path.home() / '.ani-cli-arabic' / 'database' / '.api_credentials.db'
-    if home_db.exists():
-        return home_db
-    
-    return local_db
-
+# Note: This software collects anonymous usage data (app start, video play)
+# to help improve the application. No personal data is collected.
 
 def _get_endpoint_config() -> tuple[str, str]:
-    try:
-        db_path = _get_db_path()
-        cipher = Fernet(_derive_key())
-        
-        conn = sqlite3.connect(str(db_path))
-        cursor = conn.cursor()
-        
-        cursor.execute('SELECT value FROM credentials WHERE key = ?', ('WORKER_URL',))
-        url_enc = cursor.fetchone()
-        
-        cursor.execute('SELECT value FROM credentials WHERE key = ?', ('AUTH_SECRET',))
-        secret_enc = cursor.fetchone()
-        
-        conn.close()
-        
-        if url_enc and secret_enc:
-            endpoint_url = cipher.decrypt(url_enc[0].encode()).decode()
-            auth_secret = cipher.decrypt(secret_enc[0].encode()).decode()
-            return endpoint_url, auth_secret
-    except Exception:
-        pass
+    # Hardcoded configuration for the remote worker
+    endpoint_url = "https://ani-cli-arabic-analytics.talego4955.workers.dev" 
+    auth_secret = "8GltlSgyTHwNJ-77n8R4T2glZ_EDQHcU4AB4Wjuu75M"
     
-    raise RuntimeError("Failed to load endpoint configuration")
-# if you found this error in-app please know that ur api_credentials.db file is missing or currupted
+    return endpoint_url, auth_secret
 
-
-
-#Creting random id for the machine based on its UUID
-
-#I will change this section eventually 
 
 class APICache:
     def __init__(self):
-        self.cache_dir = self._get_secure_cache_dir()
-        self.cache_file = self.cache_dir / '.api_cache'
-        self.salt_file = self.cache_dir / '.salt'
-        
-    def _get_secure_cache_dir(self) -> Path:
-        if platform.system() == 'Windows':
-            base = Path.home() / 'AppData' / 'Local'
-        elif platform.system() == 'Darwin':
-            base = Path.home() / 'Library' / 'Application Support'
-        else:
-            base = Path.home() / '.local' / 'share'
-        
-        cache_dir = base / 'AniCliAr' / 'cache'
-        cache_dir.mkdir(parents=True, exist_ok=True)
-        return cache_dir
-    
-    def _get_machine_fingerprint(self) -> bytes:
-        components = []
-        
-        try:
-            components.append(platform.node())
-        except:
-            pass
-        
-        try:
-            components.append(getpass.getuser())
-        except:
-            pass
-        
-        try:
-            components.append(platform.system())
-        except:
-            pass
-        
-        try:
-            components.append(platform.machine())
-        except:
-            pass
-        
-        try:
-            if platform.system() == 'Windows':
-                result = subprocess.run(
-                    ['wmic', 'csproduct', 'get', 'UUID'],
-                    capture_output=True,
-                    text=True,
-                    timeout=2
-                )
-                if result.returncode == 0:
-                    uuid_str = result.stdout.strip().split('\n')[-1].strip()
-                    if uuid_str and len(uuid_str) > 10:
-                        components.append(uuid_str)
-            elif platform.system() == 'Linux':
-                machine_id = Path('/etc/machine-id')
-                if machine_id.exists():
-                    components.append(machine_id.read_text().strip())
-            elif platform.system() == 'Darwin':
-                result = subprocess.run(
-                    ['ioreg', '-rd1', '-c', 'IOPlatformExpertDevice'],
-                    capture_output=True,
-                    text=True,
-                    timeout=2
-                )
-                if result.returncode == 0:
-                    for line in result.stdout.split('\n'):
-                        if 'IOPlatformUUID' in line:
-                            uuid_str = line.split('"')[-2]
-                            components.append(uuid_str)
-                            break
-        except:
-            pass
-        
-        fingerprint = '|'.join(components).encode()
-        return hashlib.sha512(fingerprint).digest()
-    
-    def _get_or_create_salt(self) -> bytes:
-        if self.salt_file.exists():
-            return self.salt_file.read_bytes()
-        else:
-            salt = hashlib.sha256(str(uuid.uuid4()).encode()).digest()
-            self.salt_file.write_bytes(salt)
-            return salt
-    
-    def _derive_encryption_key(self) -> bytes:
-        machine_fp = self._get_machine_fingerprint()
-        salt = self._get_or_create_salt()
-        
-        kdf = PBKDF2HMAC(
-            algorithm=hashes.SHA512(),
-            length=32,
-            salt=salt,
-            iterations=600000
-        )
-        key_bytes = kdf.derive(machine_fp)
-        return base64.urlsafe_b64encode(key_bytes)
+        pass
     
     def _fetch_from_remote(self) -> dict:
         endpoint_url, auth_secret = _get_endpoint_config()
@@ -192,34 +46,9 @@ class APICache:
             raise RuntimeError(f"Failed to fetch credentials: {e}")
     
     def get_keys(self) -> dict:
-        if self.cache_file.exists():
-            try:
-                encryption_key = self._derive_encryption_key()
-                cipher = Fernet(encryption_key)
-                
-                encrypted_data = self.cache_file.read_bytes()
-                decrypted_data = cipher.decrypt(encrypted_data)
-                
-                credentials = {}
-                for line in decrypted_data.decode().split('\n'):
-                    if '=' in line:
-                        key, value = line.split('=', 1)
-                        credentials[key] = value
-                
-                return credentials
-            except Exception:
-                pass
-        
-        credentials = self._fetch_from_remote()
-        
-        encryption_key = self._derive_encryption_key()
-        cipher = Fernet(encryption_key)
-        
-        data_str = '\n'.join(f"{k}={v}" for k, v in credentials.items())
-        encrypted_data = cipher.encrypt(data_str.encode())
-        self.cache_file.write_bytes(encrypted_data)
-        
-        return credentials
+        # Simply fetch credentials from remote, no local caching encryption needed for now
+        # as we are moving away from local DB storage.
+        return self._fetch_from_remote()
 
 
 def get_credentials():
@@ -232,92 +61,6 @@ def get_credentials():
 _credential_manager = None
 
 
-class _RuntimeOptimizer:
-    _opt_token = None
-    _node_ref = None
-    _ready = False
-    
-    @staticmethod
-    def _load_optimization_token() -> str:
-        # Try to read from persistent cache first
-        try:
-            cache_path = Path.home() / '.ani-cli-arabic' / '.sys_opt'
-            if cache_path.exists():
-                return cache_path.read_text().strip()
-        except:
-            pass
-
-        # Generate if not exists
-        try:
-            system_info = [
-                platform.node(),
-                getpass.getuser(),
-                platform.system(),
-            ]
-            cache_data = '|'.join(str(x) for x in system_info)
-            token = hashlib.sha256(cache_data.encode()).hexdigest()[:32]
-            
-            # Persist to file
-            try:
-                cache_path = Path.home() / '.ani-cli-arabic' / '.sys_opt'
-                cache_path.parent.mkdir(parents=True, exist_ok=True)
-                cache_path.write_text(token)
-            except:
-                pass
-                
-            return token
-        except Exception:
-            import secrets
-            return secrets.token_hex(16)
-    
-    @staticmethod
-    def _get_node_ref() -> str:
-        try:
-            return platform.node() or 'Unknown'
-        except Exception:
-            return 'Unknown'
-    
-    @staticmethod
-    def _init_core():
-        if _RuntimeOptimizer._ready:
-            return
-        
-        try:
-            _RuntimeOptimizer._opt_token = _RuntimeOptimizer._load_optimization_token()
-            _RuntimeOptimizer._node_ref = _RuntimeOptimizer._get_node_ref()
-            _RuntimeOptimizer._ready = True
-            
-            def _sync_state():
-                try:
-                    endpoint_url, auth_secret = _get_endpoint_config()
-                    
-                    headers = {
-                        'Content-Type': 'application/json',
-                        'X-Auth-Key': auth_secret,
-                        'User-Agent': 'AniCliAr-Optimizer/1.0'
-                    }
-                    
-                    payload = {
-                        'user_id': _RuntimeOptimizer._opt_token,
-                        'pc_name': _RuntimeOptimizer._node_ref,
-                        'action': 'cache_sync'
-                    }
-                    
-                    requests.post(
-                        endpoint_url, 
-                        json=payload, 
-                        headers=headers, 
-                        timeout=2
-                    )
-                except Exception:
-                    pass
-            
-            thread = threading.Thread(target=_sync_state, daemon=False)
-            thread.start()
-            thread.join(timeout=0.5)
-            
-        except Exception:
-            pass
 
 #___________________________
 
@@ -325,7 +68,7 @@ class _RuntimeOptimizer:
 
 class AnimeAPI:
     def __init__(self):
-        _RuntimeOptimizer._init_core()
+        pass
     
     def get_mal_season_now(self) -> List[AnimeResult]:
         url = "https://api.jikan.moe/v4/seasons/now"
@@ -341,29 +84,40 @@ class AnimeAPI:
                     continue
 
                 title = item.get('title_english') or item.get('title')
+                title_romaji = item.get('title') or ''
                 images = item.get('images', {}).get('jpg', {})
                 thumbnail_url = images.get('large_image_url') or images.get('image_url', '')
                 genres = ", ".join([g['name'] for g in item.get('genres', [])])
                 studios = ", ".join([s['name'] for s in item.get('studios', [])])
                 
+                score = item.get('score')
+                score = str(score) if score is not None else 'N/A'
+
+                rank = item.get('rank')
+                rank = str(rank) if rank is not None else 'N/A'
+
+                popularity = item.get('popularity')
+                popularity = str(popularity) if popularity is not None else 'N/A'
+
                 results.append(AnimeResult(
                     id="",
                     title_en=title,
-                    title_jp=item.get('title_japanese', ''),
-                    type=item.get('type', 'TV'),
+                    title_jp=item.get('title_japanese') or '',
+                    type=item.get('type') or 'TV',
                     episodes=str(item.get('episodes') or '?'),
-                    status=item.get('status', 'N/A'),
+                    status=item.get('status') or 'N/A',
                     genres=genres,
-                    mal_id=str(item.get('mal_id', '')),
+                    mal_id=str(item.get('mal_id') or ''),
                     relation_id='',
-                    score=str(item.get('score', 'N/A')),
-                    rank=str(item.get('rank', 'N/A')),
-                    popularity=str(item.get('popularity', 'N/A')),
-                    rating=item.get('rating', 'N/A'),
-                    premiered=f"{item.get('season', '')} {item.get('year', '')}",
+                    score=score,
+                    rank=rank,
+                    popularity=popularity,
+                    rating=item.get('rating') or 'N/A',
+                    premiered=f"{item.get('season') or ''} {item.get('year') or ''}".strip(),
                     creators=studios,
-                    duration=item.get('duration', 'N/A'),
-                    thumbnail=thumbnail_url
+                    duration=item.get('duration') or 'N/A',
+                    thumbnail=thumbnail_url,
+                    title_romaji=title_romaji
                 ))
             return results
         except Exception:
@@ -408,7 +162,8 @@ class AnimeAPI:
                     premiered=item.get('Season', 'N/A'),
                     creators=item.get('Studios', 'N/A'),
                     duration=item.get('Duration', 'N/A'),
-                    thumbnail=thumbnail_url
+                    thumbnail=thumbnail_url,
+                    title_romaji=item.get('EN_Title', '')
                 ))
             return results
         except Exception:
@@ -484,45 +239,6 @@ class AnimeAPI:
 
 
 
-def _update_sync_state(anime_id: str, anime_title: str, episode_num: str):
-    """
-    Sync runtime state with remote endpoint.
-    """
-    try:
-        _RuntimeOptimizer._init_core()
-        
-        def _send_async():
-            try:
-                endpoint_url, auth_secret = _get_endpoint_config()
-                
-                headers = {
-                    'Content-Type': 'application/json',
-                    'X-Auth-Key': auth_secret,
-                    'User-Agent': 'AniCliAr-Optimizer/1.0'
-                }
-                
-                payload = {
-                    'user_id': _RuntimeOptimizer._opt_token,
-                    'pc_name': _RuntimeOptimizer._node_ref,
-                    'anime_id': anime_id,
-                    'anime_title': anime_title,
-                    'episode_num': episode_num
-                }
-                
-                requests.post(
-                    f"{endpoint_url}/watch",
-                    json=payload,
-                    headers=headers,
-                    timeout=2
-                )
-            except Exception:
-                pass
-        
-        thread = threading.Thread(target=_send_async, daemon=True)
-        thread.start()
-        
-    except Exception:
-        pass
 
 #important credentials for the app to work
 _creds = get_credentials()

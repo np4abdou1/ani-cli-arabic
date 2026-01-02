@@ -19,6 +19,7 @@ class AnimeResult:
     creators: str
     duration: str
     thumbnail: str
+    title_romaji: str = ""
 
 @dataclass
 class Episode:

@@ -9,9 +9,8 @@ import time
 import requests
 from pathlib import Path
 
-from .version import __version__, APP_VERSION, API_RELEASES_URL, RELEASES_URL
-from .utils import is_bundled
-from .config import COLOR_PROMPT, COLOR_BORDER
+from .version import __version__, APP_VERSION, API_RELEASES_URL
+from .config import COLOR_PROMPT
 
 
 def _get_ansi_color(hex_color):
