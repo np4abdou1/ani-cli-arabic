@@ -25,7 +25,7 @@ Terminal-based anime streaming with Arabic subtitles
 
 <p align="center">
   <img src="https://img.shields.io/badge/Python-3.8+-3776AB?style=for-the-badge&logo=python&logoColor=white" />
-  <img src="https://img.shields.io/badge/License-Custom-orange?style=for-the-badge" />
+  <img src="https://img.shields.io/badge/License-MIT-green?style=for-the-badge" />
 </p>
 
 <p>لإختيار اللغة العربية اضغط على الزر:</p>
@@ -152,7 +152,7 @@ Access settings menu from the main screen to configure:
 
 ## License
 
-Custom Proprietary License - See [LICENSE](LICENSE) for details.
+MIT License - See [LICENSE](LICENSE) for details.
 
 ---
 
@@ -164,15 +164,9 @@ Custom Proprietary License - See [LICENSE](LICENSE) for details.
 
 > [!IMPORTANT]
 > **By using this software you agree to:**
-> - Collection of anonymous data for monitoring usage and users
-> - Not using this software for commercial uses
-> - No API abusing
+> - Collection of anonymous data for monitoring usage (app start, video play) to improve the application.
+> - No API abusing.
 
 > **License Terms:**  
-> This software is licensed for **personal, non-commercial use only**. You may modify the frontend/UI, but **API abuse or reverse-engineering is strictly prohibited**. Commercial use requires prior written permission.  
-> 
-> **API Usage:**  
-> The backend API is private and closed-source. Any attempt to extract, abuse, or redistribute API credentials will result in immediate access termination. Frontend modifications are welcome; backend modifications are not permitted.
-
-For commercial licensing inquiries, please contact the repository owner.
+> This software is licensed under the **MIT License**. You are free to use, modify, and distribute it.
 

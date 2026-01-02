@@ -1,2 +1,2 @@
-:HL["/ani-cli-arabic/_next/static/chunks/176a5bccc0277825.css","style"]
-0:{"buildId":"5xPGiz8AvmJ2G0A_bVCmq","tree":{"name":"","paramType":null,"paramKey":"","hasRuntimePrefetch":false,"slots":{"children":{"name":"__PAGE__","paramType":null,"paramKey":"__PAGE__","hasRuntimePrefetch":false,"slots":null,"isRootLayout":false}},"isRootLayout":true},"staleTime":300}
+:HL["/ani-cli-arabic/_next/static/chunks/6dc340261e1e35e9.css","style"]
+0:{"buildId":"PToytXpTqmXsuurheqYqN","tree":{"name":"","paramType":null,"paramKey":"","hasRuntimePrefetch":false,"slots":{"children":{"name":"__PAGE__","paramType":null,"paramKey":"__PAGE__","hasRuntimePrefetch":false,"slots":null,"isRootLayout":false}},"isRootLayout":true},"staleTime":300}

@@ -1,5 +1,6 @@
 import os
 import sys
+import time
 import shutil
 import subprocess
 import requests
@@ -27,7 +28,27 @@ def get_key():
                 elif key2 == b'M': return 'RIGHT'
                 elif key2 == b'K': return 'LEFT'
             elif key == b'\r': return 'ENTER'
-            elif key == b'\x1b': return 'ESC'
+            elif key == b'\x1b':
+                # Handle ANSI escape sequences on Windows (e.g. VS Code terminal)
+                start_time = time.time()
+                seq = b'\x1b'
+                while (time.time() - start_time) < 0.05:
+                    if msvcrt.kbhit():
+                        seq += msvcrt.getch()
+                        if len(seq) >= 3:
+                            if seq.startswith(b'\x1b[') or seq.startswith(b'\x1bO'):
+                                last = seq[-1:]
+                                if last == b'A': return 'UP'
+                                if last == b'B': return 'DOWN'
+                                if last == b'C': return 'RIGHT'
+                                if last == b'D': return 'LEFT'
+                            break
+                    else:
+                        time.sleep(0.001)
+                
+                if seq == b'\x1b':
+                    return 'ESC'
+                return None
             elif key == b'q' or key == b'Q': return 'q'
             elif key == b'g' or key == b'G': return 'g'
             elif key == b'b' or key == b'B': return 'b'
@@ -41,17 +62,49 @@ def get_key():
         old_settings = termios.tcgetattr(fd)
         try:
             tty.setraw(fd)
-            if select.select([sys.stdin], [], [], 0.01)[0]:
-                ch = sys.stdin.read(1)
+            if select.select([fd], [], [], 0.01)[0]:
+                ch_bytes = os.read(fd, 1)
+                if not ch_bytes: return None
+                ch = ch_bytes.decode('utf-8', errors='ignore')
+                
+                if ch == '\x03': # Ctrl+C
+                    raise KeyboardInterrupt
                 if ch == '\x1b':
-                    ch2 = sys.stdin.read(1)
-                    if ch2 == '[':
-                        ch3 = sys.stdin.read(1)
-                        if ch3 == 'A': return 'UP'
-                        elif ch3 == 'B': return 'DOWN'
-                        elif ch3 == 'C': return 'RIGHT'
-                        elif ch3 == 'D': return 'LEFT'
-                    return 'ESC'
+                    # Buffer the whole escape sequence so arrow keys don't get misread as ESC.
+                    seq = ch
+                    deadline = time.time() + 0.15
+                    while time.time() < deadline:
+                        if select.select([fd], [], [], 0.01)[0]:
+                            next_bytes = os.read(fd, 1)
+                            if next_bytes:
+                                seq += next_bytes.decode('utf-8', errors='ignore')
+                                if len(seq) >= 16:
+                                    break
+                        else:
+                            # No more data available right now
+                            pass
+
+                    # True Escape key (no following characters)
+                    if seq == '\x1b':
+                        return 'ESC'
+
+                    # Common terminal arrow sequences:
+                    # - ESC [ A/B/C/D
+                    # - ESC [ 1 ; 5 A  (modifiers)
+                    # - ESC O A/B/C/D
+                    last = seq[-1]
+                    if (seq.startswith('\x1b[') or seq.startswith('\x1bO')) and last in ('A', 'B', 'C', 'D'):
+                        if last == 'A':
+                            return 'UP'
+                        if last == 'B':
+                            return 'DOWN'
+                        if last == 'C':
+                            return 'RIGHT'
+                        if last == 'D':
+                            return 'LEFT'
+
+                    # Unknown escape sequence: ignore it (do NOT return 'ESC' or it may exit the app)
+                    return None
                 elif ch == '\r' or ch == '\n': return 'ENTER'
                 elif ch == 'q' or ch == 'Q': return 'q'
                 elif ch == 'g' or ch == 'G': return 'g'
@@ -62,7 +115,25 @@ def get_key():
                 return ch
             return None
         finally:
-            termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
+            termios.tcsetattr(fd, termios.TCSANOW, old_settings)
+
+class RawTerminal:
+    """Context manager to set terminal to raw mode (POSIX only)."""
+    def __init__(self):
+        self.fd = None
+        self.old_settings = None
+
+    def __enter__(self):
+        if os.name != 'nt':
+            self.fd = sys.stdin.fileno()
+            self.old_settings = termios.tcgetattr(self.fd)
+            tty.setcbreak(self.fd)
+        return self
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        if os.name != 'nt' and self.old_settings:
+            termios.tcsetattr(self.fd, termios.TCSANOW, self.old_settings)
+
 
 def get_idm_path():
     """Check for Internet Download Manager executable on Windows."""

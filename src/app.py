@@ -1,6 +1,5 @@
 import sys
 import atexit
-from pathlib import Path
 from rich.align import Align
 from rich.panel import Panel
 from rich.text import Text
@@ -9,7 +8,8 @@ from rich.box import HEAVY
 
 from .config import CURRENT_VERSION, COLOR_PROMPT, COLOR_BORDER
 from .ui import UIManager
-from .api import AnimeAPI, _update_sync_state
+from .api import AnimeAPI
+from .monitoring import monitor
 from .player import PlayerManager
 from .discord_rpc import DiscordRPCManager
 from .models import QualityOption
@@ -34,6 +34,7 @@ class AniCliArApp:
         atexit.register(self.cleanup)
         
         self.rpc.connect()
+        monitor.track_app_start()
         
         if self.settings.get('check_updates'):
             try:
@@ -214,12 +215,21 @@ class AniCliArApp:
 
             # --- BRIDGE LOGIC: MAL to Internal API ---
             if not selected_anime.id:
+                # Try English title first
                 internal_results = self.ui.run_with_loading(
                     f"Syncing '{selected_anime.title_en}'...",
                     self.api.search_anime,
                     selected_anime.title_en
                 )
                 
+                # If failed, try Romaji title if different
+                if not internal_results and selected_anime.title_romaji and selected_anime.title_romaji != selected_anime.title_en:
+                     internal_results = self.ui.run_with_loading(
+                        f"Syncing '{selected_anime.title_romaji}'...",
+                        self.api.search_anime,
+                        selected_anime.title_romaji
+                    )
+
                 if not internal_results:
                      self.ui.render_message("✗ Not Found", f"Sorry, '{selected_anime.title_en}' hasn't been uploaded to the server yet.", "error")
                      continue
@@ -458,10 +468,10 @@ class AniCliArApp:
                 # Update RPC to watching state before playing
                 self.rpc.update_watching(selected_anime.title_en, str(selected_ep.display_num), selected_anime.thumbnail)
                 
-                # Sync state
-                _update_sync_state(selected_anime.id, selected_anime.title_en, selected_ep.display_num)
+                monitor.track_video_play(selected_anime.title_en, str(selected_ep.display_num))
                 
                 self.player.play(direct_url, f"{selected_anime.title_en} - Ep {selected_ep.display_num} ({quality.name})", player_type=player_type)
+                self.ui.clear()
                 self.history.mark_watched(selected_anime.id, selected_ep.display_num, selected_anime.title_en)
                 self.rpc.update_selecting_episode(selected_anime.title_en, selected_anime.thumbnail)
                 return "watch"
@@ -532,46 +542,3 @@ def main():
 if __name__ == "__main__":
     main()
 
-def main():
-    """Main entry point for the ani-cli-arabic package"""
-    import os
-    # Ensure database directory exists in user home, not package location
-    home_dir = Path.home()
-    db_dir = home_dir / ".ani-cli-arabic" / "database"
-    db_dir.mkdir(parents=True, exist_ok=True)
-    
-    app = AniCliArApp()
-    app.run()
-
-
-if __name__ == "__main__":
-    main()
-    def handle_error(self, e):
-        self.ui.clear()
-        self.ui.console.print_exception()
-        
-        panel = Panel(
-            Text(f"✗ Unexpected error: {e}", justify="center", style="error"),
-            title=Text("CRITICAL ERROR", style="title"),
-            box=HEAVY,
-            padding=1,
-            border_style=COLOR_BORDER
-        )
-        
-        self.ui.print(Align.center(panel, vertical="middle", height=self.ui.console.height))
-        input("\nPress ENTER to exit...")
-
-    def cleanup(self):
-        self.rpc.disconnect()
-        self.player.cleanup_temp_mpv()
-        self.ui.clear()
-        
-        panel = Panel(
-            Text("👋", justify="center", style="info"),
-            title=Text("GOODBYE", style="title"),
-            box=HEAVY,
-            padding=1,
-            border_style=COLOR_BORDER
-        )
-        
-        self.ui.print(Align.center(panel, vertical="middle", height=self.ui.console.height))
