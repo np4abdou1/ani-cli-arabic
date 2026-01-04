@@ -4,6 +4,8 @@ from pathlib import Path
 from datetime import datetime
 
 class HistoryManager:
+    MAX_HISTORY_SIZE = 100  # Keep only the 100 most recent items
+    
     def __init__(self):
         self.history_file = self._get_history_path()
         self.history = self._load_history()
@@ -26,6 +28,16 @@ class HistoryManager:
 
     def save_history(self):
         try:
+            # Trim history to max size before saving
+            if len(self.history) > self.MAX_HISTORY_SIZE:
+                # Sort by last_updated and keep most recent
+                sorted_items = sorted(
+                    self.history.items(),
+                    key=lambda x: x[1].get('last_updated', ''),
+                    reverse=True
+                )
+                self.history = dict(sorted_items[:self.MAX_HISTORY_SIZE])
+            
             with open(self.history_file, 'w', encoding='utf-8') as f:
                 json.dump(self.history, f, indent=4, ensure_ascii=False)
         except Exception:

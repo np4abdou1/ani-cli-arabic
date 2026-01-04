@@ -14,7 +14,7 @@ from .monitoring import monitor
 from .player import PlayerManager
 from .discord_rpc import DiscordRPCManager
 from .models import QualityOption
-from .utils import download_file
+from .utils import download_file, flush_stdin
 from .history import HistoryManager
 from .settings import SettingsManager
 from .favorites import FavoritesManager
@@ -34,20 +34,39 @@ class AniCliArApp:
     def run(self):
         atexit.register(self.cleanup)
         
-        self.rpc.connect()
-        monitor.track_app_start()
+        # Start non-critical operations in background threads to speed up startup
+        import threading
         
-        if self.settings.get('check_updates'):
+        # Track Discord RPC connection status
+        rpc_connected = {'status': False}
+        
+        # Discord RPC connection (non-blocking, if enabled)
+        if self.settings.get('discord_rpc'):
+            def connect_rpc():
+                rpc_connected['status'] = self.rpc.connect()
+            threading.Thread(target=connect_rpc, daemon=True).start()
+        
+        # Analytics tracking (non-blocking)
+        threading.Thread(target=lambda: monitor.track_app_start(), daemon=True).start()
+        
+        # Update check (non-blocking, always enabled)
+        def check_updates_bg():
             try:
                 check_for_updates(auto_update=True)
             except Exception:
                 pass
+        threading.Thread(target=check_updates_bg, daemon=True).start()
         
-        # Check version once on startup
-        try:
-            self.version_info = get_version_status()
-        except Exception:
-            pass
+        # Version status check (non-blocking)
+        def check_version_bg():
+            try:
+                self.version_info = get_version_status()
+            except Exception:
+                pass
+        threading.Thread(target=check_version_bg, daemon=True).start()
+        
+        # Store RPC status for display
+        self.rpc_status = rpc_connected
 
         try:
             self.main_loop()
@@ -71,12 +90,20 @@ class AniCliArApp:
 
             self.ui.print(Align.center(self.ui.get_header_renderable()))
             self.ui.print()
-            self.ui.print(Align.center(Text.from_markup("Discord Rpc running ✅", style="secondary")))
+            
+            # Show Discord RPC status (check actual connection state and settings)
+            if self.settings.get('discord_rpc'):
+                if hasattr(self, 'rpc_status') and self.rpc_status['status']:
+                    self.ui.print(Align.center(Text.from_markup("Discord Rich Presence ✅", style="secondary")))
+                else:
+                    self.ui.print(Align.center(Text.from_markup("Discord Rich Presence [dim](enabled, not connected)[/dim]", style="dim")))
+            else:
+                self.ui.print(Align.center(Text.from_markup("Discord Rich Presence [dim](disabled)[/dim]", style="dim")))
             self.ui.print()
             
             # Keybinds panel with theme color border - BEFORE prompt
             keybinds_panel = Panel(
-                Text("S: Search | R: Featured | L: History | F: Favorites | C: Settings | Q: Quit", style="info", justify="center"),
+                Text("S: Search | R: Featured | L: History | F: Favorites | C: Settings | A: Credits | Q: Quit", style="info", justify="center"),
                 box=HEAVY,
                 border_style=COLOR_BORDER
             )
@@ -93,39 +120,48 @@ class AniCliArApp:
                 self.ui.print(Align.center(Text(status_text, style="dim")))
                 self.ui.print()
 
-            query = Prompt.ask(f"{padding}{prompt_string}", console=self.ui.console).strip()
+            # Flush any lingering input before showing prompt
+            flush_stdin()
             
-            if query.lower() in ['q', 'quit', 'exit']:
+            query = Prompt.ask(f"{padding}{prompt_string}", console=self.ui.console).strip().lower()
+            
+            if query in ['q', 'quit', 'exit']:
                 break
             
             results = []
             
-            if query.lower() == 'r':
+            if query == 'r':
                 self.rpc.update_featured()
                 # Fetching from Jikan (MAL) with auto-SFW filtering
                 results = self.ui.run_with_loading(
                     "Fetching currently airing anime from MAL...",
                     self.api.get_mal_season_now
                 )
-            elif query.lower() == 's':
+            elif query == 's':
                  term = Prompt.ask(f"{padding} Enter Search Term: ", console=self.ui.console).strip()
                  if term:
                     self.rpc.update_searching()
                     results = self.ui.run_with_loading("Searching...", self.api.search_anime, term)
-            elif query.lower() == 'l':
+            elif query == 'l':
                 self.rpc.update_history()
                 self.handle_history()
                 continue
-            elif query.lower() == 'f':
+            elif query == 'f':
                 self.rpc.update_favorites()
                 self.handle_favorites()
                 continue
-            elif query.lower() == 'c':
+            elif query == 'c':
                 self.rpc.update_settings()
                 self.ui.settings_menu(self.settings)
                 continue
+            elif query == 'a':
+                self.ui.show_credits()
+                continue
             elif query:
                 self.rpc.update_searching()
+                # Don't search for single letter commands that failed
+                if query in ['r', 's', 'l', 'f', 'c']:
+                    continue
                 results = self.ui.run_with_loading("Searching...", self.api.search_anime, query)
             else:
                 continue
@@ -152,17 +188,14 @@ class AniCliArApp:
                 break
             
             item = history_items[selected_idx]
-            # Create a dummy anime object to reuse handle_anime_selection logic partially
-            # But handle_anime_selection expects a list of results.
-            # Instead, we can directly search for this anime ID or title.
-            
-            self.ui.run_with_loading("Resuming...", self.resume_anime, item)
+            # Resume directly without nested loading screen
+            self.resume_anime(item)
             # Refresh history after watching
             history_items = self.history.get_history()
 
     def resume_anime(self, history_item):
         # We need to fetch anime details first
-        results = self.api.search_anime(history_item['title'])
+        results = self.ui.run_with_loading("Resuming...", self.api.search_anime, history_item['title'])
         if not results:
             self.ui.render_message("Error", "Could not find anime details.", "error")
             return
@@ -178,7 +211,7 @@ class AniCliArApp:
             selected_anime = results[0] # Fallback
 
         self.rpc.update_viewing_anime(selected_anime.title_en, selected_anime.thumbnail)
-        episodes = self.api.load_episodes(selected_anime.id)
+        episodes = self.api.get_episodes(selected_anime.id)
         
         if episodes:
             self.handle_episode_selection(selected_anime, episodes)
@@ -242,7 +275,7 @@ class AniCliArApp:
             
             episodes = self.ui.run_with_loading(
                 "Loading episodes...",
-                self.api.load_episodes,
+                self.api.get_episodes,
                 selected_anime.id
             )
             
@@ -463,8 +496,31 @@ class AniCliArApp:
                 return "download"
             else:
                 player_type = self.settings.get('player')
-                watching_text = f"{selected_anime.title_en} - Episode {selected_ep.display_num}"
-                self.ui.console.print(f"\n[cyan]▶ Watching:[/cyan] [bold]{watching_text}[/bold]\n")
+                
+                # Display watching message in a centered themed panel
+                from rich.text import Text
+                from rich.panel import Panel
+                from rich.align import Align
+                from rich.box import HEAVY
+                from .config import COLOR_BORDER, COLOR_TITLE
+                
+                watching_text = Text()
+                watching_text.append(selected_anime.title_en, style="bold")
+                watching_text.append("\nEpisode ", style="secondary")
+                watching_text.append(str(selected_ep.display_num), style=COLOR_TITLE)
+                watching_text.append(f"\n{quality.name}", style="dim")
+                
+                watching_panel = Panel(
+                    Align.center(watching_text, vertical="middle"),
+                    title=Text("▶ NOW PLAYING", style=COLOR_TITLE),
+                    box=HEAVY,
+                    border_style=COLOR_BORDER,
+                    padding=(1, 4),
+                    width=60
+                )
+                
+                self.ui.clear()
+                self.ui.console.print(Align.center(watching_panel, vertical="middle", height=self.ui.console.height))
                 
                 # Update RPC to watching state before playing
                 self.rpc.update_watching(selected_anime.title_en, str(selected_ep.display_num), selected_anime.thumbnail)

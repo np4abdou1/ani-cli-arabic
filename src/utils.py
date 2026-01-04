@@ -14,10 +14,46 @@ else:
     import termios
     import select
 
+# Global terminal state for Linux (keeps terminal in raw mode for better performance)
+_linux_terminal_fd = None
+_linux_old_settings = None
+_linux_raw_mode = False
+
 def is_bundled():
     return getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS')
 
+def _enter_raw_mode():
+    """Enter raw mode for the terminal (Linux/macOS only). Called once at start of menu."""
+    global _linux_terminal_fd, _linux_old_settings, _linux_raw_mode
+    if os.name == 'nt' or _linux_raw_mode:
+        return
+    try:
+        _linux_terminal_fd = sys.stdin.fileno()
+        _linux_old_settings = termios.tcgetattr(_linux_terminal_fd)
+        tty.setcbreak(_linux_terminal_fd)  # setcbreak is better than setraw for our use case
+        _linux_raw_mode = True
+    except Exception:
+        pass
+
+def _exit_raw_mode():
+    """Exit raw mode and restore terminal settings."""
+    global _linux_terminal_fd, _linux_old_settings, _linux_raw_mode
+    if os.name == 'nt' or not _linux_raw_mode:
+        return
+    try:
+        if _linux_old_settings is not None:
+            termios.tcsetattr(_linux_terminal_fd, termios.TCSADRAIN, _linux_old_settings)
+        _linux_raw_mode = False
+    except Exception:
+        pass
+
 def get_key():
+    """
+    Get a single keypress. Returns immediately if no key is available.
+    
+    On Linux, this function assumes the terminal is already in raw/cbreak mode
+    (via RawTerminal context manager or _enter_raw_mode).
+    """
     if os.name == 'nt':
         if msvcrt.kbhit():
             key = msvcrt.getch()
@@ -53,86 +89,186 @@ def get_key():
             elif key == b'g' or key == b'G': return 'g'
             elif key == b'b' or key == b'B': return 'b'
             elif key == b'd' or key == b'D': return 'd'
-            elif key == b'l' or key == b'L': return 'l'  # <--- Added 'L' key
+            elif key == b'l' or key == b'L': return 'l'
             elif key == b'/' or key == b'?': return '/'
             else: return key.decode('utf-8', errors='ignore')
         return None
     else:
+        # Linux/macOS implementation - optimized for responsiveness
         fd = sys.stdin.fileno()
-        old_settings = termios.tcgetattr(fd)
-        try:
-            tty.setraw(fd)
-            if select.select([fd], [], [], 0.01)[0]:
-                ch_bytes = os.read(fd, 1)
-                if not ch_bytes: return None
-                ch = ch_bytes.decode('utf-8', errors='ignore')
-                
-                if ch == '\x03': # Ctrl+C
-                    raise KeyboardInterrupt
-                if ch == '\x1b':
-                    # Buffer the whole escape sequence so arrow keys don't get misread as ESC.
-                    seq = ch
-                    deadline = time.time() + 0.15
-                    while time.time() < deadline:
-                        if select.select([fd], [], [], 0.01)[0]:
-                            next_bytes = os.read(fd, 1)
-                            if next_bytes:
-                                seq += next_bytes.decode('utf-8', errors='ignore')
-                                if len(seq) >= 16:
-                                    break
-                        else:
-                            # No more data available right now
-                            pass
-
-                    # True Escape key (no following characters)
-                    if seq == '\x1b':
-                        return 'ESC'
-
-                    # Common terminal arrow sequences:
-                    # - ESC [ A/B/C/D
-                    # - ESC [ 1 ; 5 A  (modifiers)
-                    # - ESC O A/B/C/D
-                    last = seq[-1]
-                    if (seq.startswith('\x1b[') or seq.startswith('\x1bO')) and last in ('A', 'B', 'C', 'D'):
-                        if last == 'A':
-                            return 'UP'
-                        if last == 'B':
-                            return 'DOWN'
-                        if last == 'C':
-                            return 'RIGHT'
-                        if last == 'D':
-                            return 'LEFT'
-
-                    # Unknown escape sequence: ignore it (do NOT return 'ESC' or it may exit the app)
-                    return None
-                elif ch == '\r' or ch == '\n': return 'ENTER'
-                elif ch == 'q' or ch == 'Q': return 'q'
-                elif ch == 'g' or ch == 'G': return 'g'
-                elif ch == 'b' or ch == 'B': return 'b'
-                elif ch == 'd' or ch == 'D': return 'd'
-                elif ch == 'l' or ch == 'L': return 'l'  # <--- Added 'L' key
-                elif ch == '/' or ch == '?': return '/'
-                return ch
+        
+        # Use a longer timeout (0.05s) for better CPU usage while still being responsive
+        if not select.select([fd], [], [], 0.05)[0]:
             return None
-        finally:
-            termios.tcsetattr(fd, termios.TCSANOW, old_settings)
+        
+        # Read available data
+        try:
+            ch_bytes = os.read(fd, 1)
+        except (OSError, IOError):
+            return None
+            
+        if not ch_bytes:
+            return None
+            
+        ch = ch_bytes.decode('utf-8', errors='ignore')
+        
+        if ch == '\x03':  # Ctrl+C
+            raise KeyboardInterrupt
+        
+        if ch == '\x1b':
+            # Escape sequence - read the rest quickly
+            seq = ch
+            # Give a short window to read the rest of the escape sequence
+            # Arrow keys send sequences like: ESC [ A
+            end_time = time.time() + 0.02  # 20ms window for escape sequences
+            
+            while time.time() < end_time:
+                if select.select([fd], [], [], 0.005)[0]:
+                    try:
+                        next_byte = os.read(fd, 1)
+                        if next_byte:
+                            seq += next_byte.decode('utf-8', errors='ignore')
+                            # Check if we have a complete sequence
+                            if len(seq) >= 3:
+                                last = seq[-1]
+                                # Standard arrow keys: ESC [ A/B/C/D or ESC O A/B/C/D
+                                if (seq.startswith('\x1b[') or seq.startswith('\x1bO')) and last in 'ABCD':
+                                    if last == 'A': return 'UP'
+                                    if last == 'B': return 'DOWN'
+                                    if last == 'C': return 'RIGHT'
+                                    if last == 'D': return 'LEFT'
+                                # Extended sequences like ESC [ 1 ; 5 A (Ctrl+Arrow)
+                                if len(seq) >= 6 and seq.startswith('\x1b[1;'):
+                                    if last == 'A': return 'UP'
+                                    if last == 'B': return 'DOWN'
+                                    if last == 'C': return 'RIGHT'
+                                    if last == 'D': return 'LEFT'
+                    except (OSError, IOError):
+                        break
+                else:
+                    # No more data, check what we have
+                    break
+            
+            # If only ESC was pressed (no following chars)
+            if seq == '\x1b':
+                return 'ESC'
+            
+            # Check final sequence
+            if len(seq) >= 3:
+                last = seq[-1]
+                if (seq.startswith('\x1b[') or seq.startswith('\x1bO')) and last in 'ABCD':
+                    if last == 'A': return 'UP'
+                    if last == 'B': return 'DOWN'
+                    if last == 'C': return 'RIGHT'
+                    if last == 'D': return 'LEFT'
+            
+            # Unknown escape sequence, ignore
+            return None
+        
+        elif ch == '\r' or ch == '\n':
+            return 'ENTER'
+        elif ch in 'qQ':
+            return 'q'
+        elif ch in 'gG':
+            return 'g'
+        elif ch in 'bB':
+            return 'b'
+        elif ch in 'dD':
+            return 'd'
+        elif ch in 'lL':
+            return 'l'
+        elif ch in 'fF':
+            return 'f'
+        elif ch in 'mM':
+            return 'm'
+        elif ch == '/' or ch == '?':
+            return '/'
+        
+        return ch
 
 class RawTerminal:
-    """Context manager to set terminal to raw mode (POSIX only)."""
+    """Context manager to set terminal to cbreak mode (POSIX only).
+    
+    Uses cbreak instead of raw mode to allow signal handling (Ctrl+C).
+    On Windows, this is a no-op since msvcrt handles input differently.
+    """
+    # Class-level storage for the active instance (allows restore/enter functions to work)
+    _active_instance = None
+    
     def __init__(self):
         self.fd = None
         self.old_settings = None
 
     def __enter__(self):
         if os.name != 'nt':
-            self.fd = sys.stdin.fileno()
-            self.old_settings = termios.tcgetattr(self.fd)
-            tty.setcbreak(self.fd)
+            try:
+                self.fd = sys.stdin.fileno()
+                self.old_settings = termios.tcgetattr(self.fd)
+                # Use setcbreak instead of setraw - allows Ctrl+C to work
+                tty.setcbreak(self.fd)
+                RawTerminal._active_instance = self
+            except (termios.error, OSError, ValueError):
+                # Handle cases where stdin is not a terminal (e.g., piped input)
+                self.old_settings = None
         return self
 
     def __exit__(self, exc_type, exc_value, traceback):
-        if os.name != 'nt' and self.old_settings:
-            termios.tcsetattr(self.fd, termios.TCSANOW, self.old_settings)
+        RawTerminal._active_instance = None
+        if os.name != 'nt' and self.old_settings is not None:
+            try:
+                # Flush any remaining input before restoring terminal
+                termios.tcflush(self.fd, termios.TCIFLUSH)
+                termios.tcsetattr(self.fd, termios.TCSADRAIN, self.old_settings)
+            except (termios.error, OSError):
+                pass
+
+
+def restore_terminal_for_input():
+    """Temporarily restore normal terminal mode for user input (like Prompt.ask).
+    
+    Call this before using Rich's Prompt.ask() or similar input functions
+    while inside a RawTerminal context. Call enter_raw_mode_after_input() after.
+    """
+    if os.name == 'nt':
+        return  # Not needed on Windows
+    
+    instance = RawTerminal._active_instance
+    if instance and instance.old_settings is not None:
+        try:
+            termios.tcsetattr(instance.fd, termios.TCSADRAIN, instance.old_settings)
+        except (termios.error, OSError):
+            pass
+
+
+def enter_raw_mode_after_input():
+    """Re-enter raw/cbreak mode after using restore_terminal_for_input().
+    
+    Call this after using Rich's Prompt.ask() or similar input functions.
+    """
+    if os.name == 'nt':
+        return  # Not needed on Windows
+    
+    instance = RawTerminal._active_instance
+    if instance and instance.old_settings is not None:
+        try:
+            tty.setcbreak(instance.fd)
+        except (termios.error, OSError):
+            pass
+
+
+def flush_stdin():
+    """Flush any pending input from stdin to prevent buffered keypresses from being read."""
+    if os.name == 'nt':
+        # Windows: consume all pending input
+        while msvcrt.kbhit():
+            msvcrt.getch()
+    else:
+        # Unix: flush input buffer
+        try:
+            fd = sys.stdin.fileno()
+            termios.tcflush(fd, termios.TCIFLUSH)
+        except (termios.error, OSError, ValueError):
+            pass
 
 
 def get_idm_path():
