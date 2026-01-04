@@ -143,7 +143,7 @@ exe = EXE(
     
     spec_content = spec_content.format(script_dir=str(script_dir), binaries=binaries)
     
-    spec_file = script_dir / "ani-cli-ar.spec"
+    spec_file = Path(__file__).parent / "ani-cli-ar.spec"
     with open(spec_file, 'w', encoding='utf-8') as f:
         f.write(spec_content)
     
