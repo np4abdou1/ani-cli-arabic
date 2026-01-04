@@ -366,13 +366,18 @@ def check_pip_update():
                     else:
                         cmd = 'ani-cli-arabic'
                     
-                    # Restart via subprocess instead of exec (cleaner)
+                    # Restart application
                     if sys.platform == 'win32':
                         subprocess.Popen([cmd], creationflags=subprocess.CREATE_NEW_CONSOLE)
+                        sys.exit(0)
                     else:
-                        subprocess.Popen([cmd])
-                    
-                    sys.exit(0)
+                        # On Unix, replace the process
+                        try:
+                            os.execvp(cmd, [cmd] + sys.argv[1:])
+                        except FileNotFoundError:
+                            # Fallback if command not found in PATH (e.g. running from source)
+                            subprocess.Popen([sys.executable] + sys.argv)
+                            sys.exit(0)
                 else:
                     _print_error(f"Update failed: {result.stderr}")
                     _print_info("Please try manually: pip install --upgrade ani-cli-arabic")
@@ -406,7 +411,12 @@ def check_executable_update():
         
         if latest > current:
             system = platform.system().lower()
-            system_name = "Windows" if system == "windows" else "Linux"
+            if system == "windows":
+                system_name = "Windows"
+            elif system == "darwin":
+                system_name = "macOS"
+            else:
+                system_name = "Linux"
             
             _print_header("Update Available")
             _print_info(f"Current: {__version__}  →  Latest: {latest_tag.lstrip('v')}")

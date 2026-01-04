@@ -17,23 +17,36 @@ class PlayerManager:
 
     def get_mpv_path(self) -> Optional[str]:
         if self.is_bundled():
-            bundled_mpv = os.path.join(sys._MEIPASS, 'mpv', 'mpv.exe')
+            exe_name = 'mpv.exe' if os.name == 'nt' else 'mpv'
+            bundled_mpv = os.path.join(sys._MEIPASS, 'mpv', exe_name)
             if os.path.exists(bundled_mpv):
                 if not self.temp_mpv_path or not os.path.exists(self.temp_mpv_path):
                     temp_dir = tempfile.mkdtemp(prefix='anime_browser_mpv_')
-                    self.temp_mpv_path = os.path.join(temp_dir, 'mpv.exe')
+                    self.temp_mpv_path = os.path.join(temp_dir, exe_name)
                     shutil.copy2(bundled_mpv, self.temp_mpv_path)
+                    
+                    # Ensure executable permissions on Linux/macOS
+                    if os.name != 'nt':
+                        st = os.stat(self.temp_mpv_path)
+                        os.chmod(self.temp_mpv_path, st.st_mode | 0o111)
+                        
                 return self.temp_mpv_path
         else:
             base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-            dev_mpv = os.path.join(base_dir, 'mpv', 'mpv.exe')
+            exe_name = 'mpv.exe' if os.name == 'nt' else 'mpv'
+            
+            dev_mpv = os.path.join(base_dir, 'mpv', exe_name)
             if os.path.exists(dev_mpv):
                 return dev_mpv
             
-            local_mpv = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'mpv', 'mpv.exe')
+            local_mpv = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'mpv', exe_name)
             if os.path.exists(local_mpv):
                 return local_mpv
 
+            # Check system PATH
+            if shutil.which('mpv'):
+                return 'mpv'
+                
             return 'mpv'
         return 'mpv'
 
@@ -67,15 +80,26 @@ class PlayerManager:
         # Check for VLC in common paths if not in PATH
         vlc_path = shutil.which('vlc')
         if not vlc_path:
-            # Common Windows paths
-            paths = [
-                r"C:\Program Files\VideoLAN\VLC\vlc.exe",
-                r"C:\Program Files (x86)\VideoLAN\VLC\vlc.exe"
-            ]
-            for p in paths:
-                if os.path.exists(p):
-                    vlc_path = p
-                    break
+            if os.name == 'nt':
+                # Common Windows paths
+                paths = [
+                    r"C:\Program Files\VideoLAN\VLC\vlc.exe",
+                    r"C:\Program Files (x86)\VideoLAN\VLC\vlc.exe"
+                ]
+                for p in paths:
+                    if os.path.exists(p):
+                        vlc_path = p
+                        break
+            elif sys.platform == 'darwin':
+                # Common macOS paths
+                paths = [
+                    "/Applications/VLC.app/Contents/MacOS/VLC",
+                    os.path.expanduser("~/Applications/VLC.app/Contents/MacOS/VLC")
+                ]
+                for p in paths:
+                    if os.path.exists(p):
+                        vlc_path = p
+                        break
         
         if not vlc_path:
             raise FileNotFoundError("VLC not found")
@@ -154,8 +178,7 @@ class PlayerManager:
         )
         
         if result.returncode != 0:
-                if self.console:
-                    from rich.text import Text
-                    self.console.print(Text(f"MPV exited with error code {result.returncode}", style="bold red"))
-
+            if self.console:
+                from rich.text import Text
+                self.console.print(Text(f"MPV exited with error code {result.returncode}", style="bold red"))
                 time.sleep(2)

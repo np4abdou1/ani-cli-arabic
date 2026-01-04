@@ -18,7 +18,7 @@ class SettingsManager:
             "default_quality": "1080p",  # 1080p, 720p, 480p
             "player": "mpv",             # mpv, vlc
             "auto_next": False,          # Auto-play next episode
-            "check_updates": True,
+            "discord_rpc": True,         # Discord Rich Presence
             "theme": "blue"              # Theme color
         }
         

@@ -124,7 +124,7 @@ class AnimeAPI:
             return []
 
     def search_anime(self, query: str) -> List[AnimeResult]:
-        endpoint = ANI_CLI_AR_API_BASE + "anime/load_anime_list_v2.php"
+        endpoint = get_api_base() + "anime/load_anime_list_v2.php"
         payload = {
             'UserId': '0',
             'Language': 'English',
@@ -132,7 +132,7 @@ class AnimeAPI:
             'FilterData': query,
             'Type': 'SERIES',
             'From': '0',
-            'Token': ANI_CLI_AR_TOKEN
+            'Token': get_api_token()
         }
         
         try:
@@ -143,7 +143,7 @@ class AnimeAPI:
             results = []
             for item in data:
                 thumbnail_filename = item.get('Thumbnail', '')
-                thumbnail_url = THUMBNAILS_BASE_URL + thumbnail_filename if thumbnail_filename else ''
+                thumbnail_url = get_thumbnails_base() + thumbnail_filename if thumbnail_filename else ''
                 
                 results.append(AnimeResult(
                     id=item.get('AnimeId', ''),
@@ -169,11 +169,11 @@ class AnimeAPI:
         except Exception:
             return []
 
-    def load_episodes(self, anime_id: str) -> List[Episode]:
-        endpoint = ANI_CLI_AR_API_BASE + "episodes/load_episodes.php"
+    def get_episodes(self, anime_id: str) -> List[Episode]:
+        endpoint = get_api_base() + "episodes/load_episodes.php"
         payload = {
             'AnimeID': anime_id,
-            'Token': ANI_CLI_AR_TOKEN
+            'Token': get_api_token()
         }
         
         try:
@@ -203,13 +203,13 @@ class AnimeAPI:
             return []
 
     def get_streaming_servers(self, anime_id: str, episode_num: str) -> Optional[Dict]:
-        endpoint = ANI_CLI_AR_API_BASE + "anime/load_servers.php"
+        endpoint = get_api_base() + "anime/load_servers.php"
         payload = {
             'UserId': '0',
             'AnimeId': anime_id,
             'Episode': str(episode_num),
             'AnimeType': 'SERIES',
-            'Token': ANI_CLI_AR_TOKEN
+            'Token': get_api_token()
         }
         
         try:
@@ -240,8 +240,48 @@ class AnimeAPI:
 
 
 
-#important credentials for the app to work
-_creds = get_credentials()
-ANI_CLI_AR_API_BASE = _creds['ANI_CLI_AR_API_BASE']
-ANI_CLI_AR_TOKEN = _creds['ANI_CLI_AR_TOKEN']
-THUMBNAILS_BASE_URL = _creds['THUMBNAILS_BASE_URL']
+#important credentials for the app to work (lazy-loaded)
+_creds = None
+_creds_fetch_failed = False
+_creds_lock = None
+
+def _ensure_creds():
+    """Lazy load credentials on first use with retry logic."""
+    global _creds, _creds_fetch_failed, _creds_lock
+    
+    # Initialize lock on first use
+    if _creds_lock is None:
+        import threading
+        _creds_lock = threading.Lock()
+    
+    # If already fetched or previously failed, return immediately
+    if _creds is not None:
+        return
+    
+    if _creds_fetch_failed:
+        raise RuntimeError("Credentials fetch previously failed. Please check your internet connection.")
+    
+    # Use lock to prevent multiple simultaneous fetch attempts
+    with _creds_lock:
+        # Double-check after acquiring lock
+        if _creds is not None:
+            return
+        
+        try:
+            _creds = get_credentials()
+        except Exception as e:
+            _creds_fetch_failed = True
+            raise RuntimeError(f"Failed to fetch API credentials: {e}") from e
+
+# Getter functions that lazy-load credentials
+def get_api_base():
+    _ensure_creds()
+    return _creds['ANI_CLI_AR_API_BASE']
+
+def get_api_token():
+    _ensure_creds()
+    return _creds['ANI_CLI_AR_TOKEN']
+
+def get_thumbnails_base():
+    _ensure_creds()
+    return _creds['THUMBNAILS_BASE_URL']

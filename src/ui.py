@@ -24,7 +24,7 @@ from .config import (
     COLOR_SECONDARY_TEXT, COLOR_HIGHLIGHT_FG, COLOR_HIGHLIGHT_BG,
     COLOR_ERROR, COLOR_LOADING_SPINNER, COLOR_ASCII, HEADER_ART
 )
-from .utils import get_key, RawTerminal
+from .utils import get_key, RawTerminal, restore_terminal_for_input, enter_raw_mode_after_input
 from . import config as config_module
 
 class UIManager:
@@ -268,8 +268,7 @@ class UIManager:
                         return None
                     elif key == 'q' or key == 'ESC':
                         return -1
-                    
-                    time.sleep(0.005)
+                    # No sleep needed - get_key() already has built-in timeout
 
     def episode_selection_menu(self, anime_title, episodes, rpc_manager=None, anime_poster=None, last_watched_ep=None, is_favorite=False, anime_details=None):
         selected = 0
@@ -451,6 +450,9 @@ class UIManager:
                     elif key == 'g':
                         live.stop()
                         try:
+                            # Restore terminal for normal input
+                            restore_terminal_for_input()
+                            
                             prompt_panel = Panel(
                                 Text("Jump to episode number:", style="info", justify="center"), 
                                 box=HEAVY, 
@@ -485,6 +487,9 @@ class UIManager:
 
                         except Exception:
                             pass
+                        finally:
+                            # Re-enter raw mode for key handling
+                            enter_raw_mode_after_input()
                         
                         self.clear()
                         live.start()
@@ -494,8 +499,7 @@ class UIManager:
                         return None
                     elif key == 'q' or key == 'ESC':
                         return -1
-                
-                time.sleep(0.05)
+                    # No sleep needed - get_key() already has built-in timeout
 
     def batch_selection_menu(self, episodes):
         selected = 0
@@ -562,8 +566,7 @@ class UIManager:
                         return sorted(list(marked))
                     elif key == 'b' or key == 'ESC':
                         return None
-                    
-                    time.sleep(0.05)
+                    # No sleep needed - get_key() already has built-in timeout
 
     def history_menu(self, history_items):
         selected = 0
@@ -628,8 +631,7 @@ class UIManager:
                         return selected
                     elif key == 'b' or key == 'ESC':
                         return None
-                    
-                    time.sleep(0.05)
+                    # No sleep needed - get_key() already has built-in timeout
 
     def favorites_menu(self, fav_items):
         selected = 0
@@ -693,19 +695,19 @@ class UIManager:
                         return (selected, 'remove')
                     elif key == 'b' or key == 'ESC':
                         return None
-                    
-                    time.sleep(0.05)
+                    # No sleep needed - get_key() already has built-in timeout
 
     def settings_menu(self, settings_mgr):
         options = [
             ("Default Quality", ["1080p", "720p", "480p"], "default_quality"),
             ("Player", ["mpv", "vlc"], "player"),
             ("Auto Next Episode", [True, False], "auto_next"),
-            ("Check Updates", [True, False], "check_updates"),
+            ("Discord Rich Presence", [True, False], "discord_rpc"),
             ("Theme", ["blue", "red", "green", "purple", "cyan", "yellow", "pink", "orange", "teal", "magenta", "lime", "coral", "lavender", "gold", "mint", "rose"], "theme")
         ]
         selected = 0
         theme_changed = False  # Track if theme was changed
+        rpc_changed = False    # Track if Discord RPC was changed
         
         def generate_renderable():
             content = Text()
@@ -758,6 +760,10 @@ class UIManager:
                             
                         settings_mgr.set(key_name, new_val)
                         
+                        # Track if Discord RPC was changed
+                        if key_name == "discord_rpc":
+                            rpc_changed = True
+                        
                         # Reload colors if theme changed and apply immediately
                         if key_name == "theme":
                             theme_changed = True  # Mark that theme was changed
@@ -776,7 +782,10 @@ class UIManager:
                             self.console = Console(theme=self.theme)
                         
                         live.update(Align.center(generate_renderable(), vertical="middle", height=self.console.height), refresh=True)
-                    elif key == 'b' or key == 'ESC':
+                    elif key == 'b' or key == 'B' or key == 'ESC':
+                        # Exit the Live context first
+                        live.stop()
+                        
                         # If theme was changed, exit app to apply globally
                         if theme_changed:
                             self.console.clear()
@@ -784,9 +793,17 @@ class UIManager:
                             self.console.print("[dim]Please run the application again to apply the new theme.[/dim]\n")
                             time.sleep(2)
                             sys.exit(0)
+                        # If Discord RPC was changed, notify user
+                        if rpc_changed:
+                            self.console.clear()
+                            self.console.print("\n[bold cyan]Discord Rich Presence setting changed![/bold cyan]")
+                            self.console.print("[dim]Please restart the application for changes to take effect.[/dim]\n")
+                            time.sleep(2)
+                        
+                        # Clear the screen before returning
+                        self.clear()
                         return
-                    
-                    time.sleep(0.05)
+                    # No sleep needed - get_key() already has built-in timeout
 
     def quality_selection_menu(self, anime_title, episode_num, available_qualities, rpc_manager=None, anime_poster=None):
         if rpc_manager:
@@ -835,8 +852,7 @@ class UIManager:
                         return None
                     elif key == 'q' or key == 'ESC':
                         return -1
-                    
-                    time.sleep(0.05)
+                    # No sleep needed - get_key() already has built-in timeout
 
     def post_watch_menu(self):
         options = ["Next Episode", "Previous Episode", "Replay", "Back to List"]
@@ -874,5 +890,44 @@ class UIManager:
                         return options[selected]
                     elif key == 'q' or key == 'b' or key == 'ESC':
                         return "Back to List"
-                    
-                    time.sleep(0.05)
+                    # No sleep needed - get_key() already has built-in timeout
+
+    def show_credits(self):
+        """Display credits and contributors."""
+        from .version import __version__
+        
+        def generate_renderable():
+            content = Text()
+            
+            content.append(f"ani-cli-arabic v{__version__}\n\n", style="bold " + COLOR_TITLE)
+            
+            content.append("Abdollah", style="bold")
+            content.append(" • ", style="dim")
+            content.append("github.com/np4abdou1\n", style=COLOR_PROMPT)
+            
+            content.append("Anas Tourari", style="bold")
+            content.append(" • ", style="dim")
+            content.append("github.com/Anas-Tou\n\n", style=COLOR_PROMPT)
+            
+            content.append("github.com/np4abdou1/ani-cli-arabic", style="dim")
+            
+            panel = Panel(
+                Align.center(content, vertical="middle"),
+                title=Text("CREDITS", style="bold " + COLOR_TITLE),
+                subtitle=Text("press any key to go back", style="dim"),
+                box=HEAVY,
+                border_style=COLOR_BORDER,
+                padding=(2, 4),
+                width=50
+            )
+            
+            return panel
+        
+        self.clear()
+        
+        with RawTerminal():
+            with Live(Align.center(generate_renderable(), vertical="middle", height=self.console.height), console=self.console, auto_refresh=False, screen=True) as live:
+                while True:
+                    key = get_key()
+                    if key:
+                        break

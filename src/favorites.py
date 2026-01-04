@@ -3,6 +3,8 @@ from pathlib import Path
 from datetime import datetime
 
 class FavoritesManager:
+    MAX_FAVORITES = 100  # Limit to 100 favorites
+    
     def __init__(self):
         self.file_path = self._get_path()
         self.favorites = self._load()
@@ -30,6 +32,12 @@ class FavoritesManager:
             pass
 
     def add(self, anime_id, title, thumbnail):
+        # Check if we're at the limit (but allow updating existing favorites)
+        if str(anime_id) not in self.favorites and len(self.favorites) >= self.MAX_FAVORITES:
+            # Remove oldest favorite to make room
+            oldest = min(self.favorites.items(), key=lambda x: x[1]['added_at'])
+            del self.favorites[oldest[0]]
+        
         self.favorites[str(anime_id)] = {
             'title': title,
             'thumbnail': thumbnail,
