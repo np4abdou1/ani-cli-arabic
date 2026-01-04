@@ -1,8 +1,7 @@
 <div align="center">
 
-<h1>ani-cli-ar</h1>
 
-![445026601441165313](https://github.com/user-attachments/assets/3c6ad4e9-2df6-4ee6-991f-536150e49da2)
+![download](https://github.com/user-attachments/assets/39760ac2-9550-407c-893b-51ad5cbe3bfa)
 
 
 
