@@ -2,6 +2,6 @@
 echo Building ani-cli-arabic...
 echo.
 cd /d "%~dp0"
-python scripts\build.py
+python build.py
 echo.
 pause
