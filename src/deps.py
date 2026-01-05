@@ -1,6 +1,6 @@
 """
-Dependency Manager for ani-cli-arabic
-Checks and installs required dependencies (ffmpeg, mpv, yt-dlp).
+Dependency Manager
+Auto-installs media tools: mpv (streaming), ffmpeg (helper), yt-dlp (trailers)
 """
 
 import os
@@ -8,7 +8,6 @@ import sys
 import shutil
 import subprocess
 import platform
-import time
 import requests
 from pathlib import Path
 from rich.console import Console
@@ -46,10 +45,7 @@ def _windows_local_mpv_root() -> Path | None:
 
 
 def _clean_deps_keep_mpv() -> None:
-    """Delete everything inside deps/ except mpv.exe.
-
-    This avoids running mpv-install.bat (admin required) and keeps the setup portable.
-    """
+    """Keep only mpv.exe in deps/ for portable installation."""
     try:
         DEPS_DIR.mkdir(parents=True, exist_ok=True)
     except Exception:
@@ -64,16 +60,15 @@ def _clean_deps_keep_mpv() -> None:
             else:
                 child.unlink(missing_ok=True)
         except Exception:
-            # Best-effort cleanup; don't block mpv usage.
-            pass
+            pass  # Best-effort cleanup
 
 def is_installed(tool):
     """Check if a tool is in the PATH."""
     return shutil.which(tool) is not None
 
 def check_dependencies_status():
-    """Returns a dict of tool -> bool (is_installed)."""
-    # On Windows, allow using local repo deps/mpv.exe without a full install.
+    """Check if required tools are installed."""
+    # Add local deps/mpv.exe to PATH on Windows
     if platform.system() == "Windows":
         mpv_root = _windows_local_mpv_root()
         if mpv_root:
@@ -232,8 +227,7 @@ def install_mpv_windows():
         console.print("[red]✘[/red] mpv.exe not found after extraction")
         return False
 
-    # No installer: mpv-install.bat requires admin. Make mpv portable.
-    # If mpv.exe is not in deps/ root, move it there.
+    # Make mpv portable: move to deps root if nested
     if mpv_root != DEPS_DIR:
         try:
             shutil.move(str(mpv_root / "mpv.exe"), str(DEPS_DIR / "mpv.exe"))
@@ -244,7 +238,7 @@ def install_mpv_windows():
 
     _clean_deps_keep_mpv()
     
-    # Add to PATH for this session
+    # Add to PATH
     _prepend_to_path(mpv_root)
     
     # Verify mpv.exe exists
@@ -314,14 +308,8 @@ def install_deps_linux():
     console.print(f"[dim]Running: {cmd}[/dim]")
     return os.system(cmd) == 0
 
-def restart_program():
-    console.print("[green]Restarting...[/green]")
-    time.sleep(1)
-    python = sys.executable
-    os.execl(python, python, *sys.argv)
-
 def ensure_dependencies():
-    """Main entry point for dependency checking."""
+    """Check and install missing dependencies (mpv, ffmpeg, yt-dlp)."""
     # Quick check
     if all(check_dependencies_status().values()):
         return True

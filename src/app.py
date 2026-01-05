@@ -34,7 +34,7 @@ class AniCliArApp:
         self.version_info = None
 
     def run(self):
-        # Check dependencies on first run (or if missing)
+        # Ensure media tools are installed
         if not ensure_dependencies():
             print("\n[!] Cannot start without required dependencies.")
             input("Press ENTER to exit...")
@@ -42,10 +42,8 @@ class AniCliArApp:
         
         atexit.register(self.cleanup)
         
-        # Start non-critical operations in background threads to speed up startup
+        # Background tasks for faster startup
         import threading
-        
-        # Track Discord RPC connection status
         rpc_connected = {'status': None}
         
         # Discord RPC connection (non-blocking, if enabled)

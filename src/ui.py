@@ -19,9 +19,6 @@ from rich.theme import Theme
 from rich.box import HEAVY
 from rich.spinner import Spinner
 
-
-
-
 from .config import (
     COLOR_BORDER, COLOR_PROMPT, COLOR_PRIMARY_TEXT, COLOR_TITLE,
     COLOR_SECONDARY_TEXT, COLOR_HIGHLIGHT_FG, COLOR_HIGHLIGHT_BG,

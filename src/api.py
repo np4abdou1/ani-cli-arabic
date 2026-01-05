@@ -60,6 +60,7 @@ _creds = None
 _creds_lock = threading.Lock()
 
 def _ensure_creds():
+    """Load API credentials once (thread-safe)."""
     global _creds
     if _creds is not None:
         return
