@@ -30,11 +30,17 @@ classifiers = [
 ]
 requires-python = ">=3.8"
 dependencies = [
-    "rich>=13.0.0",
-    "requests>=2.31.0",
-    "pypresence>=4.3.0",
-    "cryptography>=41.0.0",
+    "rich>=13.0.0",          # Terminal UI framework
+    "requests>=2.31.0",      # HTTP client for API communication
+    "pypresence>=4.5.0",     # Discord Rich Presence integration
+    "cryptography>=41.0.0",  # Secure API authentication
+    "yt-dlp",                # Extract anime trailers from YouTube
+    "Pillow>=10.0.0",        # Image processing for anime posters
+    "numpy>=1.24.0",         # Array operations for image display
 ]
+# External tools (auto-installed by deps.py):
+# - mpv: Media player for streaming episodes
+# - ffmpeg: Multimedia framework (helper for mpv)
 
 [project.urls]
 Homepage = "https://github.com/np4abdou1/ani-cli-arabic"

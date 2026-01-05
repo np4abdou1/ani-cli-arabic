@@ -20,6 +20,8 @@ class AnimeResult:
     duration: str
     thumbnail: str
     title_romaji: str = ""
+    trailer: str = ""
+    yt_trailer: str = ""
 
 @dataclass
 class Episode:

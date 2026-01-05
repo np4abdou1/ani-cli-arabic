@@ -23,7 +23,6 @@ class MonitoringSystem:
 
     def _generate_fingerprint(self) -> str:
         # Generates a basic anonymous fingerprint based on system properties.
-        # Does NOT use hardware UUIDs to respect privacy while maintaining uniqueness.
         try:
             # Combine basic system info
             components = [

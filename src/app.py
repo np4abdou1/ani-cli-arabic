@@ -1,5 +1,6 @@
 import sys
 import atexit
+import re
 from pathlib import Path
 from rich.align import Align
 from rich.panel import Panel
@@ -7,9 +8,9 @@ from rich.text import Text
 from rich.prompt import Prompt
 from rich.box import HEAVY
 
-from .config import CURRENT_VERSION, COLOR_PROMPT, COLOR_BORDER
+from .config import COLOR_PROMPT, COLOR_BORDER
 from .ui import UIManager
-from .api import AnimeAPI
+from .api import AnimeAPI, get_trailers_base
 from .monitoring import monitor
 from .player import PlayerManager
 from .discord_rpc import DiscordRPCManager
@@ -19,6 +20,7 @@ from .history import HistoryManager
 from .settings import SettingsManager
 from .favorites import FavoritesManager
 from .updater import check_for_updates, get_version_status
+from .deps import ensure_dependencies
 
 class AniCliArApp:
     def __init__(self):
@@ -32,13 +34,17 @@ class AniCliArApp:
         self.version_info = None
 
     def run(self):
+        # Ensure media tools are installed
+        if not ensure_dependencies():
+            print("\n[!] Cannot start without required dependencies.")
+            input("Press ENTER to exit...")
+            sys.exit(1)
+        
         atexit.register(self.cleanup)
         
-        # Start non-critical operations in background threads to speed up startup
+        # Background tasks for faster startup
         import threading
-        
-        # Track Discord RPC connection status
-        rpc_connected = {'status': False}
+        rpc_connected = {'status': None}
         
         # Discord RPC connection (non-blocking, if enabled)
         if self.settings.get('discord_rpc'):
@@ -65,7 +71,6 @@ class AniCliArApp:
                 pass
         threading.Thread(target=check_version_bg, daemon=True).start()
         
-        # Store RPC status for display
         self.rpc_status = rpc_connected
 
         try:
@@ -81,9 +86,8 @@ class AniCliArApp:
         while True:
             self.ui.clear()
             
-            # Calculate vertical spacing - move content up
             vertical_space = self.ui.console.height - 14
-            top_padding = (vertical_space // 2) - 2  # Move up by reducing top padding
+            top_padding = (vertical_space // 2) - 2
             
             if top_padding > 0:
                 self.ui.print(Text("\n" * top_padding))
@@ -91,19 +95,21 @@ class AniCliArApp:
             self.ui.print(Align.center(self.ui.get_header_renderable()))
             self.ui.print()
             
-            # Show Discord RPC status (check actual connection state and settings)
             if self.settings.get('discord_rpc'):
-                if hasattr(self, 'rpc_status') and self.rpc_status['status']:
-                    self.ui.print(Align.center(Text.from_markup("Discord Rich Presence ✅", style="secondary")))
-                else:
-                    self.ui.print(Align.center(Text.from_markup("Discord Rich Presence [dim](enabled, not connected)[/dim]", style="dim")))
+                if hasattr(self, 'rpc_status'):
+                    if self.rpc_status['status'] is True:
+                        self.ui.print(Align.center(Text.from_markup("Discord Rich Presence ✅", style="secondary")))
+                    elif self.rpc_status['status'] is None:
+                        self.ui.print(Align.center(Text.from_markup("Discord Rich Presence [dim](connecting...)[/dim]", style="dim")))
+                    else:
+                        self.ui.print(Align.center(Text.from_markup("Discord Rich Presence [dim](enabled, not connected)[/dim]", style="dim")))
             else:
                 self.ui.print(Align.center(Text.from_markup("Discord Rich Presence [dim](disabled)[/dim]", style="dim")))
             self.ui.print()
             
             # Keybinds panel with theme color border - BEFORE prompt
             keybinds_panel = Panel(
-                Text("S: Search | R: Featured | L: History | F: Favorites | C: Settings | A: Credits | Q: Quit", style="info", justify="center"),
+                Text("S: Search | T: Trending | P: Popular | G: Genres | D: Studios | L: History | F: Favorites | C: Settings | Q: Quit", style="info", justify="center"),
                 box=HEAVY,
                 border_style=COLOR_BORDER
             )
@@ -130,13 +136,40 @@ class AniCliArApp:
             
             results = []
             
-            if query == 'r':
-                self.rpc.update_featured()
-                # Fetching from Jikan (MAL) with auto-SFW filtering
+            if query == 't':
+                self.rpc.update_trending()
                 results = self.ui.run_with_loading(
-                    "Fetching currently airing anime from MAL...",
-                    self.api.get_mal_season_now
+                    "Fetching trending anime...",
+                    self.api.get_trending_anime,
+                    0,
+                    15
                 )
+                if results:
+                    def load_more_trending(current_count):
+                        return self.api.get_trending_anime(current_count, 15)
+                    self.handle_anime_selection_with_lazy_load(results, load_more_trending)
+                    continue
+            elif query == 'p':
+                self.rpc.update_popular()
+                results = self.ui.run_with_loading(
+                    "Fetching popular anime...",
+                    self.api.get_top_rated_anime,
+                    0,
+                    15
+                )
+                if results:
+                    def load_more_popular(current_count):
+                        return self.api.get_top_rated_anime(current_count, 15)
+                    self.handle_anime_selection_with_lazy_load(results, load_more_popular)
+                    continue
+            elif query == 'g':
+                self.rpc.update_genres()
+                self.handle_genres()
+                continue
+            elif query == 'd':
+                self.rpc.update_studios()
+                self.handle_studios()
+                continue
             elif query == 's':
                  term = Prompt.ask(f"{padding} Enter Search Term: ", console=self.ui.console).strip()
                  if term:
@@ -159,8 +192,8 @@ class AniCliArApp:
                 continue
             elif query:
                 self.rpc.update_searching()
-                # Don't search for single letter commands that failed
-                if query in ['r', 's', 'l', 'f', 'c']:
+                # Don't search for single letter commands
+                if query in ['t', 'p', 'g', 'd', 's', 'l', 'f', 'c', 'a']:
                     continue
                 results = self.ui.run_with_loading("Searching...", self.api.search_anime, query)
             else:
@@ -175,6 +208,97 @@ class AniCliArApp:
                 continue
             
             self.handle_anime_selection(results)
+
+    def handle_anime_selection_with_lazy_load(self, results, load_more_callback):
+        while True:
+            anime_idx = self.ui.anime_selection_menu(results, load_more_callback=load_more_callback)
+            
+            if anime_idx == -1:
+                sys.exit(0)
+            if anime_idx is None:
+                return
+            
+            selected_anime = results[anime_idx]
+
+            self.rpc.update_viewing_anime(selected_anime.title_en, selected_anime.thumbnail)
+            
+            def load_episodes_and_poster():
+                eps = self.api.get_episodes(selected_anime.id)
+                if selected_anime.thumbnail:
+                    screen_height = self.ui.console.height
+                    target_height = min(screen_height, 35)
+                    poster_height = target_height - 8
+                    if poster_height > 0:
+                        self.ui._generate_poster_ansi(selected_anime.thumbnail, poster_height)
+                return eps
+            
+            episodes = self.ui.run_with_loading(
+                "Loading episodes & poster...",
+                load_episodes_and_poster
+            )
+            
+            if not episodes:
+                self.ui.render_message(
+                    "✗ No Episodes",
+                    f"No episodes found for '{selected_anime.title_en}'.",
+                    "error"
+                )
+                continue
+            
+            self.handle_episode_selection(selected_anime, episodes)
+
+    def handle_genres(self):
+        genres = [
+            "Action", "Adventure", "Comedy", "Drama", "Fantasy", 
+            "Horror", "Mystery", "Romance", "Sci-Fi", "Slice of Life", 
+            "Sports", "Supernatural", "Thriller", "Isekai", "School"
+        ]
+        
+        selected_genre = self.ui.selection_menu(genres, title="Select Genre")
+        if selected_genre:
+            results = self.ui.run_with_loading(
+                f"Fetching {selected_genre} anime...",
+                self.api.get_anime_list,
+                "GENRE",
+                selected_genre,
+                "SERIES",
+                0,
+                15
+            )
+            if results:
+                def load_more_genre(current_count):
+                    return self.api.get_anime_list("GENRE", selected_genre, "SERIES", current_count, 15)
+                self.handle_anime_selection_with_lazy_load(results, load_more_genre)
+            else:
+                self.ui.render_message("Info", f"No anime found for genre: {selected_genre}", "info")
+
+    def handle_studios(self):
+        studios = [
+            "Toei Animation", "Sunrise", "Madhouse", "Production I.G", "J.C.Staff", 
+            "TMS Entertainment", "Studio Pierrot", "Studio Deen", "A-1 Pictures", 
+            "Bones", "Kyoto Animation", "MAPPA", "Wit Studio", "ufotable", 
+            "White Fox", "David Production", "Shaft", "Trigger", "CloverWorks", 
+            "Lerche", "P.A. Works", "CoMix Wave Films", "Gainax", "Tatsunoko Production"
+        ]
+        studios.sort()
+        
+        selected_studio = self.ui.selection_menu(studios, title="Select Studio")
+        if selected_studio:
+            results = self.ui.run_with_loading(
+                f"Fetching {selected_studio} anime...",
+                self.api.get_anime_list,
+                "STUDIOS",
+                selected_studio,
+                "SERIES",
+                0,
+                15
+            )
+            if results:
+                def load_more_studio(current_count):
+                    return self.api.get_anime_list("STUDIOS", selected_studio, "SERIES", current_count, 15)
+                self.handle_anime_selection_with_lazy_load(results, load_more_studio)
+            else:
+                self.ui.render_message("Info", f"No anime found for studio: {selected_studio}", "info")
 
     def handle_history(self):
         history_items = self.history.get_history()
@@ -247,36 +371,23 @@ class AniCliArApp:
             
             selected_anime = results[anime_idx]
 
-            # --- BRIDGE LOGIC: MAL to Internal API ---
-            if not selected_anime.id:
-                # Try English title first
-                internal_results = self.ui.run_with_loading(
-                    f"Syncing '{selected_anime.title_en}'...",
-                    self.api.search_anime,
-                    selected_anime.title_en
-                )
-                
-                # If failed, try Romaji title if different
-                if not internal_results and selected_anime.title_romaji and selected_anime.title_romaji != selected_anime.title_en:
-                     internal_results = self.ui.run_with_loading(
-                        f"Syncing '{selected_anime.title_romaji}'...",
-                        self.api.search_anime,
-                        selected_anime.title_romaji
-                    )
-
-                if not internal_results:
-                     self.ui.render_message("✗ Not Found", f"Sorry, '{selected_anime.title_en}' hasn't been uploaded to the server yet.", "error")
-                     continue
-                
-                selected_anime = internal_results[0]
-            # -----------------------------------------
-
             self.rpc.update_viewing_anime(selected_anime.title_en, selected_anime.thumbnail)
             
+            # Load episodes and pre-generate poster in one loading screen
+            def load_episodes_and_poster():
+                eps = self.api.get_episodes(selected_anime.id)
+                # Pre-generate poster while loading (will be cached)
+                if selected_anime.thumbnail:
+                    screen_height = self.ui.console.height
+                    target_height = min(screen_height, 35)
+                    poster_height = target_height - 8
+                    if poster_height > 0:
+                        self.ui._generate_poster_ansi(selected_anime.thumbnail, poster_height)
+                return eps
+            
             episodes = self.ui.run_with_loading(
-                "Loading episodes...",
-                self.api.get_episodes,
-                selected_anime.id
+                "Loading episodes & poster...",
+                load_episodes_and_poster
             )
             
             if not episodes:
@@ -290,6 +401,83 @@ class AniCliArApp:
             back_pressed = self.handle_episode_selection(selected_anime, episodes)
             if not back_pressed:
                 break
+    
+    def play_trailer(self, anime):
+        import requests
+        import time
+        
+        trailer_url = None
+        
+        # Try Animeify Trailer field first (filename from API)
+        if anime.trailer and anime.trailer not in ["N/A", "None", None, ""]:
+            if anime.trailer.startswith(('http://', 'https://')):
+                trailer_url = anime.trailer
+            else:
+                # It's a filename, construct full URL
+                trailer_url = get_trailers_base() + anime.trailer
+            
+            # Verify if the trailer file exists
+            try:
+                check = requests.head(trailer_url, timeout=5)
+                if check.status_code == 404:
+                    trailer_url = None  # File doesn't exist, try fallback
+            except Exception:
+                trailer_url = None
+        
+        # Try YTTrailer field
+        if not trailer_url and anime.yt_trailer and anime.yt_trailer not in ["N/A", "None", None, ""]:
+            if anime.yt_trailer.startswith(('http://', 'https://')):
+                trailer_url = anime.yt_trailer
+            else:
+                # Assume it's a YouTube video ID
+                trailer_url = f"https://www.youtube.com/watch?v={anime.yt_trailer}"
+        
+        # Fallback to Jikan API using MAL ID
+        if not trailer_url and anime.mal_id and anime.mal_id not in ["0", "N/A", "None", None, ""]:
+            try:
+                time.sleep(0.5)  # Rate limiting for Jikan API
+                jikan_response = requests.get(
+                    f"https://api.jikan.moe/v4/anime/{anime.mal_id}",
+                    timeout=10
+                )
+                if jikan_response.status_code == 200:
+                    jikan_data = jikan_response.json()
+                    trailer_data = jikan_data.get('data', {}).get('trailer', {})
+                    embed_url = trailer_data.get('embed_url', '')
+                    
+                    if embed_url:
+                        # Extract YouTube ID from embed URL
+                        match = re.search(r'/embed/([a-zA-Z0-9_-]+)', embed_url)
+                        if match:
+                            yt_id = match.group(1)
+                            trailer_url = f"https://www.youtube.com/watch?v={yt_id}"
+            except Exception:
+                pass  # Jikan fallback failed, show error below
+        
+        if not trailer_url:
+            self.ui.render_message("Error", "No trailer available for this anime.", "error")
+            return
+        
+        self.ui.clear()
+        
+        # Center the message vertically and horizontally
+        message_text = Text()
+        message_text.append("Trailer Launched!\n\n", style="bold green")
+        message_text.append("Playing trailer in MPV window...\n", style="info")
+        message_text.append("Close MPV to return to episodes list.", style="secondary")
+        
+        panel = Panel(
+            Align.center(message_text, vertical="middle"),
+            title=Text("Trailer", style="title"),
+            box=HEAVY,
+            border_style=COLOR_BORDER,
+            padding=(2, 6),
+            width=60
+        )
+        
+        self.ui.console.print(Align.center(panel, vertical="middle", height=self.ui.console.height))
+        
+        self.player.play(trailer_url, f"Trailer - {anime.title_en}")
 
     def handle_episode_selection(self, selected_anime, episodes):
         current_idx = 0 
@@ -302,10 +490,15 @@ class AniCliArApp:
             anime_details = {
                 'score': selected_anime.score,
                 'rank': selected_anime.rank,
+                'popularity': selected_anime.popularity,
+                'rating': selected_anime.rating,
                 'type': selected_anime.type,
                 'episodes': selected_anime.episodes,
                 'status': selected_anime.status,
-                'genres': selected_anime.genres
+                'studio': selected_anime.creators,
+                'genres': selected_anime.genres,
+                'trailer': selected_anime.trailer,
+                'yt_trailer': selected_anime.yt_trailer
             }
 
             ep_idx = self.ui.episode_selection_menu(
@@ -332,6 +525,9 @@ class AniCliArApp:
             elif ep_idx == 'batch_mode':
                 self.handle_batch_download(selected_anime, episodes)
                 continue
+            elif ep_idx == 'trailer':
+                self.play_trailer(selected_anime)
+                continue
             
             current_idx = ep_idx
             
@@ -342,7 +538,8 @@ class AniCliArApp:
                     "Loading servers...",
                     self.api.get_streaming_servers,
                     selected_anime.id, 
-                    selected_ep.number
+                    selected_ep.number,
+                    selected_anime.type
                 )
                 
                 if not server_data:
@@ -401,7 +598,7 @@ class AniCliArApp:
             ep = episodes[idx]
             self.ui.print(f"Processing Episode {ep.display_num}...")
             
-            server_data = self.api.get_streaming_servers(selected_anime.id, ep.number)
+            server_data = self.api.get_streaming_servers(selected_anime.id, ep.number, selected_anime.type)
             if not server_data:
                 self.ui.print(f"[error]Skipping Ep {ep.display_num}: No servers found[/error]")
                 continue
@@ -490,7 +687,7 @@ class AniCliArApp:
             filename = f"{selected_anime.title_en} - Ep {selected_ep.display_num} [{quality.name.split()[1]}].mp4"
             
             if action == 'download':
-                success = download_file(direct_url, filename, self.ui.console)
+                download_file(direct_url, filename, self.ui.console)
                 # Save download as "watched" in history so you can jump to it next time
                 self.history.mark_watched(selected_anime.id, selected_ep.display_num, selected_anime.title_en)
                 return "download"
@@ -505,17 +702,19 @@ class AniCliArApp:
                 from .config import COLOR_BORDER, COLOR_TITLE
                 
                 watching_text = Text()
+                watching_text.append("▶ ", style=COLOR_TITLE + " blink")
                 watching_text.append(selected_anime.title_en, style="bold")
                 watching_text.append("\nEpisode ", style="secondary")
-                watching_text.append(str(selected_ep.display_num), style=COLOR_TITLE)
-                watching_text.append(f"\n{quality.name}", style="dim")
+                watching_text.append(str(selected_ep.display_num), style=COLOR_TITLE + " bold")
+                watching_text.append(" ◀", style=COLOR_TITLE + " blink")
+                watching_text.append(f"\n\n{quality.name}", style="dim")
                 
                 watching_panel = Panel(
                     Align.center(watching_text, vertical="middle"),
-                    title=Text("▶ NOW PLAYING", style=COLOR_TITLE),
+                    title=Text("NOW PLAYING", style=COLOR_TITLE + " bold"),
                     box=HEAVY,
                     border_style=COLOR_BORDER,
-                    padding=(1, 4),
+                    padding=(2, 4),
                     width=60
                 )
                 
@@ -573,20 +772,15 @@ class AniCliArApp:
         self.player.cleanup_temp_mpv()
         self.ui.clear()
         
-        panel = Panel(
-            Text("👋", justify="center", style="info"),
-            title=Text("GOODBYE", style="title"),
-            box=HEAVY,
-            padding=1,
-            border_style=COLOR_BORDER
-        )
+        from .config import COLOR_ASCII
         
-        self.ui.print(Align.center(panel, vertical="middle", height=self.ui.console.height))
+        self.ui.print("\n" * 2)
+        self.ui.print(Align.center(Text(goodbye, style=COLOR_ASCII)))
+        self.ui.print("\n")
 
 
 def main():
     """Main entry point for the ani-cli-arabic package"""
-    import os
     # Ensure database directory exists in user home, not package location
     home_dir = Path.home()
     db_dir = home_dir / ".ani-cli-arabic" / "database"
@@ -599,3 +793,14 @@ def main():
 if __name__ == "__main__":
     main()
 
+goodbye = r"""
+
+
+ ..|'''.|                       '||     '||''|.                    .|.
+.|'     '    ...     ...      .. ||      ||   ||  .... ...   ....  |||
+||    .... .|  '|. .|  '|.  .'  '||      ||'''|.   '|.  |  .|...|| '|'
+'|.    ||  ||   || ||   ||  |.   ||      ||    ||   '|.|   ||       | 
+ ''|...'|   '|..|'  '|..|'  '|..'||.    .||...|'     '|     '|...'  . 
+                                                  .. |             '|'
+                                                   ''                 
+"""

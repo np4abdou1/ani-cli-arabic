@@ -1,6 +1,3 @@
-import os
-import sys
-
 from .version import APP_VERSION
 
 CURRENT_VERSION = APP_VERSION

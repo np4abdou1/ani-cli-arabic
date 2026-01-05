@@ -141,23 +141,9 @@ class PlayerManager:
             '--hwdec=auto-safe',
             '--vo=gpu',
             '--profile=gpu-hq',
-            '--scale=ewa_lanczossharp',
-            '--cscale=ewa_lanczossharp',
-            '--dscale=mitchell',
-            '--video-sync=display-resample',
-            '--interpolation',
-            '--tscale=oversample',
-            '--correct-downscaling=yes',
-            '--linear-downscaling=yes',
-            '--sigmoid-upscaling=yes',
-            '--deband=yes',
-            '--deband-iterations=2',
-            '--deband-threshold=35',
-            '--deband-range=16',
             '--ytdl',
             '--ytdl-format=bestvideo[height<=?1080]+bestaudio/best',
             '--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-            '--http-header-fields=Referer: https://gogoanime.gg/',
             '--sub-auto=fuzzy',
             '--sub-file-paths=subs',
             '--slang=ara,ar,eng,en',
@@ -165,10 +151,13 @@ class PlayerManager:
             '--title=' + title,
             url
         ]
-
-        if sys.platform == 'win32':
-            mpv_args.append('--gpu-api=d3d11')
         
+        # Remove aggressive options that might cause issues with some drivers/setup
+        # '--gpu-api=d3d11' caused issues on some systems, letting MPV choose is safer
+        
+        # Add force-window to ensure window appears even if audio-only (rare for anime but good safety)
+        mpv_args.append('--force-window=yes')
+
         result = subprocess.run(
             mpv_args,
             check=False,

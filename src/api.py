@@ -1,17 +1,9 @@
-import requests
-import platform
-import base64
-import hashlib
-import subprocess
-import uuid
 import re
-import getpass
-from pathlib import Path
-from typing import List, Optional, Dict
-from .models import AnimeResult, Episode
+import threading
+from typing import Dict, List, Optional
 
-# Note: This software collects anonymous usage data (app start, video play)
-# to help improve the application. No personal data is collected.
+import requests
+from .models import AnimeResult, Episode
 
 def _get_endpoint_config() -> tuple[str, str]:
     # Hardcoded configuration for the remote worker
@@ -22,9 +14,6 @@ def _get_endpoint_config() -> tuple[str, str]:
 
 
 class APICache:
-    def __init__(self):
-        pass
-    
     def _fetch_from_remote(self) -> dict:
         endpoint_url, auth_secret = _get_endpoint_config()
         
@@ -41,13 +30,21 @@ class APICache:
             if response.status_code == 200:
                 return response.json()
             else:
-                raise Exception(f"Remote endpoint returned status {response.status_code}")
-        except Exception as e:
-            raise RuntimeError(f"Failed to fetch credentials: {e}")
+                return {
+                    'ANI_CLI_AR_API_BASE': '',
+                    'ANI_CLI_AR_TOKEN': '',
+                    'THUMBNAILS_BASE_URL': '',
+                    'TRAILERS_BASE_URL': 'https://animeify.net/animeify/files/trailers/'
+                }
+        except Exception:
+            return {
+                'ANI_CLI_AR_API_BASE': '',
+                'ANI_CLI_AR_TOKEN': '',
+                'THUMBNAILS_BASE_URL': '',
+                'TRAILERS_BASE_URL': 'https://animeify.net/animeify/files/trailers/'
+            }
     
     def get_keys(self) -> dict:
-        # Simply fetch credentials from remote, no local caching encryption needed for now
-        # as we are moving away from local DB storage.
         return self._fetch_from_remote()
 
 
@@ -59,115 +56,151 @@ def get_credentials():
 
 
 _credential_manager = None
+_creds = None
+_creds_lock = threading.Lock()
 
+def _ensure_creds():
+    """Load API credentials once (thread-safe)."""
+    global _creds
+    if _creds is not None:
+        return
 
+    with _creds_lock:
+        if _creds is not None:
+            return
+        _creds = get_credentials()
 
-#___________________________
+def get_api_base():
+    _ensure_creds()
+    return _creds['ANI_CLI_AR_API_BASE']
 
-#Jikan api is free and opensource 
+def get_api_token():
+    _ensure_creds()
+    return _creds['ANI_CLI_AR_TOKEN']
+
+def get_thumbnails_base():
+    _ensure_creds()
+    return _creds['THUMBNAILS_BASE_URL']
+
+def get_trailers_base():
+    _ensure_creds()
+    return _creds.get('TRAILERS_BASE_URL', 'https://animeify.net/animeify/files/trailers/')
 
 class AnimeAPI:
     def __init__(self):
         pass
     
-    def get_mal_season_now(self) -> List[AnimeResult]:
-        url = "https://api.jikan.moe/v4/seasons/now"
-        try:
-            response = requests.get(url, params={'sfw': 'true'}, timeout=10)
-            response.raise_for_status()
-            data = response.json().get('data', [])
+    def _parse_anime_result(self, item: dict) -> AnimeResult:
+        thumbnail_filename = item.get('Thumbnail', '')
+        thumbnail_url = get_thumbnails_base() + thumbnail_filename if thumbnail_filename else ''
+        
+        return AnimeResult(
+            id=item.get('AnimeId', ''),
+            title_en=item.get('EN_Title', 'Unknown'),
+            title_jp=item.get('JP_Title', ''),
+            type=item.get('Type', 'N/A'),
+            episodes=str(item.get('Episodes', 'N/A')),
+            status=item.get('Status', 'N/A'),
+            genres=item.get('Genres', 'N/A'),
+            mal_id=item.get('MalId', '0'),
+            relation_id=item.get('RelationId', ''),
+            score=str(item.get('Score', 'N/A')),
+            rank=str(item.get('Rank', 'N/A')),
+            popularity=str(item.get('Popularity', 'N/A')),
+            rating=item.get('Rating', 'N/A'),
+            premiered=item.get('Season', 'N/A'),
+            creators=item.get('Creators', 'N/A'),
+            duration=str(item.get('Duration', 'N/A')),
+            thumbnail=thumbnail_url,
+            title_romaji=item.get('EN_Title', ''),
+            trailer=item.get('Trailer', ''),
+            yt_trailer=item.get('YTTrailer', '')
+        )
+
+    def get_anime_list(self, filter_type: str = "", filter_data: str = "", anime_type: str = "SERIES", from_index: int = 0, limit: int = 30) -> List[AnimeResult]:
+        endpoint = get_api_base() + "anime/load_anime_list_v2.php"
+        all_results = []
+        current_from = from_index
+        
+        while len(all_results) < limit:
+            payload = {
+                'UserId': '0',
+                'Language': 'English',
+                'FilterType': filter_type,
+                'FilterData': filter_data,
+                'Type': anime_type,
+                'From': str(current_from),
+                'Token': get_api_token()
+            }
             
-            results = []
-            for item in data:
-                rating_str = item.get('rating', '')
-                if rating_str and 'Rx' in rating_str:
-                    continue
-
-                title = item.get('title_english') or item.get('title')
-                title_romaji = item.get('title') or ''
-                images = item.get('images', {}).get('jpg', {})
-                thumbnail_url = images.get('large_image_url') or images.get('image_url', '')
-                genres = ", ".join([g['name'] for g in item.get('genres', [])])
-                studios = ", ".join([s['name'] for s in item.get('studios', [])])
+            try:
+                response = requests.post(endpoint, data=payload, timeout=10)
+                response.raise_for_status()
+                data = response.json()
                 
-                score = item.get('score')
-                score = str(score) if score is not None else 'N/A'
+                if not data:
+                    break
+                    
+                batch = [self._parse_anime_result(item) for item in data]
+                all_results.extend(batch)
+                
+                if len(batch) < 10: 
+                    break
+                    
+                current_from += len(batch)
+                
+            except Exception:
+                break
+                
+        return all_results[:limit]
 
-                rank = item.get('rank')
-                rank = str(rank) if rank is not None else 'N/A'
-
-                popularity = item.get('popularity')
-                popularity = str(popularity) if popularity is not None else 'N/A'
-
-                results.append(AnimeResult(
-                    id="",
-                    title_en=title,
-                    title_jp=item.get('title_japanese') or '',
-                    type=item.get('type') or 'TV',
-                    episodes=str(item.get('episodes') or '?'),
-                    status=item.get('status') or 'N/A',
-                    genres=genres,
-                    mal_id=str(item.get('mal_id') or ''),
-                    relation_id='',
-                    score=score,
-                    rank=rank,
-                    popularity=popularity,
-                    rating=item.get('rating') or 'N/A',
-                    premiered=f"{item.get('season') or ''} {item.get('year') or ''}".strip(),
-                    creators=studios,
-                    duration=item.get('duration') or 'N/A',
-                    thumbnail=thumbnail_url,
-                    title_romaji=title_romaji
-                ))
-            return results
-        except Exception:
-            return []
+    def get_latest_anime(self, from_index: int = 0, limit: int = 30) -> List[AnimeResult]:
+        endpoint = get_api_base() + "anime/load_latest_anime.php"
+        all_results = []
+        current_from = from_index
+        
+        while len(all_results) < limit:
+            payload = {
+                'UserId': '0',
+                'Language': 'English',
+                'From': str(current_from),
+                'Token': get_api_token()
+            }
+            
+            try:
+                response = requests.post(endpoint, data=payload, timeout=10)
+                response.raise_for_status()
+                data = response.json()
+                
+                if not data:
+                    break
+                
+                batch = [self._parse_anime_result(item) for item in data]
+                all_results.extend(batch)
+                
+                if len(batch) < 10:
+                    break
+                    
+                current_from += len(batch)
+            except Exception:
+                break
+                
+        return all_results[:limit]
 
     def search_anime(self, query: str) -> List[AnimeResult]:
-        endpoint = get_api_base() + "anime/load_anime_list_v2.php"
-        payload = {
-            'UserId': '0',
-            'Language': 'English',
-            'FilterType': 'SEARCH',
-            'FilterData': query,
-            'Type': 'SERIES',
-            'From': '0',
-            'Token': get_api_token()
-        }
-        
-        try:
-            response = requests.post(endpoint, data=payload, timeout=10)
-            response.raise_for_status()
-            data = response.json()
-            
-            results = []
-            for item in data:
-                thumbnail_filename = item.get('Thumbnail', '')
-                thumbnail_url = get_thumbnails_base() + thumbnail_filename if thumbnail_filename else ''
-                
-                results.append(AnimeResult(
-                    id=item.get('AnimeId', ''),
-                    title_en=item.get('EN_Title', 'Unknown'),
-                    title_jp=item.get('JP_Title', ''),
-                    type=item.get('Type', 'N/A'),
-                    episodes=str(item.get('Episodes', 'N/A')),
-                    status=item.get('Status', 'N/A'),
-                    genres=item.get('Genres', 'N/A'),
-                    mal_id=item.get('MalId', '0'),
-                    relation_id=item.get('RelationId', ''),
-                    score=str(item.get('Score', 'N/A')),
-                    rank=str(item.get('Rank', 'N/A')),
-                    popularity=str(item.get('Popularity', 'N/A')),
-                    rating=item.get('Rating', 'N/A'),
-                    premiered=item.get('Season', 'N/A'),
-                    creators=item.get('Studios', 'N/A'),
-                    duration=item.get('Duration', 'N/A'),
-                    thumbnail=thumbnail_url,
-                    title_romaji=item.get('EN_Title', '')
-                ))
-            return results
-        except Exception:
-            return []
+        series_results = self.get_anime_list(filter_type="SEARCH", filter_data=query, anime_type="SERIES", limit=20)
+        movie_results = self.get_anime_list(filter_type="SEARCH", filter_data=query, anime_type="MOVIE", limit=20)
+        return series_results + movie_results
+
+    def get_trending_anime(self, from_index: int = 0, limit: int = 15) -> List[AnimeResult]:
+        fetch_limit = limit + from_index + 20
+        results = self.get_latest_anime(limit=fetch_limit)
+        results_with_pop = [r for r in results if r.popularity and r.popularity.isdigit()]
+        results_with_pop.sort(key=lambda x: int(x.popularity))
+        return results_with_pop[from_index:from_index + limit]
+
+    def get_top_rated_anime(self, from_index: int = 0, limit: int = 15) -> List[AnimeResult]:
+        return self.get_anime_list(filter_type="SORT", filter_data="HIGHEST_RATE", anime_type="SERIES", from_index=from_index, limit=limit)
 
     def get_episodes(self, anime_id: str) -> List[Episode]:
         endpoint = get_api_base() + "episodes/load_episodes.php"
@@ -202,13 +235,13 @@ class AnimeAPI:
         except Exception:
             return []
 
-    def get_streaming_servers(self, anime_id: str, episode_num: str) -> Optional[Dict]:
+    def get_streaming_servers(self, anime_id: str, episode_num: str, anime_type: str = 'SERIES') -> Optional[Dict]:
         endpoint = get_api_base() + "anime/load_servers.php"
         payload = {
             'UserId': '0',
             'AnimeId': anime_id,
             'Episode': str(episode_num),
-            'AnimeType': 'SERIES',
+            'AnimeType': anime_type,
             'Token': get_api_token()
         }
         
@@ -236,52 +269,3 @@ class AnimeAPI:
             return server_id
         return f'https://www.mediafire.com/file/{server_id}'
 
-
-
-
-
-#important credentials for the app to work (lazy-loaded)
-_creds = None
-_creds_fetch_failed = False
-_creds_lock = None
-
-def _ensure_creds():
-    """Lazy load credentials on first use with retry logic."""
-    global _creds, _creds_fetch_failed, _creds_lock
-    
-    # Initialize lock on first use
-    if _creds_lock is None:
-        import threading
-        _creds_lock = threading.Lock()
-    
-    # If already fetched or previously failed, return immediately
-    if _creds is not None:
-        return
-    
-    if _creds_fetch_failed:
-        raise RuntimeError("Credentials fetch previously failed. Please check your internet connection.")
-    
-    # Use lock to prevent multiple simultaneous fetch attempts
-    with _creds_lock:
-        # Double-check after acquiring lock
-        if _creds is not None:
-            return
-        
-        try:
-            _creds = get_credentials()
-        except Exception as e:
-            _creds_fetch_failed = True
-            raise RuntimeError(f"Failed to fetch API credentials: {e}") from e
-
-# Getter functions that lazy-load credentials
-def get_api_base():
-    _ensure_creds()
-    return _creds['ANI_CLI_AR_API_BASE']
-
-def get_api_token():
-    _ensure_creds()
-    return _creds['ANI_CLI_AR_TOKEN']
-
-def get_thumbnails_base():
-    _ensure_creds()
-    return _creds['THUMBNAILS_BASE_URL']
