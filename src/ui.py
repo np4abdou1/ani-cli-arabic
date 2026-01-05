@@ -3,7 +3,10 @@ import threading
 import importlib
 import os
 import sys
-import subprocess
+import requests
+from io import BytesIO
+import numpy as np
+from PIL import Image, ImageEnhance
 from rich.console import Console
 from rich.panel import Panel
 from rich.text import Text
@@ -28,6 +31,9 @@ from .utils import get_key, RawTerminal, restore_terminal_for_input, enter_raw_m
 from . import config as config_module
 
 class UIManager:
+    # Class-level poster cache for faster reloading
+    _poster_cache = {}
+    
     def __init__(self):
         self.theme = Theme({
             "panel.border": COLOR_BORDER,
@@ -117,13 +123,18 @@ class UIManager:
         
         return result_container.get('result')
 
-    def anime_selection_menu(self, results):
+    def anime_selection_menu(self, results, load_more_callback=None):
         selected = 0
         scroll_offset = 0
+        is_loading_more = False
+        has_more = True
+        loading_dots = 0
+        details_cache = {}  # Cache for anime details to avoid regeneration
         
         screen_height = self.console.height
         target_height = min(screen_height, 35)
-        if target_height < 20: target_height = screen_height
+        if target_height < 20:
+            target_height = screen_height
         
         vertical_pad = (screen_height - target_height) // 6
 
@@ -159,10 +170,25 @@ class UIManager:
         content_layout = layout["content"] if vertical_pad > 0 else layout
 
         def generate_renderable():
+            nonlocal loading_dots
             content_layout["header"].update(Align.center(header_renderable))
-            content_layout["footer"].update(Panel(Text("↑↓ Navigate | ENTER Select | b Back | q Quit", justify="center", style="secondary"), box=HEAVY, border_style=COLOR_BORDER))
             
-            max_display = target_height - 11 - 3 - 2
+            # Show loading indicator in footer if loading more
+            if is_loading_more:
+                theme_fade = [COLOR_PROMPT, COLOR_TITLE, COLOR_SECONDARY_TEXT]
+                base_text = " Loading more... "
+                animated = Text(justify="center")
+                for idx, ch in enumerate(base_text):
+                    color_idx = (loading_dots + idx) % len(theme_fade)
+                    animated.append(ch, style=theme_fade[color_idx])
+                loading_dots += 1
+                footer_render = Panel(animated, box=HEAVY, border_style=COLOR_BORDER)
+            else:
+                footer_text = "↑↓ Navigate | ENTER Select | b Back | q Quit"
+                footer_render = Panel(Text(footer_text, justify="center", style="secondary"), box=HEAVY, border_style=COLOR_BORDER)
+            content_layout["footer"].update(footer_render)
+            
+            max_display = target_height - 11 - 3 - 3
             left_content = Text()
             
             start = scroll_offset
@@ -186,6 +212,20 @@ class UIManager:
             ))
             
             selected_anime = results[selected]
+            
+            # Use cached details if same anime is selected
+            if selected not in details_cache:
+                container = Table.grid(padding=1)
+                container.add_column()
+            else:
+                container = details_cache[selected]
+                content_layout["right"].update(Panel(
+                    container, 
+                    title=Text("Details", style="title"),
+                    box=HEAVY,
+                    border_style=COLOR_BORDER
+                ))
+                return layout
             
             container = Table.grid(padding=1)
             container.add_column()
@@ -216,21 +256,42 @@ class UIManager:
             stats_table.add_row("Score:", Text(score_text, style="#FFA500"))
             stats_table.add_row("Rank:", Text(rank_text, style="title"))
             stats_table.add_row("Popularity:", Text(pop_text, style="title"))
-            stats_table.add_row("Rating:", selected_anime.rating)
-            stats_table.add_row("Type:", selected_anime.type)
-            stats_table.add_row("Episodes:", selected_anime.episodes)
-            stats_table.add_row("Status:", selected_anime.status)
-            stats_table.add_row("Aired:", selected_anime.premiered)
-            stats_table.add_row("Duration:", f"{selected_anime.duration} min/ep")
+            stats_table.add_row("Rating:", selected_anime.rating if selected_anime.rating not in ["N/A", "None", None, ""] else "Unknown")
+            stats_table.add_row("Type:", selected_anime.type if selected_anime.type not in ["N/A", "None", None, ""] else "Unknown")
+            stats_table.add_row("Episodes:", selected_anime.episodes if selected_anime.episodes not in ["N/A", "None", None, ""] else "Unknown")
+            stats_table.add_row("Status:", selected_anime.status if selected_anime.status not in ["N/A", "None", None, ""] else "Unknown")
+            
+            # Add Studio field - always show with fallback
+            studio_val = selected_anime.creators
+            studio_display = "Unknown" if studio_val in ["N/A", "None", None, "", "Unknown"] else studio_val
+            stats_table.add_row("Studio:", studio_display)
+
+            # Add Trailer status
+            trailer_val = selected_anime.trailer or selected_anime.yt_trailer
+            if trailer_val and trailer_val not in ["N/A", "None", None, ""]:
+                stats_table.add_row("Trailer:", Text("Found", style="bold green"))
+            else:
+                stats_table.add_row("Trailer:", Text("Not Found", style="dim"))
+            
+            # Add Season/Aired with fallback
+            season_val = selected_anime.premiered
+            if season_val and season_val not in ["N/A", "None", None, "", "0", "Unknown"]:
+                stats_table.add_row("Season:", season_val)
+            
+            # Add Duration with fallback
+            duration_val = selected_anime.duration
+            if duration_val and duration_val not in ["N/A", "None", None, "", "0", "Unknown"]:
+                # Handle duration format
+                if "min" in duration_val.lower():
+                    stats_table.add_row("Duration:", duration_val)
+                else:
+                    stats_table.add_row("Duration:", f"{duration_val} min/ep")
             
             text_container = Table.grid()
             text_container.add_column()
             text_container.add_row(Text("Genres", style="title", justify="center"))
-            text_container.add_row(Text(selected_anime.genres, style="secondary", justify="center"))
-            text_container.add_row("")
-            text_container.add_row(Text("Info", style="title", justify="center"))
-            text_container.add_row(Text("All anime details loaded instantly!", style="secondary", justify="center"))
-            text_container.add_row(Text(f"MAL ID: {selected_anime.mal_id}", style="dim", justify="center"))
+            genres_text = selected_anime.genres if selected_anime.genres not in ["N/A", "None", None, ""] else "Unknown"
+            text_container.add_row(Text(genres_text, style="secondary", justify="center"))
             
             details_grid.add_row(Align(stats_table, vertical="top"), text_container)
             container.add_row(details_grid)
@@ -250,25 +311,215 @@ class UIManager:
             with Live(generate_renderable(), console=self.console, auto_refresh=False, screen=True, refresh_per_second=10) as live:
                 while True:
                     key = get_key()
-                    max_display = target_height - 11 - 3 - 2
+                    max_display = target_height - 11 - 3 - 3
+                    needs_update = False
                     
                     if key == 'UP' and selected > 0:
                         selected -= 1
                         if selected < scroll_offset:
                             scroll_offset = selected
-                        live.update(generate_renderable(), refresh=True)
+                        needs_update = True
                     elif key == 'DOWN' and selected < len(results) - 1:
                         selected += 1
                         if selected >= scroll_offset + max_display:
                             scroll_offset = selected - max_display + 1
-                        live.update(generate_renderable(), refresh=True)
+                        needs_update = True
+                        
+                        # Predictive loading: when user is 5 items from the end, load more
+                        if load_more_callback and has_more and not is_loading_more:
+                            if selected >= len(results) - 5:
+                                is_loading_more = True
+                                live.update(generate_renderable(), refresh=True)
+                                
+                                import threading
+                                def load_in_background():
+                                    nonlocal is_loading_more, has_more
+                                    try:
+                                        new_results = load_more_callback(len(results))
+                                        if new_results:
+                                            results.extend(new_results)
+                                            live.update(generate_renderable(), refresh=True)
+                                        else:
+                                            has_more = False
+                                    except Exception:
+                                        has_more = False
+                                    finally:
+                                        is_loading_more = False
+                                        live.update(generate_renderable(), refresh=True)
+                                
+                                thread = threading.Thread(target=load_in_background, daemon=True)
+                                thread.start()
                     elif key == 'ENTER':
                         return selected
                     elif key == 'b':
                         return None
                     elif key == 'q' or key == 'ESC':
                         return -1
+                    
+                    if needs_update:
+                        live.update(generate_renderable(), refresh=True)
                     # No sleep needed - get_key() already has built-in timeout
+
+    def _generate_poster_ansi(self, url, max_height):
+        """Generate ANSI art from poster URL with caching and optimized rendering."""
+        if not url:
+            return Text("No poster available", style="secondary")
+        
+        # Check cache first
+        cache_key = f"{url}_{max_height}"
+        if cache_key in UIManager._poster_cache:
+            return UIManager._poster_cache[cache_key]
+        
+        try:
+            # Download with timeout
+            res = requests.get(url, timeout=5)
+            img = Image.open(BytesIO(res.content)).convert("RGB")
+            
+            # Enhance for terminal display
+            enhancer = ImageEnhance.Sharpness(img)
+            img = enhancer.enhance(1.8)
+            enhancer = ImageEnhance.Contrast(img)
+            img = enhancer.enhance(1.15)
+            
+            # Calculate dimensions
+            target_pixel_height = max_height * 2
+            new_height = target_pixel_height
+            new_width = int((img.width / img.height) * new_height * 2.0)
+            
+            # Ensure even dimensions
+            if new_width % 2 != 0:
+                new_width -= 1
+            if new_height % 2 != 0:
+                new_height -= 1
+            
+            # Use BILINEAR for speed (still good quality)
+            img = img.resize((new_width, new_height), Image.Resampling.BILINEAR)
+            arr = np.array(img, dtype=np.uint8)
+            
+            quadrants = [' ', '▘', '▝', '▀', '▖', '▌', '▞', '▛', '▗', '▚', '▐', '▜', '▄', '▙', '▟', '█']
+            output_lines = []
+            
+            # Process in batches for speed
+            for y in range(0, new_height, 2):
+                line_parts = []  # No padding to fit outline
+                for x in range(0, new_width, 2):
+                    # Get 2x2 block
+                    p0 = arr[y, x]
+                    p1 = arr[y, x+1] if x+1 < new_width else p0
+                    p2 = arr[y+1, x] if y+1 < new_height else p0
+                    p3 = arr[y+1, x+1] if (y+1 < new_height and x+1 < new_width) else p0
+                    
+                    # Fast 2-color quantization using luminance
+                    def calculate_luminance(p):
+                        return 0.299*p[0] + 0.587*p[1] + 0.114*p[2]
+                    lums = [calculate_luminance(p0), calculate_luminance(p1), calculate_luminance(p2), calculate_luminance(p3)]
+                    avg_lum = sum(lums) / 4
+                    
+                    # Split by luminance threshold
+                    mask = [lum_val > avg_lum for lum_val in lums]
+                    
+                    # Calculate average colors for each group
+                    bright = [p for i, p in enumerate([p0, p1, p2, p3]) if mask[i]]
+                    dark = [p for i, p in enumerate([p0, p1, p2, p3]) if not mask[i]]
+                    
+                    if bright:
+                        fg = np.mean(bright, axis=0).astype(int)
+                    else:
+                        fg = np.mean([p0, p1, p2, p3], axis=0).astype(int)
+                    
+                    if dark:
+                        bg = np.mean(dark, axis=0).astype(int)
+                    else:
+                        bg = fg
+                    
+                    # Determine quadrant character
+                    if all(mask):
+                        char_idx = 15
+                    elif not any(mask):
+                        char_idx = 15
+                    else:
+                        q_val = 0
+                        if mask[0]:
+                            q_val += 1
+                        if mask[1]:
+                            q_val += 2
+                        if mask[2]:
+                            q_val += 4
+                        if mask[3]:
+                            q_val += 8
+                        char_idx = q_val
+                    
+                    char = quadrants[char_idx]
+                    line_parts.append(f"\033[38;2;{fg[0]};{fg[1]};{fg[2]}m\033[48;2;{bg[0]};{bg[1]};{bg[2]}m{char}")
+                
+                line_parts.append("\033[0m")
+                output_lines.append("".join(line_parts))
+            
+            result = Text.from_ansi("\n".join(output_lines))
+            
+            # Cache the result
+            UIManager._poster_cache[cache_key] = result
+            
+            return result
+            
+        except Exception:
+            return Text("Poster unavailable", style="dim")
+
+    def selection_menu(self, items, title="Select Item"):
+        selected = 0
+        scroll_offset = 0
+        
+        screen_height = self.console.height
+        target_height = min(screen_height, 25)
+
+        def generate_renderable():
+            max_display = target_height - 5
+            content = Text()
+            
+            start = scroll_offset
+            end = min(start + max_display, len(items))
+            
+            for idx in range(start, end):
+                item = items[idx]
+                is_selected = idx == selected
+                
+                if is_selected:
+                    content.append(f"▶ {item}\n", style="highlight")
+                else:
+                    content.append(f"  {item}\n", style="info")
+            
+            panel = Panel(
+                content,
+                title=Text(title, style="title"),
+                box=HEAVY,
+                border_style=COLOR_BORDER,
+                padding=(1, 2)
+            )
+            
+            return Align.center(panel, vertical="middle", height=self.console.height)
+
+        self.clear()
+        
+        with RawTerminal():
+            with Live(generate_renderable(), console=self.console, auto_refresh=False, screen=True) as live:
+                while True:
+                    key = get_key()
+                    max_display = target_height - 5
+                    
+                    if key == 'UP' and selected > 0:
+                        selected -= 1
+                        if selected < scroll_offset:
+                            scroll_offset = selected
+                        live.update(generate_renderable(), refresh=True)
+                    elif key == 'DOWN' and selected < len(items) - 1:
+                        selected += 1
+                        if selected >= scroll_offset + max_display:
+                            scroll_offset = selected - max_display + 1
+                        live.update(generate_renderable(), refresh=True)
+                    elif key == 'ENTER':
+                        return items[selected]
+                    elif key == 'q' or key == 'b':
+                        return None
 
     def episode_selection_menu(self, anime_title, episodes, rpc_manager=None, anime_poster=None, last_watched_ep=None, is_favorite=False, anime_details=None):
         selected = 0
@@ -279,9 +530,11 @@ class UIManager:
 
         screen_height = self.console.height
         target_height = min(screen_height, 35)
-        if target_height < 15: target_height = screen_height
+        if target_height < 15:
+            target_height = screen_height
         
         vertical_pad = (screen_height - target_height) // 2
+        poster_height = target_height - 8
 
         def create_layout():
             layout = Layout(name="root")
@@ -306,13 +559,23 @@ class UIManager:
             )
             
             content_area["body"].split_row(
-                Layout(name="left", ratio=1),
-                Layout(name="right", ratio=6)
+                Layout(name="left", ratio=2),
+                Layout(name="right", ratio=5)
+            )
+            
+            content_area["right"].split_row(
+                Layout(name="poster_panel", ratio=1),
+                Layout(name="details_panel", ratio=1)
             )
             return layout
 
         layout = create_layout()
         content_layout = layout["content"] if vertical_pad > 0 else layout
+        
+        # Get poster from cache (already pre-generated during loading)
+        poster_renderable = None
+        if anime_poster and poster_height > 0:
+            poster_renderable = self._generate_poster_ansi(anime_poster, poster_height)
 
         def generate_renderable():
             content_layout["header"].update(Panel(Text(anime_title, justify="center", style="title"), box=HEAVY, border_style=COLOR_BORDER))
@@ -358,6 +621,23 @@ class UIManager:
                 padding=(0, 1)
             ))
             
+            # Poster Panel
+            if poster_renderable:
+                content_layout["poster_panel"].update(Panel(
+                    Align.center(poster_renderable, vertical="middle"),
+                    title=Text("Poster", style="title"),
+                    box=HEAVY,
+                    border_style=COLOR_BORDER,
+                    padding=(0, 0)
+                ))
+            else:
+                content_layout["poster_panel"].update(Panel(
+                    Align.center(Text("No Poster", style="dim"), vertical="middle"),
+                    title=Text("Poster", style="title"),
+                    box=HEAVY,
+                    border_style=COLOR_BORDER
+                ))
+
             # Show anime details in right panel
             fav_icon = "★" if is_favorite else "☆"
             
@@ -378,12 +658,30 @@ class UIManager:
 
                 rank_val = anime_details.get('rank')
                 rank_text = "N/A" if rank_val in ["N/A", "None", None] else f"#{rank_val}"
+                
+                pop_val = anime_details.get('popularity')
+                pop_text = "N/A" if pop_val in ["N/A", "None", None] else f"#{pop_val}"
 
                 stats_table.add_row("Score:", Text(score_text, style="#FFA500"))
                 stats_table.add_row("Rank:", Text(rank_text, style="title"))
+                stats_table.add_row("Popularity:", Text(pop_text, style="title"))
+                stats_table.add_row("Rating:", anime_details.get('rating', 'N/A') if anime_details.get('rating') not in ["N/A", "None", None, ""] else "Unknown")
                 stats_table.add_row("Type:", anime_details.get('type', 'N/A'))
                 stats_table.add_row("Episodes:", str(anime_details.get('episodes', 'N/A')))
                 stats_table.add_row("Status:", anime_details.get('status', 'N/A'))
+                
+                # Add Studio field
+                studio_val = anime_details.get('studio')
+                studio_display = "Unknown" if studio_val in ["N/A", "None", None, "", "Unknown"] else studio_val
+                stats_table.add_row("Studio:", studio_display)
+
+                # Add Trailer status
+                trailer_val = anime_details.get('trailer') or anime_details.get('yt_trailer')
+                if trailer_val and trailer_val not in ["N/A", "None", None, ""]:
+                    stats_table.add_row("Trailer:", Text("Found (Press T)", style="bold green"))
+                else:
+                    stats_table.add_row("Trailer:", Text("Not Found", style="dim"))
+                
                 if last_watched_ep:
                     stats_table.add_row("Last Watched:", Text(f"Episode {last_watched_ep}", style="bold green"))
                 stats_table.add_row("Favorite:", Text(fav_icon + (" Yes" if is_favorite else " No"), style="title"))
@@ -393,7 +691,7 @@ class UIManager:
                 details_container.add_row(Text("Genres", style="title", justify="center"))
                 details_container.add_row(Text(anime_details.get('genres', 'N/A'), style="secondary", justify="center"))
                 
-                content_layout["right"].update(Panel(
+                content_layout["details_panel"].update(Panel(
                     Align.center(details_container, vertical="middle"),
                     title=Text(f"{fav_icon} Info", style="title"),
                     box=HEAVY,
@@ -447,6 +745,8 @@ class UIManager:
                         return 'toggle_fav'
                     elif key == 'm' or key == 'M':
                         return 'batch_mode'
+                    elif key == 't' or key == 'T':
+                        return 'trailer'
                     elif key == 'g':
                         live.stop()
                         try:
@@ -789,15 +1089,31 @@ class UIManager:
                         # If theme was changed, exit app to apply globally
                         if theme_changed:
                             self.console.clear()
-                            self.console.print("\n[bold cyan]Theme changed! Exiting application...[/bold cyan]")
-                            self.console.print("[dim]Please run the application again to apply the new theme.[/dim]\n")
+                            message = Text()
+                            message.append("Theme changed! Exiting application...\n\n", style=COLOR_TITLE)
+                            message.append("Please run the application again to apply the new theme.", style="secondary")
+                            panel = Panel(
+                                Align.center(message, vertical="middle"),
+                                box=HEAVY,
+                                border_style=COLOR_BORDER,
+                                padding=(2, 4)
+                            )
+                            self.console.print(Align.center(panel, vertical="middle", height=self.console.height))
                             time.sleep(2)
                             sys.exit(0)
                         # If Discord RPC was changed, notify user
                         if rpc_changed:
                             self.console.clear()
-                            self.console.print("\n[bold cyan]Discord Rich Presence setting changed![/bold cyan]")
-                            self.console.print("[dim]Please restart the application for changes to take effect.[/dim]\n")
+                            message = Text()
+                            message.append("Discord Rich Presence setting changed!\n\n", style=COLOR_TITLE)
+                            message.append("Please restart the application for changes to take effect.", style="secondary")
+                            panel = Panel(
+                                Align.center(message, vertical="middle"),
+                                box=HEAVY,
+                                border_style=COLOR_BORDER,
+                                padding=(2, 4)
+                            )
+                            self.console.print(Align.center(panel, vertical="middle", height=self.console.height))
                             time.sleep(2)
                         
                         # Clear the screen before returning
@@ -926,7 +1242,7 @@ class UIManager:
         self.clear()
         
         with RawTerminal():
-            with Live(Align.center(generate_renderable(), vertical="middle", height=self.console.height), console=self.console, auto_refresh=False, screen=True) as live:
+            with Live(Align.center(generate_renderable(), vertical="middle", height=self.console.height), console=self.console, auto_refresh=False, screen=True):
                 while True:
                     key = get_key()
                     if key:

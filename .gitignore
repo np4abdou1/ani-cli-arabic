@@ -1,17 +1,21 @@
-# Python
+# Python & garbage
 __pycache__/
 *.py[cod]
 *$py.class
 *.so
 .Python
+/dashboard
 build/
+/api docs
 develop-eggs/
 dist/
 downloads/
+/worker
 eggs/
 .eggs/
 lib/
 lib64/
+/site
 parts/
 sdist/
 var/
@@ -64,8 +68,5 @@ temp/
 tmp/
 *.tmp
 
-# Worker (contains secrets and build artifacts)
-worker/
-site/
-# Local dashboard
-dashboard/
+# Dev folders; used for api, github pages.
+

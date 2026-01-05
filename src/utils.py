@@ -59,11 +59,16 @@ def get_key():
             key = msvcrt.getch()
             if key == b'\xe0' or key == b'\x00':
                 key2 = msvcrt.getch()
-                if key2 == b'H': return 'UP'
-                elif key2 == b'P': return 'DOWN'
-                elif key2 == b'M': return 'RIGHT'
-                elif key2 == b'K': return 'LEFT'
-            elif key == b'\r': return 'ENTER'
+                if key2 == b'H':
+                    return 'UP'
+                elif key2 == b'P':
+                    return 'DOWN'
+                elif key2 == b'M':
+                    return 'RIGHT'
+                elif key2 == b'K':
+                    return 'LEFT'
+            elif key == b'\r':
+                return 'ENTER'
             elif key == b'\x1b':
                 # Handle ANSI escape sequences on Windows (e.g. VS Code terminal)
                 start_time = time.time()
@@ -74,10 +79,14 @@ def get_key():
                         if len(seq) >= 3:
                             if seq.startswith(b'\x1b[') or seq.startswith(b'\x1bO'):
                                 last = seq[-1:]
-                                if last == b'A': return 'UP'
-                                if last == b'B': return 'DOWN'
-                                if last == b'C': return 'RIGHT'
-                                if last == b'D': return 'LEFT'
+                                if last == b'A':
+                                    return 'UP'
+                                if last == b'B':
+                                    return 'DOWN'
+                                if last == b'C':
+                                    return 'RIGHT'
+                                if last == b'D':
+                                    return 'LEFT'
                             break
                     else:
                         time.sleep(0.001)
@@ -85,13 +94,20 @@ def get_key():
                 if seq == b'\x1b':
                     return 'ESC'
                 return None
-            elif key == b'q' or key == b'Q': return 'q'
-            elif key == b'g' or key == b'G': return 'g'
-            elif key == b'b' or key == b'B': return 'b'
-            elif key == b'd' or key == b'D': return 'd'
-            elif key == b'l' or key == b'L': return 'l'
-            elif key == b'/' or key == b'?': return '/'
-            else: return key.decode('utf-8', errors='ignore')
+            elif key == b'q' or key == b'Q':
+                return 'q'
+            elif key == b'g' or key == b'G':
+                return 'g'
+            elif key == b'b' or key == b'B':
+                return 'b'
+            elif key == b'd' or key == b'D':
+                return 'd'
+            elif key == b'l' or key == b'L':
+                return 'l'
+            elif key == b'/' or key == b'?':
+                return '/'
+            else:
+                return key.decode('utf-8', errors='ignore')
         return None
     else:
         # Linux/macOS implementation - optimized for responsiveness
@@ -133,16 +149,24 @@ def get_key():
                                 last = seq[-1]
                                 # Standard arrow keys: ESC [ A/B/C/D or ESC O A/B/C/D
                                 if (seq.startswith('\x1b[') or seq.startswith('\x1bO')) and last in 'ABCD':
-                                    if last == 'A': return 'UP'
-                                    if last == 'B': return 'DOWN'
-                                    if last == 'C': return 'RIGHT'
-                                    if last == 'D': return 'LEFT'
+                                    if last == 'A':
+                                        return 'UP'
+                                    if last == 'B':
+                                        return 'DOWN'
+                                    if last == 'C':
+                                        return 'RIGHT'
+                                    if last == 'D':
+                                        return 'LEFT'
                                 # Extended sequences like ESC [ 1 ; 5 A (Ctrl+Arrow)
                                 if len(seq) >= 6 and seq.startswith('\x1b[1;'):
-                                    if last == 'A': return 'UP'
-                                    if last == 'B': return 'DOWN'
-                                    if last == 'C': return 'RIGHT'
-                                    if last == 'D': return 'LEFT'
+                                    if last == 'A':
+                                        return 'UP'
+                                    if last == 'B':
+                                        return 'DOWN'
+                                    if last == 'C':
+                                        return 'RIGHT'
+                                    if last == 'D':
+                                        return 'LEFT'
                     except (OSError, IOError):
                         break
                 else:
@@ -157,10 +181,14 @@ def get_key():
             if len(seq) >= 3:
                 last = seq[-1]
                 if (seq.startswith('\x1b[') or seq.startswith('\x1bO')) and last in 'ABCD':
-                    if last == 'A': return 'UP'
-                    if last == 'B': return 'DOWN'
-                    if last == 'C': return 'RIGHT'
-                    if last == 'D': return 'LEFT'
+                    if last == 'A':
+                        return 'UP'
+                    if last == 'B':
+                        return 'DOWN'
+                    if last == 'C':
+                        return 'RIGHT'
+                    if last == 'D':
+                        return 'LEFT'
             
             # Unknown escape sequence, ignore
             return None
@@ -296,11 +324,11 @@ def download_file(url, filename, console):
     idm_path = get_idm_path()
     if idm_path:
         # Prompt the user to use IDM if found
-        use_idm = Confirm.ask(f"[bold cyan]Internet Download Manager detected.[/bold cyan] Use it?", default=True, console=console)
+        use_idm = Confirm.ask("[bold cyan]Internet Download Manager detected.[/bold cyan] Use it?", default=True, console=console)
         
         if use_idm:
             try:
-                console.print(f"[green]Sending to IDM...[/green]")
+                console.print("[green]Sending to IDM...[/green]")
                 # /d: URL, /p: Local Path, /f: Local Filename, /n: Silent
                 # /a: Add to queue, /s: Start queue
                 subprocess.Popen([
@@ -312,11 +340,11 @@ def download_file(url, filename, console):
                     '/a', # Add to queue
                     '/s'  # Start queue
                 ])
-                console.print(f"[bold green]✓ Added to IDM Queue.[/bold green]")
+                console.print("[bold green]✓ Added to IDM Queue.[/bold green]")
                 console.print(f"[dim]File: {filename}[/dim]")
                 
                 # Added Manual Start Message
-                console.print(f"[yellow]⚠ Note: If the download does not start automatically, please open IDM and click 'Start Queue'.[/yellow]")
+                console.print("[yellow]⚠ Note: If the download does not start automatically, please open IDM and click 'Start Queue'.[/yellow]")
                 
                 input("\nPress ENTER to continue...")
                 return True
@@ -327,7 +355,7 @@ def download_file(url, filename, console):
     # 2. Try using aria2c (Fast Method) with cleaner output
     aria2_path = shutil.which("aria2c")
     if aria2_path:
-        console.print(f"[bold green]🚀 Starting aria2c download...[/bold green]")
+        console.print("[bold green]🚀 Starting aria2c download...[/bold green]")
         try:
             cmd = [
                 aria2_path,
