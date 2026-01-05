@@ -4,7 +4,6 @@ import re
 import platform
 import subprocess
 import tempfile
-import shutil
 import time
 import requests
 from pathlib import Path
@@ -184,13 +183,13 @@ def apply_update_and_restart(new_file_path):
                 
                 # Delete old backup if exists
                 f.write(f'if exist "{backup_path}" (\n')
-                f.write(f'    echo Removing old backup...\n')
+                f.write('    echo Removing old backup...\n')
                 f.write(f'    del /f /q "{backup_path}" 2>nul\n')
                 f.write(')\n')
                 f.write('echo.\n')
                 
                 # Backup current exe
-                f.write(f'echo Backing up current version...\n')
+                f.write('echo Backing up current version...\n')
                 f.write(f'move /y "{current_exe}" "{backup_path}" >nul 2>&1\n')
                 f.write('if errorlevel 1 (\n')
                 f.write('    echo ERROR: Failed to backup current exe\n')
@@ -201,7 +200,7 @@ def apply_update_and_restart(new_file_path):
                 f.write('echo.\n')
                 
                 # Move new exe
-                f.write(f'echo Installing new version...\n')
+                f.write('echo Installing new version...\n')
                 f.write(f'move /y "{new_file_path}" "{current_exe}" >nul 2>&1\n')
                 f.write('if errorlevel 1 (\n')
                 f.write('    echo ERROR: Failed to install new exe\n')
@@ -270,12 +269,12 @@ def apply_update_and_restart(new_file_path):
                 f.write(f'        chmod +x "{current_path}"\n')
                 f.write(f'        cd "{current_dir}"\n')
                 f.write(f'        nohup "{current_path}" > /dev/null 2>&1 &\n')
-                f.write(f'        sleep 2\n')
+                f.write('        sleep 2\n')
                 f.write(f'        [ -f "{backup_path}" ] && rm -f "{backup_path}"\n')
-                f.write(f'    else\n')
+                f.write('    else\n')
                 f.write(f'        mv "{backup_path}" "{current_path}"\n')
-                f.write(f'    fi\n')
-                f.write(f'fi\n')
+                f.write('    fi\n')
+                f.write('fi\n')
                 f.write('rm -f "$0"\n')
             
             os.chmod(update_script, 0o755)
@@ -360,7 +359,6 @@ def check_pip_update():
                     
                     # Restart using the entry point command
                     # Determine which command was used to launch
-                    script_name = Path(sys.argv[0]).stem if sys.argv else 'ani-cli-arabic'
                     if 'ani-cli-ar' in str(sys.argv[0]).lower():
                         cmd = 'ani-cli-ar'
                     else:
