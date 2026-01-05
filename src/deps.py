@@ -14,7 +14,7 @@ from rich.console import Console
 from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, DownloadColumn, TransferSpeedColumn
 
 console = Console()
-
+#OFFICIAL_MPV_MIRROR
 DEPS_DIR = Path.cwd() / "deps"
 MPV_URL = "https://github.com/shinchiro/mpv-winbuild-cmake/releases/download/20260105/mpv-i686-20260105-git-0035bb7.7z"
 SEVENZIP_URL = "https://www.7-zip.org/a/7zr.exe"  # Standalone 7z extractor (~600KB)
@@ -171,22 +171,14 @@ def install_mpv_windows():
     
     DEPS_DIR.mkdir(parents=True, exist_ok=True)
 
-    # If mpv.exe is already present in deps/, just run the installer and set PATH.
     existing_root = _windows_local_mpv_root()
     if existing_root:
-        # No installer: mpv-install.bat requires admin. We just use mpv.exe directly.
-        _clean_deps_keep_mpv()
+        _clean_deps_keep_mpv()  # Portable install, no admin needed
         _prepend_to_path(existing_root)
-        if shutil.which("mpv"):
-            console.print("[green]✔[/green] MPV ready")
-            return True
-
-        # mpv.exe exists but PATH resolution might still fail in some shells.
-        if (existing_root / "mpv.exe").exists():
+        if shutil.which("mpv") or (existing_root / "mpv.exe").exists():
             console.print("[green]✔[/green] MPV ready")
             return True
     
-    # Get 7z extractor
     extractor = get_7z_extractor()
     if not extractor:
         console.print("[red]✘[/red] Could not get 7z extractor")
@@ -195,11 +187,9 @@ def install_mpv_windows():
     archive_name = MPV_URL.split("/")[-1]
     archive_path = DEPS_DIR / archive_name
     
-    # Download
     if not download_file_with_progress(MPV_URL, archive_path, "MPV"):
         return False
     
-    # Extract using 7z
     console.print("[dim]Extracting...[/dim]")
     try:
         result = subprocess.run(
@@ -213,15 +203,12 @@ def install_mpv_windows():
             return False
         
         console.print("[green]✔[/green] Extracted")
-        
-        # Cleanup archive
         archive_path.unlink()
         
     except Exception as e:
         console.print(f"[red]✘[/red] Extraction error: {e}")
         return False
 
-    # Determine where mpv.exe ended up.
     mpv_root = _windows_local_mpv_root()
     if not mpv_root:
         console.print("[red]✘[/red] mpv.exe not found after extraction")
@@ -233,15 +220,12 @@ def install_mpv_windows():
             shutil.move(str(mpv_root / "mpv.exe"), str(DEPS_DIR / "mpv.exe"))
             mpv_root = DEPS_DIR
         except Exception:
-            # If move fails, keep using the detected folder.
-            pass
+            pass  # Keep using detected folder
 
     _clean_deps_keep_mpv()
-    
-    # Add to PATH
     _prepend_to_path(mpv_root)
     
-    # Verify mpv.exe exists
+    # Verify installation
     mpv_exe = mpv_root / "mpv.exe"
     if mpv_exe.exists():
         console.print("[green]✔[/green] MPV ready")
@@ -254,7 +238,6 @@ def install_deps_windows():
     """Windows Installation Logic"""
     success = True
     
-    # FFmpeg via Winget
     if not is_installed("ffmpeg"):
         console.print("[cyan]Installing FFmpeg...[/cyan]")
         try:
@@ -274,7 +257,6 @@ def install_deps_windows():
             console.print("[red]✘[/red] FFmpeg installation failed")
             success = False
 
-    # MPV Manual Install
     if not is_installed("mpv"):
         if not install_mpv_windows():
             success = False

@@ -71,7 +71,6 @@ class AniCliArApp:
                 pass
         threading.Thread(target=check_version_bg, daemon=True).start()
         
-        # Store RPC status for display
         self.rpc_status = rpc_connected
 
         try:
@@ -87,9 +86,8 @@ class AniCliArApp:
         while True:
             self.ui.clear()
             
-            # Calculate vertical spacing - move content up
             vertical_space = self.ui.console.height - 14
-            top_padding = (vertical_space // 2) - 2  # Move up by reducing top padding
+            top_padding = (vertical_space // 2) - 2
             
             if top_padding > 0:
                 self.ui.print(Text("\n" * top_padding))
@@ -97,7 +95,6 @@ class AniCliArApp:
             self.ui.print(Align.center(self.ui.get_header_renderable()))
             self.ui.print()
             
-            # Show Discord RPC status (check actual connection state and settings)
             if self.settings.get('discord_rpc'):
                 if hasattr(self, 'rpc_status'):
                     if self.rpc_status['status'] is True:
