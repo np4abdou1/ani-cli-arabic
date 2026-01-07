@@ -353,4 +353,5 @@ class DiscordRPCManager:
                 self.rpc.close()
             except Exception:
                 pass
-            self.connected = False
+            finally:
+                self.connected = False

@@ -17,7 +17,30 @@ console = Console()
 #OFFICIAL_MPV_MIRROR
 DEPS_DIR = Path.cwd() / "deps"
 MPV_URL = "https://github.com/shinchiro/mpv-winbuild-cmake/releases/download/20260105/mpv-i686-20260105-git-0035bb7.7z"
+FZF_URL = "https://github.com/junegunn/fzf/releases/download/v0.67.0/fzf-0.67.0-windows_amd64.zip"
 SEVENZIP_URL = "https://www.7-zip.org/a/7zr.exe"  # Standalone 7z extractor (~600KB)
+
+
+def is_installed(tool):
+    """Check if a tool is available on PATH."""
+    return shutil.which(tool) is not None
+
+
+def _clean_deps_keep_important():
+    """Clean up deps folder but keep mpv, fzf and 7zr."""
+    if not DEPS_DIR.exists():
+        return
+        
+    for item in DEPS_DIR.iterdir():
+        if item.name.lower() in ("mpv.exe", "fzf.exe", "7zr.exe"):
+            continue
+        try:
+            if item.is_dir():
+                shutil.rmtree(item)
+            else:
+                item.unlink()
+        except (OSError, PermissionError):
+            pass
 
 
 def _prepend_to_path(dir_path: Path) -> None:
@@ -27,65 +50,35 @@ def _prepend_to_path(dir_path: Path) -> None:
         os.environ["PATH"] = dir_str + os.pathsep + current
 
 
-def _windows_local_mpv_root() -> Path | None:
-    """Return the folder containing mpv.exe if present in our repo deps folder."""
-    mpv_exe = DEPS_DIR / "mpv.exe"
-    if mpv_exe.exists():
+def _windows_local_deps_root() -> Path | None:
+    """Return the local deps folder if mpv.exe or fzf.exe is present."""
+    if (DEPS_DIR / "mpv.exe").exists() or (DEPS_DIR / "fzf.exe").exists():
         return DEPS_DIR
-
-    # Fallback: some archives may extract into a nested directory
-    try:
-        for child in DEPS_DIR.iterdir():
-            if child.is_dir() and (child / "mpv.exe").exists():
-                return child
-    except FileNotFoundError:
-        return None
-
     return None
 
 
-def _clean_deps_keep_mpv() -> None:
-    """Keep only mpv.exe in deps/ for portable installation."""
-    try:
-        DEPS_DIR.mkdir(parents=True, exist_ok=True)
-    except Exception:
-        return
-
-    for child in DEPS_DIR.iterdir():
-        if child.name.lower() == "mpv.exe":
-            continue
-        try:
-            if child.is_dir():
-                shutil.rmtree(child, ignore_errors=True)
-            else:
-                child.unlink(missing_ok=True)
-        except Exception:
-            pass  # Best-effort cleanup
-
-def is_installed(tool):
-    """Check if a tool is in the PATH."""
-    return shutil.which(tool) is not None
-
 def check_dependencies_status():
     """Check if required tools are installed."""
-    # Add local deps/mpv.exe to PATH on Windows
+    # Add local deps/mpv.exe and fzf.exe to PATH on Windows
     if platform.system() == "Windows":
-        mpv_root = _windows_local_mpv_root()
-        if mpv_root:
-            _prepend_to_path(mpv_root)
+        deps_root = _windows_local_deps_root()
+        if deps_root:
+            _prepend_to_path(deps_root)
 
     return {
         "mpv": is_installed("mpv"),
         "ffmpeg": is_installed("ffmpeg"),
-        "yt-dlp": is_installed("yt-dlp")
+        "yt-dlp": is_installed("yt-dlp"),
+        "fzf": is_installed("fzf")
     }
 
 def print_explanation(tool):
-    """Returns a short description of what the tool does."""
+    """Returns a short explanation of what the tool does."""
     explanations = {
         "mpv": "Media player for streaming",
         "ffmpeg": "Video/audio processing",
-        "yt-dlp": "Stream URL extraction"
+        "yt-dlp": "Stream URL extraction",
+        "fzf": "Command-line fuzzy finder"
     }
     return explanations.get(tool, "")
 
@@ -106,7 +99,7 @@ def print_status(status):
 def download_file_with_progress(url, dest_path, description="Downloading"):
     """Download a file with a progress bar."""
     try:
-        response = requests.get(url, stream=True)
+        response = requests.get(url, stream=True, timeout=30)
         total_size = int(response.headers.get('content-length', 0))
         
         with Progress(
@@ -159,7 +152,7 @@ def get_7z_extractor():
     console.print("[dim]Downloading 7z extractor...[/dim]")
     
     try:
-        response = requests.get(SEVENZIP_URL)
+        response = requests.get(SEVENZIP_URL, timeout=30)
         local_7z.write_bytes(response.content)
         return str(local_7z)
     except Exception:
@@ -169,15 +162,15 @@ def install_mpv_windows():
     """Downloads and extracts MPV for Windows."""
     console.print("[cyan]Installing MPV...[/cyan]")
     
-    DEPS_DIR.mkdir(parents=True, exist_ok=True)
-
-    existing_root = _windows_local_mpv_root()
+    existing_root = _windows_local_deps_root()
     if existing_root:
-        _clean_deps_keep_mpv()  # Portable install, no admin needed
+        _clean_deps_keep_important()
         _prepend_to_path(existing_root)
         if shutil.which("mpv") or (existing_root / "mpv.exe").exists():
             console.print("[green]✔[/green] MPV ready")
             return True
+    
+    DEPS_DIR.mkdir(parents=True, exist_ok=True)
     
     extractor = get_7z_extractor()
     if not extractor:
@@ -209,7 +202,7 @@ def install_mpv_windows():
         console.print(f"[red]✘[/red] Extraction error: {e}")
         return False
 
-    mpv_root = _windows_local_mpv_root()
+    mpv_root = _windows_local_deps_root()
     if not mpv_root:
         console.print("[red]✘[/red] mpv.exe not found after extraction")
         return False
@@ -222,7 +215,7 @@ def install_mpv_windows():
         except Exception:
             pass  # Keep using detected folder
 
-    _clean_deps_keep_mpv()
+    _clean_deps_keep_important()
     _prepend_to_path(mpv_root)
     
     # Verify installation
@@ -232,6 +225,63 @@ def install_mpv_windows():
         return True
 
     console.print("[red]✘[/red] mpv.exe not found")
+    return False
+
+def install_fzf_windows():
+    """Downloads and extracts fzf for Windows."""
+    console.print("[cyan]Installing fzf...[/cyan]")
+    
+    DEPS_DIR.mkdir(parents=True, exist_ok=True)
+    
+    # Check if existing
+    if (DEPS_DIR / "fzf.exe").exists():
+        console.print("[green]✔[/green] fzf already present")
+        _prepend_to_path(DEPS_DIR)
+        return True
+
+    extractor = get_7z_extractor()
+    if not extractor:
+        return False
+
+    archive_name = "fzf.zip"
+    archive_path = DEPS_DIR / archive_name
+    
+    if not download_file_with_progress(FZF_URL, archive_path, "fzf"):
+        return False
+    
+    console.print("[dim]Extracting fzf...[/dim]")
+    try:
+        result = subprocess.run(
+            [extractor, "x", str(archive_path), f"-o{DEPS_DIR}", "-y"],
+            capture_output=True,
+            text=True
+        )
+        
+        if result.returncode != 0:
+            console.print(f"[red]✘[/red] Extraction failed: {result.stderr}")
+            return False
+            
+        archive_path.unlink()
+        
+        if (DEPS_DIR / "fzf-0.67.0-windows_amd64").exists():
+             # Move nested binary
+             nested = DEPS_DIR / "fzf-0.67.0-windows_amd64" / "fzf.exe"
+             if nested.exists():
+                 shutil.move(str(nested), str(DEPS_DIR / "fzf.exe"))
+                 try:
+                     shutil.rmtree(str(DEPS_DIR / "fzf-0.67.0-windows_amd64"))
+                 except (OSError, PermissionError):
+                     pass
+
+        if (DEPS_DIR / "fzf.exe").exists():
+            console.print("[green]✔[/green] fzf ready")
+            _prepend_to_path(DEPS_DIR)
+            return True
+            
+    except Exception as e:
+        console.print(f"[red]✘[/red] Install error: {e}")
+        return False
+        
     return False
 
 def install_deps_windows():
@@ -260,6 +310,10 @@ def install_deps_windows():
     if not is_installed("mpv"):
         if not install_mpv_windows():
             success = False
+
+    if not is_installed("fzf"):
+        if not install_fzf_windows():
+            success = False
     
     return success
 
@@ -272,26 +326,28 @@ def install_deps_linux():
                 if line.startswith("ID="):
                     distro_id = line.strip().split("=")[1].strip('"')
                     break
-    except:
+    except (IOError, OSError, FileNotFoundError, PermissionError):
         pass
 
     console.print(f"[dim]Detected: {distro_id}[/dim]")
     
     if distro_id in ["debian", "ubuntu", "kali", "linuxmint", "pop"]:
-        cmd = "sudo apt update && sudo apt install -y mpv ffmpeg"
+        cmd = "sudo apt update && sudo apt install -y mpv ffmpeg fzf"
     elif distro_id in ["arch", "manjaro", "endeavouros"]:
-        cmd = "sudo pacman -S --noconfirm mpv ffmpeg"
+        # Arch usually has fzf in community or extra, standard pacman works
+        cmd = "sudo pacman -S --noconfirm mpv ffmpeg fzf"
     elif distro_id in ["fedora"]:
-        cmd = "sudo dnf install -y mpv ffmpeg"
+        cmd = "sudo dnf install -y mpv ffmpeg fzf"
     else:
-        console.print(f"[red]Unsupported distro. Install mpv and ffmpeg manually.[/red]")
+        # Fallback for others
+        console.print(f"[red]Unsupported distro. Install mpv, ffmpeg, and fzf manually.[/red]")
         return False
 
     console.print(f"[dim]Running: {cmd}[/dim]")
     return os.system(cmd) == 0
 
 def ensure_dependencies():
-    """Check and install missing dependencies (mpv, ffmpeg, yt-dlp)."""
+    """Check and install missing dependencies (mpv, ffmpeg, yt-dlp, fzf)."""
     # Quick check
     if all(check_dependencies_status().values()):
         return True
@@ -321,7 +377,7 @@ def ensure_dependencies():
         install_ytdlp()
 
     # Platform-specific
-    if not (status["mpv"] and status["ffmpeg"]):
+    if not (status["mpv"] and status["ffmpeg"] and status["fzf"]):
         if platform.system() == "Windows":
             install_deps_windows()
         elif platform.system() == "Linux":

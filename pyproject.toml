@@ -7,7 +7,7 @@ name = "ani-cli-arabic"
 dynamic = ["version"]
 description = "Terminal-based anime streaming with Arabic subtitles"
 readme = "README.md"
-license = "MIT"
+license = "GPL-3.0"
 authors = [
     {name = "np4abdou1"}
 ]
@@ -33,7 +33,6 @@ dependencies = [
     "rich>=13.0.0",          # Terminal UI framework
     "requests>=2.31.0",      # HTTP client for API communication
     "pypresence>=4.5.0",     # Discord Rich Presence integration
-    "cryptography>=41.0.0",  # Secure API authentication
     "yt-dlp",                # Extract anime trailers from YouTube
     "Pillow>=10.0.0",        # Image processing for anime posters
     "numpy>=1.24.0",         # Array operations for image display

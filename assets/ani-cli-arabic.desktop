@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Ani-CLI Arabic
+Comment=Terminal-based anime streaming with Arabic subtitles
+Exec=ani-cli-arabic
+Icon=ani-cli-arabic
+Terminal=true
+Categories=Video;AudioVideo;Player;ConsoleOnly;
+Keywords=anime;streaming;arabic;cli;
+StartupNotify=false

@@ -12,3 +12,4 @@ numpy>=1.24.0         # Array operations for image display
 # External tools (auto-installed by deps.py):
 # - mpv: Media player for streaming episodes
 # - ffmpeg: Multimedia framework (helper for mpv)
+# - fzf: its just fuzzy... :)

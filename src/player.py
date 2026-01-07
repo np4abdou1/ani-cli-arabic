@@ -5,6 +5,7 @@ import shutil
 import subprocess
 import tempfile
 from typing import Optional
+from .utils import is_bundled
 
 class PlayerManager:
     def __init__(self, rpc_manager=None, console=None):
@@ -12,11 +13,8 @@ class PlayerManager:
         self.rpc_manager = rpc_manager
         self.console = console
 
-    def is_bundled(self):
-        return getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS')
-
     def get_mpv_path(self) -> Optional[str]:
-        if self.is_bundled():
+        if is_bundled():
             exe_name = 'mpv.exe' if os.name == 'nt' else 'mpv'
             bundled_mpv = os.path.join(sys._MEIPASS, 'mpv', exe_name)
             if os.path.exists(bundled_mpv):
@@ -46,8 +44,9 @@ class PlayerManager:
             # Check system PATH
             if shutil.which('mpv'):
                 return 'mpv'
-                
+            
             return 'mpv'
+        
         return 'mpv'
 
     def cleanup_temp_mpv(self):
@@ -55,7 +54,7 @@ class PlayerManager:
             try:
                 temp_dir = os.path.dirname(self.temp_mpv_path)
                 shutil.rmtree(temp_dir, ignore_errors=True)
-            except Exception:
+            except (OSError, PermissionError):
                 pass
 
     def play(self, url: str, title: str, player_type: str = 'mpv'):
@@ -69,12 +68,18 @@ class PlayerManager:
             if self.console:
                 from rich.text import Text
                 self.console.print(Text(f"{player_type.upper()} executable not found. Please install it or check path.", style="bold red"))
-                time.sleep(2)
+                input("Press Enter to continue...")
+            else:
+                print(f"{player_type.upper()} executable not found. Please install it or check path.", file=sys.stderr)
+                input("Press Enter to continue...")
         except Exception as e:
             if self.console:
                 from rich.text import Text
                 self.console.print(Text(f"Error launching player: {str(e)}", style="bold red"))
-                time.sleep(2)
+                input("Press Enter to continue...")
+            else:
+                print(f"Error launching player: {str(e)}", file=sys.stderr)
+                input("Press Enter to continue...")
 
     def _play_vlc(self, url: str, title: str):
         # Check for VLC in common paths if not in PATH
@@ -170,4 +175,4 @@ class PlayerManager:
             if self.console:
                 from rich.text import Text
                 self.console.print(Text(f"MPV exited with error code {result.returncode}", style="bold red"))
-                time.sleep(2)
+                input("Press Enter to continue...")

@@ -5,11 +5,16 @@ from typing import Dict, List, Optional
 import requests
 from .models import AnimeResult, Episode
 
+# Default credentials - can be overridden with environment variables
+# This is for analytics and also api credentials fetching.
+ENDPOINT_URL = "https://ani-cli-arabic-analytics.talego4955.workers.dev"
+AUTH_SECRET = "8GltlSgyTHwNJ-77n8R4T2glZ_EDQHcU4AB4Wjuu75M"
+
 def _get_endpoint_config() -> tuple[str, str]:
-    # Hardcoded configuration for the remote worker
-    endpoint_url = "https://ani-cli-arabic-analytics.talego4955.workers.dev" 
-    auth_secret = "8GltlSgyTHwNJ-77n8R4T2glZ_EDQHcU4AB4Wjuu75M"
-    
+    """Get API endpoint configuration from environment or hardcoded defaults."""
+    import os
+    endpoint_url = os.getenv('ANI_CLI_AR_ENDPOINT', ENDPOINT_URL)
+    auth_secret = os.getenv('ANI_CLI_AR_AUTH_SECRET', AUTH_SECRET)
     return endpoint_url, auth_secret
 
 
@@ -60,15 +65,16 @@ _creds = None
 _creds_lock = threading.Lock()
 
 def _ensure_creds():
-    """Load API credentials once (thread-safe)."""
-    global _creds
+    global _creds, _credential_manager
     if _creds is not None:
         return
 
     with _creds_lock:
         if _creds is not None:
             return
-        _creds = get_credentials()
+        if _credential_manager is None:
+            _credential_manager = APICache()
+        _creds = _credential_manager.get_keys()
 
 def get_api_base():
     _ensure_creds()
@@ -138,10 +144,13 @@ class AnimeAPI:
                 response.raise_for_status()
                 data = response.json()
                 
+                if not isinstance(data, list):
+                    break
+                    
                 if not data:
                     break
                     
-                batch = [self._parse_anime_result(item) for item in data]
+                batch = [self._parse_anime_result(item) for item in data if isinstance(item, dict)]
                 all_results.extend(batch)
                 
                 if len(batch) < 10: 
@@ -172,10 +181,13 @@ class AnimeAPI:
                 response.raise_for_status()
                 data = response.json()
                 
+                if not isinstance(data, list):
+                    break
+                
                 if not data:
                     break
                 
-                batch = [self._parse_anime_result(item) for item in data]
+                batch = [self._parse_anime_result(item) for item in data if isinstance(item, dict)]
                 all_results.extend(batch)
                 
                 if len(batch) < 10:
@@ -214,8 +226,14 @@ class AnimeAPI:
             response.raise_for_status()
             data = response.json()
             
+            if not isinstance(data, list):
+                return []
+            
             episodes = []
             for idx, ep in enumerate(data, 1):
+                if not isinstance(ep, dict):
+                    continue
+                    
                 ep_num = ep.get('Episode', str(idx))
                 ep_type = ep.get('Type', 'Episode')
                 
@@ -232,7 +250,7 @@ class AnimeAPI:
                     display_num = idx
                 episodes.append(Episode(ep_num, ep_type, display_num))
             return episodes
-        except Exception:
+        except (requests.RequestException, ValueError, TypeError):
             return []
 
     def get_streaming_servers(self, anime_id: str, episode_num: str, anime_type: str = 'SERIES') -> Optional[Dict]:
@@ -249,7 +267,7 @@ class AnimeAPI:
             response = requests.post(endpoint, data=payload, timeout=10)
             response.raise_for_status()
             return response.json()
-        except Exception:
+        except (requests.RequestException, ValueError, TypeError):
             return None
 
     def extract_mediafire_direct(self, mf_url: str) -> Optional[str]:
@@ -261,7 +279,7 @@ class AnimeAPI:
             response.raise_for_status()
             match = re.search(r'(https://download[^"]+)', response.text)
             return match.group(1) if match else None
-        except Exception:
+        except (requests.RequestException, AttributeError):
             return None
 
     def build_mediafire_url(self, server_id: str) -> str:

@@ -24,7 +24,7 @@ Terminal-based anime streaming with Arabic subtitles
 
 <p align="center">
   <img src="https://img.shields.io/badge/Python-3.8+-3776AB?style=for-the-badge&logo=python&logoColor=white" />
-  <img src="https://img.shields.io/badge/License-MIT-green?style=for-the-badge" />
+  <img src="https://img.shields.io/badge/License-GPL--3.0-green?style=for-the-badge" />
 </p>
 
 <p>لإختيار اللغة العربية اضغط على الزر:</p>
@@ -67,10 +67,11 @@ https://github.com/user-attachments/assets/8b57a95a-2949-44d2-b786-bd1c035e0060
 
 ## Installation
 
-**Requirements:** Python 3.8+ and MPV player anf ffmpeg, 
-PLEASE DONT USE PYTHON v3.13+ as when installing numpy it compiles from source and takes long time (HOURS)
+**Requirements:** Python 3.8+ and MPV player and ffmpeg
 
-**Recommended:** python v3.12.x
+**Note:** Python 3.13+ is not currently recommended, as numpy may need to compile from source which can take considerable time.
+
+**Recommended:** Python 3.12.x
 
 ### Via pip (All platforms)
 

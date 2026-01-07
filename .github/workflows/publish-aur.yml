@@ -1,0 +1,62 @@
+name: Publish to AUR
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to publish (e.g., 1.2.0)'
+        required: true
+        type: string
+
+jobs:
+  aur-release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Get Version
+        id: get_version
+        run: |
+          if [ "${{ github.event_name }}" == "release" ]; then
+            VERSION="${{ github.event.release.tag_name }}"
+          else
+            VERSION="v${{ inputs.version }}"
+          fi
+          # Ensure VERSION starts with v
+          if [[ $VERSION != v* ]]; then VERSION="v$VERSION"; fi
+          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Calculate Checksum
+        id: checksum
+        run: |
+          VERSION=${{ steps.get_version.outputs.VERSION }}
+          CLEAN_VER=${VERSION#v}
+          URL="https://github.com/np4abdou1/ani-cli-arabic/archive/refs/tags/${VERSION}.tar.gz"
+          
+          echo "Downloading $URL"
+          wget -q $URL -O source.tar.gz
+          SHA256=$(sha256sum source.tar.gz | cut -d ' ' -f 1)
+          
+          echo "SHA256=$SHA256" >> $GITHUB_OUTPUT
+          echo "CLEAN_VER=$CLEAN_VER" >> $GITHUB_OUTPUT
+
+      - name: Generate PKGBUILD
+        run: |
+          export VERSION=${{ steps.checksum.outputs.CLEAN_VER }}
+          export SHA256=${{ steps.checksum.outputs.SHA256 }}
+          envsubst '${VERSION} ${SHA256}' < aur/PKGBUILD.template > PKGBUILD
+          echo "Generated PKGBUILD:"
+          cat PKGBUILD
+
+      - name: Publish to AUR
+        uses: KSXGitHub/github-actions-deploy-aur@v2.7.0
+        with:
+          pkgname: ani-cli-arabic
+          pkgbuild: ./PKGBUILD
+          commit_username: np4abdou1
+          commit_email: np4abdou1@users.noreply.github.com
+          ssh_private_key: ${{ secrets.AUR_SSH_PRIVATE_KEY }}
+          commit_message: Update to ${{ steps.get_version.outputs.VERSION }}

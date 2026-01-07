@@ -5,6 +5,7 @@ import os
 import sys
 import requests
 from io import BytesIO
+from functools import lru_cache
 import numpy as np
 from PIL import Image, ImageEnhance
 from rich.console import Console
@@ -28,9 +29,6 @@ from .utils import get_key, RawTerminal, restore_terminal_for_input, enter_raw_m
 from . import config as config_module
 
 class UIManager:
-    # Class-level poster cache for faster reloading
-    _poster_cache = {}
-    
     def __init__(self):
         self.theme = Theme({
             "panel.border": COLOR_BORDER,
@@ -126,7 +124,8 @@ class UIManager:
         is_loading_more = False
         has_more = True
         loading_dots = 0
-        details_cache = {}  # Cache for anime details to avoid regeneration
+        details_cache = {}
+        results_lock = threading.Lock()  # Cache for anime details to avoid regeneration
         
         screen_height = self.console.height
         target_height = min(screen_height, 35)
@@ -224,11 +223,14 @@ class UIManager:
                 ))
                 return layout
             
-            container = Table.grid(padding=1)
+            container = Table.grid(padding=(0, 1))
             container.add_column()
             
             container.add_row(Text(selected_anime.title_en, style="title", justify="center"))
-            container.add_row(Text(selected_anime.title_jp, style="secondary", justify="center"))
+            if selected_anime.title_jp and selected_anime.title_jp not in ["N/A", "None", None, ""]:
+                container.add_row(Text(selected_anime.title_jp, style="secondary", justify="center"))
+            
+            container.add_row(Text(" "))
             
             details_grid = Table.grid(padding=(0, 2), expand=True)
             details_grid.add_column(min_width=25)
@@ -328,13 +330,13 @@ class UIManager:
                                 is_loading_more = True
                                 live.update(generate_renderable(), refresh=True)
                                 
-                                import threading
                                 def load_in_background():
                                     nonlocal is_loading_more, has_more
                                     try:
                                         new_results = load_more_callback(len(results))
                                         if new_results:
-                                            results.extend(new_results)
+                                            with results_lock:
+                                                results.extend(new_results)
                                             live.update(generate_renderable(), refresh=True)
                                         else:
                                             has_more = False
@@ -357,15 +359,11 @@ class UIManager:
                         live.update(generate_renderable(), refresh=True)
                     # No sleep needed - get_key() already has built-in timeout
 
+    @lru_cache(maxsize=50)
     def _generate_poster_ansi(self, url, max_height):
-        """Generate ANSI art from poster URL with caching and optimized rendering."""
+        """Generate ANSI art from poster URL with automatic LRU caching."""
         if not url:
             return Text("No poster available", style="secondary")
-        
-        # Check cache first
-        cache_key = f"{url}_{max_height}"
-        if cache_key in UIManager._poster_cache:
-            return UIManager._poster_cache[cache_key]
         
         try:
             # Download with timeout
@@ -454,9 +452,6 @@ class UIManager:
             
             result = Text.from_ansi("\n".join(output_lines))
             
-            # Cache the result
-            UIManager._poster_cache[cache_key] = result
-            
             return result
             
         except Exception:
@@ -533,6 +528,19 @@ class UIManager:
         vertical_pad = (screen_height - target_height) // 2
         poster_height = target_height - 8
 
+        # Get poster from cache (already pre-generated during loading)
+        poster_renderable = None
+        poster_width = 30
+        if anime_poster and poster_height > 0:
+            poster_renderable = self._generate_poster_ansi(anime_poster, poster_height)
+            if poster_renderable:
+                try:
+                    lines = poster_renderable.plain.split('\n')
+                    if lines:
+                        poster_width = max(len(line) for line in lines)
+                except Exception:
+                    pass
+
         def create_layout():
             layout = Layout(name="root")
             
@@ -555,24 +563,17 @@ class UIManager:
                 Layout(name="footer", size=3)
             )
             
+            poster_size = poster_width + 4 if poster_renderable else 20
+
             content_area["body"].split_row(
-                Layout(name="left", ratio=2),
-                Layout(name="right", ratio=5)
-            )
-            
-            content_area["right"].split_row(
-                Layout(name="poster_panel", ratio=1),
-                Layout(name="details_panel", ratio=1)
+                Layout(name="left", ratio=1),
+                Layout(name="details_panel", ratio=2),
+                Layout(name="poster_panel", size=poster_size)
             )
             return layout
 
         layout = create_layout()
         content_layout = layout["content"] if vertical_pad > 0 else layout
-        
-        # Get poster from cache (already pre-generated during loading)
-        poster_renderable = None
-        if anime_poster and poster_height > 0:
-            poster_renderable = self._generate_poster_ansi(anime_poster, poster_height)
 
         def generate_renderable():
             content_layout["header"].update(Panel(Text(anime_title, justify="center", style="title"), box=HEAVY, border_style=COLOR_BORDER))
@@ -639,11 +640,11 @@ class UIManager:
             fav_icon = "★" if is_favorite else "☆"
             
             if anime_details:
-                details_container = Table.grid()
+                details_container = Table.grid(expand=True)
                 details_container.add_column()
                 
                 # Stats table
-                stats_table = Table.grid(padding=(0, 1))
+                stats_table = Table.grid(padding=(0, 2))
                 stats_table.add_column(style="secondary", no_wrap=True, min_width=10)
                 stats_table.add_column(style="info", no_wrap=True)
                 
@@ -689,10 +690,11 @@ class UIManager:
                 details_container.add_row(Text(anime_details.get('genres', 'N/A'), style="secondary", justify="center"))
                 
                 content_layout["details_panel"].update(Panel(
-                    Align.center(details_container, vertical="middle"),
+                    details_container,
                     title=Text(f"{fav_icon} Info", style="title"),
                     box=HEAVY,
-                    border_style=COLOR_BORDER
+                    border_style=COLOR_BORDER,
+                    padding=(1, 4)
                 ))
             else:
                 # Fallback if no anime_details
@@ -710,7 +712,7 @@ class UIManager:
                 right_content.append(Text(f"{fav_icon}\n", style="title", justify="center"))
                 right_content.append(Text("Favorite: " + ("Yes" if is_favorite else "No"), style="secondary", justify="center"))
                 
-                content_layout["right"].update(Panel(
+                content_layout["details_panel"].update(Panel(
                     Align.center(right_content, vertical="middle"),
                     title=Text(f"{fav_icon} Info", style="title"),
                     box=HEAVY,
@@ -777,10 +779,10 @@ class UIManager:
                                     scroll_offset = max(0, selected - (max_display // 2))
                                 else:
                                     self.console.print(Text(f"Episode {ep_input} not found.", style="error"))
-                                    time.sleep(1)
+                                    input("Press Enter to continue...")
                             except ValueError:
                                 self.console.print(Text("Invalid number.", style="error"))
-                                time.sleep(1)
+                                input("Press Enter to continue...")
 
                         except Exception:
                             pass
@@ -1000,7 +1002,8 @@ class UIManager:
             ("Player", ["mpv", "vlc"], "player"),
             ("Auto Next Episode", [True, False], "auto_next"),
             ("Discord Rich Presence", [True, False], "discord_rpc"),
-            ("Theme", ["blue", "red", "green", "purple", "cyan", "yellow", "pink", "orange", "teal", "magenta", "lime", "coral", "lavender", "gold", "mint", "rose"], "theme")
+            ("Analytics", [True, False], "analytics"),
+            ("Theme", ["blue", "red", "green", "purple", "cyan", "yellow", "pink", "orange", "teal", "magenta", "lime", "coral", "lavender", "gold", "mint", "rose", "sunset"], "theme")
         ]
         selected = 0
         theme_changed = False  # Track if theme was changed
