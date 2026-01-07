@@ -3,7 +3,8 @@ from pathlib import Path
 from datetime import datetime
 
 class FavoritesManager:
-    MAX_FAVORITES = 100  # Limit to 100 favorites
+    # Maximum favorites to prevent database bloat and ensure performance
+    MAX_FAVORITES = 100
     
     def __init__(self):
         self.file_path = self._get_path()
@@ -20,21 +21,30 @@ class FavoritesManager:
             return {}
         try:
             with open(self.file_path, 'r', encoding='utf-8') as f:
-                return json.load(f)
-        except Exception:
+                data = json.load(f)
+                if not isinstance(data, dict):
+                    return {}
+                return data
+        except (json.JSONDecodeError, IOError, OSError):
             return {}
 
     def save(self):
         try:
             with open(self.file_path, 'w', encoding='utf-8') as f:
                 json.dump(self.favorites, f, indent=4, ensure_ascii=False)
-        except Exception:
-            pass
+        except (IOError, OSError) as e:
+            import sys
+            print(f"Warning: Failed to save favorites: {e}", file=sys.stderr)
 
     def add(self, anime_id, title, thumbnail):
-        # Check if we're at the limit (but allow updating existing favorites)
-        if str(anime_id) not in self.favorites and len(self.favorites) >= self.MAX_FAVORITES:
-            # Remove oldest favorite to make room
+        anime_id_str = str(anime_id)
+        if anime_id_str in self.favorites:
+            # Update existing favorite
+            self.favorites[anime_id_str]['added_at'] = datetime.now().isoformat()
+            self.save()
+            return
+        
+        if len(self.favorites) >= self.MAX_FAVORITES:
             oldest = min(self.favorites.items(), key=lambda x: x[1]['added_at'])
             del self.favorites[oldest[0]]
         

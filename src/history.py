@@ -3,14 +3,14 @@ from pathlib import Path
 from datetime import datetime
 
 class HistoryManager:
-    MAX_HISTORY_SIZE = 100  # Keep only the 100 most recent items
+    # Maximum history entries to maintain reasonable file size and load times
+    MAX_HISTORY_SIZE = 100
     
     def __init__(self):
         self.history_file = self._get_history_path()
         self.history = self._load_history()
 
     def _get_history_path(self) -> Path:
-        # Save in user home directory
         home_dir = Path.home()
         db_dir = home_dir / ".ani-cli-arabic" / "database"
         db_dir.mkdir(parents=True, exist_ok=True)
@@ -21,15 +21,16 @@ class HistoryManager:
             return {}
         try:
             with open(self.history_file, 'r', encoding='utf-8') as f:
-                return json.load(f)
-        except Exception:
+                data = json.load(f)
+                if not isinstance(data, dict):
+                    return {}
+                return data
+        except (json.JSONDecodeError, IOError, OSError):
             return {}
 
     def save_history(self):
         try:
-            # Trim history to max size before saving
             if len(self.history) > self.MAX_HISTORY_SIZE:
-                # Sort by last_updated and keep most recent
                 sorted_items = sorted(
                     self.history.items(),
                     key=lambda x: x[1].get('last_updated', ''),
@@ -39,11 +40,11 @@ class HistoryManager:
             
             with open(self.history_file, 'w', encoding='utf-8') as f:
                 json.dump(self.history, f, indent=4, ensure_ascii=False)
-        except Exception:
-            pass
+        except (IOError, OSError) as e:
+            import sys
+            print(f"Warning: Failed to save history: {e}", file=sys.stderr)
 
     def mark_watched(self, anime_id, episode_num, anime_title):
-        """Saves the last watched episode for a specific anime."""
         self.history[str(anime_id)] = {
             'episode': str(episode_num),
             'title': anime_title,
@@ -52,14 +53,12 @@ class HistoryManager:
         self.save_history()
 
     def get_last_watched(self, anime_id):
-        """Returns the episode number of the last watched episode."""
         data = self.history.get(str(anime_id))
         if data:
             return data.get('episode')
         return None
     
     def get_history(self):
-        """Returns all history as a list sorted by last_updated."""
         items = []
         for anime_id, data in self.history.items():
             items.append({

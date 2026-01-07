@@ -14,11 +14,12 @@ class SettingsManager:
 
     def _load_settings(self) -> dict:
         defaults = {
-            "default_quality": "1080p",  # 1080p, 720p, 480p
-            "player": "mpv",             # mpv, vlc
-            "auto_next": False,          # Auto-play next episode
-            "discord_rpc": True,         # Discord Rich Presence
-            "theme": "blue"              # Theme color
+            "default_quality": "1080p",
+            "player": "mpv",
+            "auto_next": False,
+            "discord_rpc": True,
+            "theme": "blue",
+            "analytics": True  # Allow users to opt-out of analytics
         }
         
         if not self.config_file.exists():
@@ -27,17 +28,19 @@ class SettingsManager:
         try:
             with open(self.config_file, 'r', encoding='utf-8') as f:
                 saved = json.load(f)
-                # Merge with defaults to ensure all keys exist
+                if not isinstance(saved, dict):
+                    return defaults
                 return {**defaults, **saved}
-        except Exception:
+        except (json.JSONDecodeError, IOError, OSError):
             return defaults
 
     def save(self):
         try:
             with open(self.config_file, 'w', encoding='utf-8') as f:
                 json.dump(self.settings, f, indent=4)
-        except Exception:
-            pass
+        except (IOError, OSError) as e:
+            import sys
+            print(f"Warning: Failed to save settings: {e}", file=sys.stderr)
 
     def get(self, key):
         return self.settings.get(key)

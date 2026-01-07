@@ -21,6 +21,10 @@ from .settings import SettingsManager
 from .favorites import FavoritesManager
 from .updater import check_for_updates, get_version_status
 from .deps import ensure_dependencies
+from .cli import run_simple_cli
+from .config import GOODBYE_ART
+import shutil
+import argparse
 
 class AniCliArApp:
     def __init__(self):
@@ -32,9 +36,29 @@ class AniCliArApp:
         self.history = HistoryManager()
         self.favorites = FavoritesManager()
         self.version_info = None
+        self.current_mode = "tui"
+        self.force_cli = False
 
     def run(self):
-        # Ensure media tools are installed
+        # Argument parsing
+        parser = argparse.ArgumentParser(
+            description="ani-cli-arabic: A CLI tool to browse and watch anime in Arabic.",
+            formatter_class=argparse.RawTextHelpFormatter
+        )
+        parser.add_argument('-i', '--interactive', action='store_true', help="Force minimal interactive CLI mode")
+        parser.add_argument('-v', '--version', action='store_true', help="Show version information")
+        parser.add_argument('query', nargs='*', help="Anime name to search for")
+        
+        args = parser.parse_args()
+        
+        if args.version:
+            from .version import __version__
+            print(f"ani-cli-arabic v{__version__}")
+            sys.exit(0)
+            
+        self.force_cli = args.interactive
+        initial_query = " ".join(args.query) if args.query else None
+
         if not ensure_dependencies():
             print("\n[!] Cannot start without required dependencies.")
             input("Press ENTER to exit...")
@@ -42,20 +66,16 @@ class AniCliArApp:
         
         atexit.register(self.cleanup)
         
-        # Background tasks for faster startup
         import threading
         rpc_connected = {'status': None}
         
-        # Discord RPC connection (non-blocking, if enabled)
         if self.settings.get('discord_rpc'):
             def connect_rpc():
                 rpc_connected['status'] = self.rpc.connect()
             threading.Thread(target=connect_rpc, daemon=True).start()
         
-        # Analytics tracking (non-blocking)
         threading.Thread(target=lambda: monitor.track_app_start(), daemon=True).start()
         
-        # Update check (non-blocking, always enabled)
         def check_updates_bg():
             try:
                 check_for_updates(auto_update=True)
@@ -63,7 +83,6 @@ class AniCliArApp:
                 pass
         threading.Thread(target=check_updates_bg, daemon=True).start()
         
-        # Version status check (non-blocking)
         def check_version_bg():
             try:
                 self.version_info = get_version_status()
@@ -74,7 +93,7 @@ class AniCliArApp:
         self.rpc_status = rpc_connected
 
         try:
-            self.main_loop()
+            self.unified_loop(initial_query)
         except KeyboardInterrupt:
             self.handle_exit()
         except Exception as e:
@@ -82,8 +101,42 @@ class AniCliArApp:
         finally:
             self.cleanup()
 
-    def main_loop(self):
+    def unified_loop(self, query=None):
         while True:
+            is_narrow = shutil.get_terminal_size().columns < 80
+            
+            if self.force_cli or is_narrow:
+                self.current_mode = "cli"
+                result = self.run_cli_mode(query)
+                query = None # Clear query after first run
+                if result == "SWITCH_TO_TUI":
+                    if self.force_cli:
+                         pass
+                    continue
+                break
+            else:
+                self.current_mode = "tui"
+                result = self.run_tui_mode(query)
+                query = None
+                if result == "SWITCH_TO_CLI":
+                    continue
+                break
+
+    def run_cli_mode(self, query=None):
+        deps = {
+            'api': self.api,
+            'player': self.player,
+            'history': self.history,
+            'settings': self.settings,
+            'rpc': self.rpc
+        }
+        return run_simple_cli(query, deps=deps)
+
+    def run_tui_mode(self, query=None):
+        while True:
+            if '-i' not in sys.argv and shutil.get_terminal_size().columns < 80:
+                return "SWITCH_TO_CLI"
+
             self.ui.clear()
             
             vertical_space = self.ui.console.height - 14
@@ -107,7 +160,6 @@ class AniCliArApp:
                 self.ui.print(Align.center(Text.from_markup("Discord Rich Presence [dim](disabled)[/dim]", style="dim")))
             self.ui.print()
             
-            # Keybinds panel with theme color border - BEFORE prompt
             keybinds_panel = Panel(
                 Text("S: Search | T: Trending | P: Popular | G: Genres | D: Studios | L: History | F: Favorites | C: Settings | Q: Quit", style="info", justify="center"),
                 box=HEAVY,
@@ -116,7 +168,6 @@ class AniCliArApp:
             self.ui.print(Align.center(keybinds_panel))
             self.ui.print()
             
-            # Type box
             prompt_string = f" {Text('›', style=COLOR_PROMPT)} "
             pad_width = (self.ui.console.width - 30) // 2
             padding = " " * max(0, pad_width)
@@ -126,7 +177,6 @@ class AniCliArApp:
                 self.ui.print(Align.center(Text(status_text, style="dim")))
                 self.ui.print()
 
-            # Flush any lingering input before showing prompt
             flush_stdin()
             
             query = Prompt.ask(f"{padding}{prompt_string}", console=self.ui.console).strip().lower()
@@ -192,9 +242,6 @@ class AniCliArApp:
                 continue
             elif query:
                 self.rpc.update_searching()
-                # Don't search for single letter commands
-                if query in ['t', 'p', 'g', 'd', 's', 'l', 'f', 'c', 'a']:
-                    continue
                 results = self.ui.run_with_loading("Searching...", self.api.search_anime, query)
             else:
                 continue
@@ -358,7 +405,10 @@ class AniCliArApp:
                 self.favorites.remove(item['anime_id'])
                 continue
             elif action == 'watch':
-                self.ui.run_with_loading("Loading...", self.resume_anime, item)
+                try:
+                    self.resume_anime(item)
+                except Exception as e:
+                    self.ui.render_message("Error", f"Failed to resume anime: {str(e)}", "error")
 
     def handle_anime_selection(self, results):
         while True:
@@ -373,10 +423,9 @@ class AniCliArApp:
 
             self.rpc.update_viewing_anime(selected_anime.title_en, selected_anime.thumbnail)
             
-            # Load episodes and pre-generate poster in one loading screen
             def load_episodes_and_poster():
                 eps = self.api.get_episodes(selected_anime.id)
-                # Pre-generate poster while loading (will be cached)
+                # Cache poster if possible
                 if selected_anime.thumbnail:
                     screen_height = self.ui.console.height
                     target_height = min(screen_height, 35)
@@ -408,23 +457,19 @@ class AniCliArApp:
         
         trailer_url = None
         
-        # Try Animeify Trailer field first (filename from API)
         if anime.trailer and anime.trailer not in ["N/A", "None", None, ""]:
             if anime.trailer.startswith(('http://', 'https://')):
                 trailer_url = anime.trailer
             else:
-                # It's a filename, construct full URL
                 trailer_url = get_trailers_base() + anime.trailer
             
-            # Verify if the trailer file exists
             try:
                 check = requests.head(trailer_url, timeout=5)
                 if check.status_code == 404:
-                    trailer_url = None  # File doesn't exist, try fallback
+                    trailer_url = None
             except Exception:
                 trailer_url = None
         
-        # Try YTTrailer field
         if not trailer_url and anime.yt_trailer and anime.yt_trailer not in ["N/A", "None", None, ""]:
             if anime.yt_trailer.startswith(('http://', 'https://')):
                 trailer_url = anime.yt_trailer
@@ -435,7 +480,6 @@ class AniCliArApp:
         # Fallback to Jikan API using MAL ID
         if not trailer_url and anime.mal_id and anime.mal_id not in ["0", "N/A", "None", None, ""]:
             try:
-                time.sleep(0.5)  # Rate limiting for Jikan API
                 jikan_response = requests.get(
                     f"https://api.jikan.moe/v4/anime/{anime.mal_id}",
                     timeout=10
@@ -452,7 +496,7 @@ class AniCliArApp:
                             yt_id = match.group(1)
                             trailer_url = f"https://www.youtube.com/watch?v={yt_id}"
             except Exception:
-                pass  # Jikan fallback failed, show error below
+                pass
         
         if not trailer_url:
             self.ui.render_message("Error", "No trailer available for this anime.", "error")
@@ -460,7 +504,6 @@ class AniCliArApp:
         
         self.ui.clear()
         
-        # Center the message vertically and horizontally
         message_text = Text()
         message_text.append("Trailer Launched!\n\n", style="bold green")
         message_text.append("Playing trailer in MPV window...\n", style="info")
@@ -486,7 +529,6 @@ class AniCliArApp:
             last_watched = self.history.get_last_watched(selected_anime.id)
             is_fav = self.favorites.is_favorite(selected_anime.id)
             
-            # Prepare anime details for display
             anime_details = {
                 'score': selected_anime.score,
                 'rank': selected_anime.rank,
@@ -553,12 +595,10 @@ class AniCliArApp:
                 action_taken = self.handle_quality_selection(selected_anime, selected_ep, server_data)
                 
                 if action_taken == "watch" or action_taken == "download":
-                    # Auto Next Logic
                     auto_next = self.settings.get('auto_next')
                     if auto_next and action_taken == "watch":
                         if current_idx + 1 < len(episodes):
                             current_idx += 1
-                            # Small delay or notification could be nice here
                             continue
                         else:
                             self.ui.render_message("Info", "No more episodes!", "info")
@@ -602,8 +642,7 @@ class AniCliArApp:
             if not server_data:
                 self.ui.print(f"[error]Skipping Ep {ep.display_num}: No servers found[/error]")
                 continue
-                
-            # Auto-select quality based on settings or default to best available
+            
             current_ep_data = server_data.get('CurrentEpisode', {})
             qualities = [
                 QualityOption("1080p", 'FRFhdQ', "info"),
@@ -611,10 +650,9 @@ class AniCliArApp:
                 QualityOption("480p", 'FRLowQ', "info"),
             ]
             
-            target_quality = self.settings.get('default_quality') # e.g. "1080p"
+            target_quality = self.settings.get('default_quality')
             selected_q = None
             
-            # Try to find target quality
             for q in qualities:
                 if target_quality in q.name and current_ep_data.get(q.server_key):
                     selected_q = q
@@ -688,13 +726,11 @@ class AniCliArApp:
             
             if action == 'download':
                 download_file(direct_url, filename, self.ui.console)
-                # Save download as "watched" in history so you can jump to it next time
                 self.history.mark_watched(selected_anime.id, selected_ep.display_num, selected_anime.title_en)
                 return "download"
             else:
                 player_type = self.settings.get('player')
                 
-                # Display watching message in a centered themed panel
                 from rich.text import Text
                 from rich.panel import Panel
                 from rich.align import Align
@@ -721,7 +757,6 @@ class AniCliArApp:
                 self.ui.clear()
                 self.ui.console.print(Align.center(watching_panel, vertical="middle", height=self.ui.console.height))
                 
-                # Update RPC to watching state before playing
                 self.rpc.update_watching(selected_anime.title_en, str(selected_ep.display_num), selected_anime.thumbnail)
                 
                 monitor.track_video_play(selected_anime.title_en, str(selected_ep.display_num))
@@ -768,20 +803,27 @@ class AniCliArApp:
         input("\nPress ENTER to exit...")
 
     def cleanup(self):
-        self.rpc.disconnect()
-        self.player.cleanup_temp_mpv()
-        self.ui.clear()
+        try:
+            self.rpc.disconnect()
+        except Exception:
+            pass
         
-        from .config import COLOR_ASCII
+        try:
+            self.player.cleanup_temp_mpv()
+        except Exception:
+            pass
         
-        self.ui.print("\n" * 2)
-        self.ui.print(Align.center(Text(goodbye, style=COLOR_ASCII)))
-        self.ui.print("\n")
+        # Only show TUI goodbye if we are NOT in CLI mode
+        if self.current_mode != "cli":
+            self.ui.clear()
+            from .config import COLOR_ASCII
+            
+            self.ui.print("\n" * 2)
+            self.ui.print(Align.center(Text(GOODBYE_ART, style=COLOR_ASCII)))
+            self.ui.print("\n")
 
 
 def main():
-    """Main entry point for the ani-cli-arabic package"""
-    # Ensure database directory exists in user home, not package location
     home_dir = Path.home()
     db_dir = home_dir / ".ani-cli-arabic" / "database"
     db_dir.mkdir(parents=True, exist_ok=True)
@@ -792,15 +834,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-goodbye = r"""
-
-
- ..|'''.|                       '||     '||''|.                    .|.
-.|'     '    ...     ...      .. ||      ||   ||  .... ...   ....  |||
-||    .... .|  '|. .|  '|.  .'  '||      ||'''|.   '|.  |  .|...|| '|'
-'|.    ||  ||   || ||   ||  |.   ||      ||    ||   '|.|   ||       | 
- ''|...'|   '|..|'  '|..|'  '|..'||.    .||...|'     '|     '|...'  . 
-                                                  .. |             '|'
-                                                   ''                 
-"""

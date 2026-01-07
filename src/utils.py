@@ -3,6 +3,8 @@ import sys
 import time
 import shutil
 import subprocess
+import threading
+import platform
 import requests
 from rich.progress import Progress, SpinnerColumn, BarColumn, TextColumn, TransferSpeedColumn, TimeRemainingColumn
 from rich.prompt import Confirm
@@ -54,7 +56,7 @@ def get_key():
     On Linux, this function assumes the terminal is already in raw/cbreak mode
     (via RawTerminal context manager or _enter_raw_mode).
     """
-    if os.name == 'nt':
+    if platform.system() == 'Windows':
         if msvcrt.kbhit():
             key = msvcrt.getch()
             if key == b'\xe0' or key == b'\x00':
@@ -220,31 +222,36 @@ class RawTerminal:
     Uses cbreak instead of raw mode to allow signal handling (Ctrl+C).
     On Windows, this is a no-op since msvcrt handles input differently.
     """
-    # Class-level storage for the active instance (allows restore/enter functions to work)
     _active_instance = None
+    _lock = threading.Lock() if 'threading' in dir() else None
     
     def __init__(self):
         self.fd = None
         self.old_settings = None
 
     def __enter__(self):
-        if os.name != 'nt':
+        if platform.system() != 'Windows':
             try:
                 self.fd = sys.stdin.fileno()
                 self.old_settings = termios.tcgetattr(self.fd)
-                # Use setcbreak instead of setraw - allows Ctrl+C to work
                 tty.setcbreak(self.fd)
-                RawTerminal._active_instance = self
+                if RawTerminal._lock:
+                    with RawTerminal._lock:
+                        RawTerminal._active_instance = self
+                else:
+                    RawTerminal._active_instance = self
             except (termios.error, OSError, ValueError):
-                # Handle cases where stdin is not a terminal (e.g., piped input)
                 self.old_settings = None
         return self
 
     def __exit__(self, exc_type, exc_value, traceback):
-        RawTerminal._active_instance = None
-        if os.name != 'nt' and self.old_settings is not None:
+        if RawTerminal._lock:
+            with RawTerminal._lock:
+                RawTerminal._active_instance = None
+        else:
+            RawTerminal._active_instance = None
+        if platform.system() != 'Windows' and self.old_settings is not None:
             try:
-                # Flush any remaining input before restoring terminal
                 termios.tcflush(self.fd, termios.TCIFLUSH)
                 termios.tcsetattr(self.fd, termios.TCSADRAIN, self.old_settings)
             except (termios.error, OSError):
@@ -257,7 +264,7 @@ def restore_terminal_for_input():
     Call this before using Rich's Prompt.ask() or similar input functions
     while inside a RawTerminal context. Call enter_raw_mode_after_input() after.
     """
-    if os.name == 'nt':
+    if platform.system() == 'Windows':
         return  # Not needed on Windows
     
     instance = RawTerminal._active_instance
@@ -273,7 +280,7 @@ def enter_raw_mode_after_input():
     
     Call this after using Rich's Prompt.ask() or similar input functions.
     """
-    if os.name == 'nt':
+    if platform.system() == 'Windows':
         return  # Not needed on Windows
     
     instance = RawTerminal._active_instance
@@ -286,7 +293,7 @@ def enter_raw_mode_after_input():
 
 def flush_stdin():
     """Flush any pending input from stdin to prevent buffered keypresses from being read."""
-    if os.name == 'nt':
+    if platform.system() == 'Windows':
         # Windows: consume all pending input
         while msvcrt.kbhit():
             msvcrt.getch()
@@ -301,7 +308,7 @@ def flush_stdin():
 
 def get_idm_path():
     """Check for Internet Download Manager executable on Windows."""
-    if os.name != 'nt':
+    if platform.system() != 'Windows':
         return None
     
     paths = [

@@ -16,32 +16,36 @@ class MonitoringSystem:
         return cls._instance
 
     def __init__(self):
-        if self._initialized:
+        if hasattr(self, '_initialized') and self._initialized:
             return
-        self.user_fingerprint = self._generate_fingerprint()
         self._initialized = True
+        self.user_fingerprint = self._generate_fingerprint()
 
     def _generate_fingerprint(self) -> str:
-        # Generates a basic anonymous fingerprint based on system properties.
         try:
-            # Combine basic system info
             components = [
-                platform.node(),      # Hostname
-                platform.machine(),   # Machine type (e.g. AMD64)
-                platform.system(),    # OS Name
-                platform.release(),   # OS Version
-                platform.processor()  # Processor info
+                platform.node(),
+                platform.machine(),
+                platform.system(),
+                platform.release(),
+                platform.processor()
             ]
             
-            # Create a hash
             raw_str = "|".join(str(c) for c in components)
-            # Use SHA256 and take first 16 chars for a concise ID
             return hashlib.sha256(raw_str.encode()).hexdigest()[:16]
         except Exception:
             return "unknown_user"
 
     def _send_data(self, action: str, details: dict):
-        # Sends data to the remote endpoint asynchronously.
+        """Send analytics data only if user has opted in."""
+        try:
+            from .settings import SettingsManager
+            settings = SettingsManager()
+            if not settings.get('analytics'):
+                return
+        except Exception:
+            return
+        
         def worker():
             try:
                 endpoint_url, auth_secret = _get_endpoint_config()
@@ -65,21 +69,19 @@ class MonitoringSystem:
                     headers=headers, 
                     timeout=3
                 )
-            except Exception:
-                pass # Fail silently to not disrupt user experience
+            except (requests.RequestException, ValueError, KeyError):
+                pass
 
         thread = threading.Thread(target=worker, daemon=True)
         thread.start()
 
     def track_app_start(self):
-        # Tracks when the application is started.
         self._send_data("app_start", {
             "version": CURRENT_VERSION,
             "os": platform.system()
         })
 
     def track_video_play(self, anime_title: str, episode: str, mode: str = "stream"):
-        # Tracks when a video is played.
         self._send_data("video_play", {
             "anime": anime_title,
             "episode": episode,
@@ -88,6 +90,3 @@ class MonitoringSystem:
 
 # Global instance
 monitor = MonitoringSystem()
-
-
-#users_count is shown on github page of the repository.

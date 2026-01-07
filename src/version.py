@@ -1,8 +1,8 @@
 # Version info for ani-cli-arabic
-# THIS IS THE SINGLE SOURCE OF TRUTH FOR VERSION
+# THIS IS THE SINGLE SOURCE OF VERSION
 # All other files (pyproject.toml, workflows, etc.) read from here
 
-__version__ = "1.7.2" #V1.7.2 is a the most stable on all platforms
+__version__ = "1.8"
 
 APP_VERSION = f"v{__version__}"
 GITHUB_REPO = "np4abdou1/ani-cli-arabic"
