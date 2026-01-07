@@ -60,3 +60,4 @@ jobs:
           commit_email: np4abdou1@users.noreply.github.com
           ssh_private_key: ${{ secrets.AUR_SSH_PRIVATE_KEY }}
           commit_message: Update to ${{ steps.get_version.outputs.VERSION }}
+          ssh_keyscan_types: rsa,ecdsa,ed25519
