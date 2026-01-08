@@ -61,6 +61,7 @@ class AniCliWrapper:
                     args,
                     input=input_str,
                     text=True,
+                    encoding='utf-8',
                     stdout=subprocess.PIPE,
                     stderr=None  # Let fzf render UI to terminal
                 )

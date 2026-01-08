@@ -9,13 +9,14 @@ import shutil
 import subprocess
 import platform
 import requests
+import zipfile
 from pathlib import Path
 from rich.console import Console
 from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, DownloadColumn, TransferSpeedColumn
 
 console = Console()
 #OFFICIAL_MPV_MIRROR
-DEPS_DIR = Path.cwd() / "deps"
+DEPS_DIR = Path.home() / ".ani-cli-arabic" / "deps"
 MPV_URL = "https://github.com/shinchiro/mpv-winbuild-cmake/releases/download/20260105/mpv-i686-20260105-git-0035bb7.7z"
 FZF_URL = "https://github.com/junegunn/fzf/releases/download/v0.67.0/fzf-0.67.0-windows_amd64.zip"
 SEVENZIP_URL = "https://www.7-zip.org/a/7zr.exe"  # Standalone 7z extractor (~600KB)
@@ -239,10 +240,6 @@ def install_fzf_windows():
         _prepend_to_path(DEPS_DIR)
         return True
 
-    extractor = get_7z_extractor()
-    if not extractor:
-        return False
-
     archive_name = "fzf.zip"
     archive_path = DEPS_DIR / archive_name
     
@@ -251,35 +248,34 @@ def install_fzf_windows():
     
     console.print("[dim]Extracting fzf...[/dim]")
     try:
-        result = subprocess.run(
-            [extractor, "x", str(archive_path), f"-o{DEPS_DIR}", "-y"],
-            capture_output=True,
-            text=True
-        )
-        
-        if result.returncode != 0:
-            console.print(f"[red]✘[/red] Extraction failed: {result.stderr}")
-            return False
+        with zipfile.ZipFile(archive_path, 'r') as zip_ref:
+            zip_ref.extractall(DEPS_DIR)
             
         archive_path.unlink()
         
-        if (DEPS_DIR / "fzf-0.67.0-windows_amd64").exists():
-             # Move nested binary
-             nested = DEPS_DIR / "fzf-0.67.0-windows_amd64" / "fzf.exe"
-             if nested.exists():
-                 shutil.move(str(nested), str(DEPS_DIR / "fzf.exe"))
-                 try:
-                     shutil.rmtree(str(DEPS_DIR / "fzf-0.67.0-windows_amd64"))
-                 except (OSError, PermissionError):
-                     pass
+        # Check for nested fzf.exe
+        if not (DEPS_DIR / "fzf.exe").exists():
+            # Search recursively for fzf.exe
+            for item in DEPS_DIR.rglob("fzf.exe"):
+                shutil.move(str(item), str(DEPS_DIR / "fzf.exe"))
+                break
 
         if (DEPS_DIR / "fzf.exe").exists():
             console.print("[green]✔[/green] fzf ready")
             _prepend_to_path(DEPS_DIR)
+            # Cleanup any extracted folders
+            for item in DEPS_DIR.iterdir():
+                if item.is_dir():
+                    try:
+                        shutil.rmtree(item)
+                    except:
+                        pass
             return True
             
     except Exception as e:
         console.print(f"[red]✘[/red] Install error: {e}")
+        if archive_path.exists():
+            archive_path.unlink()
         return False
         
     return False

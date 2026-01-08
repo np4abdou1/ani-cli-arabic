@@ -26,5 +26,5 @@ package() {
     install -Dm644 assets/ani-cli-arabic.desktop "$pkgdir/usr/share/applications/ani-cli-arabic.desktop"
     
     # Install icon
-    install -Dm644 assets/icon.ico "$pkgdir/usr/share/pixmaps/ani-cli-arabic.ico"
+    install -Dm644 assets/icon.png "$pkgdir/usr/share/pixmaps/ani-cli-arabic.png"
 }
