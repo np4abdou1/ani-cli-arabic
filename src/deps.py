@@ -16,7 +16,7 @@ from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, Downlo
 
 console = Console()
 DEPS_DIR = Path.home() / ".ani-cli-arabic" / "deps"
-MPV_FALLBACK = "https://github.com/shinchiro/mpv-winbuild-cmake/releases/download/20260105/mpv-i686-20260105-git-0035bb7.7z"
+MPV_FALLBACK = "https://github.com/shinchiro/mpv-winbuild-cmake/releases/download/20260307/mpv-x86_64-v3-20260307-git-f9190e5.7z"
 FZF_FALLBACK = "https://github.com/junegunn/fzf/releases/download/v0.67.0/fzf-0.67.0-windows_amd64.zip"
 FFMPEG_FALLBACK = "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip"
 SEVENZIP_URL = "https://www.7-zip.org/a/7zr.exe"
@@ -188,8 +188,9 @@ def install_mpv_windows():
         return False
     
     urls = [
-        get_latest_github_release("shinchiro/mpv-winbuild-cmake", "x86_64-v3"),
-        get_latest_github_release("shinchiro/mpv-winbuild-cmake", "x86_64"),
+        get_latest_github_release("shinchiro/mpv-winbuild-cmake", "mpv-x86_64-v3"),
+        get_latest_github_release("shinchiro/mpv-winbuild-cmake", "mpv-x86_64-"),
+        get_latest_github_release("shinchiro/mpv-winbuild-cmake", "mpv-i686-"),
         MPV_FALLBACK
     ]
     
