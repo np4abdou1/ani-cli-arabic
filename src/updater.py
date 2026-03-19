@@ -147,10 +147,10 @@ def check_pip_update():
         if latest > current:
             sys.stdout.write("\033[2J\033[H")  # Clear screen for better UI
             sys.stdout.flush()
-            _print_header("🚨 CRITICAL UPDATE REQUIRED 🚨")
-            _print_info(f"Current: {__version__}  →  Latest: {latest_version}")
+            _print_header("Update Required")
+            _print_info(f"Current version: {__version__}  →  Latest version: {latest_version}")
             print()
-            _print_info("A mandatory update is available. The app cannot be used until updated.")
+            _print_info("A mandatory update is available. Please update to continue using the application.")
             print()
             
             # Auto-update without asking
@@ -160,8 +160,9 @@ def check_pip_update():
                 # Safely handle pipx and user installs
                 path_str = str(Path(__file__).resolve())
                 if 'pipx' in path_str:
-                    _print_error("Cannot auto-update isolated pipx installation.")
-                    _print_info("Please run in your terminal: pipx upgrade ani-cli-arabic")
+                    _print_error("Cannot automatically update a pipx-managed installation.")
+                    _print_info("Please execute the following command to update:")
+                    _print_info("  pipx upgrade ani-cli-arabic")
                     print()
                     sys.exit(1)
                 
@@ -170,7 +171,7 @@ def check_pip_update():
                     # System python on Linux/Mac, try using --user first 
                     pip_cmd.append('--user')
                 
-                _print_info("Running auto-update... please wait.")
+                _print_info("Downloading and installing the update...")
                 result = subprocess.run(
                     pip_cmd,
                     capture_output=True,
@@ -179,7 +180,7 @@ def check_pip_update():
                 
                 # If it fails with PEP 668 internally managed error, retry aggressively with break-system-packages
                 if result.returncode != 0 and 'externally-managed-environment' in result.stderr:
-                    _print_info("System package restricted environment detected. Retrying override...")
+                    _print_info("Restricted package environment detected. Re-attempting installation...")
                     # Remove --user if appending break-system-packages for cleaner retry, though both can work.
                     if '--user' in pip_cmd:
                         pip_cmd.remove('--user')
@@ -192,27 +193,27 @@ def check_pip_update():
                     )
 
                 if result.returncode == 0:
-                    _print_success("Update successfully installed!")
+                    _print_success("Update installed successfully.")
                     print()
-                    _print_info("The application will now terminate.")
-                    _print_info("Please RELAUNCH the app to use the new version.")
+                    _print_info("The application will now safely terminate.")
+                    _print_info("Please restart the application to apply the changes.")
                     print()
                     sys.exit(0)
                 else:
-                    _print_error(f"Auto-update failed. (Return code: {result.returncode})")
+                    _print_error(f"Automated update failed. (Exit code: {result.returncode})")
                     if "externally-managed-environment" in result.stderr:
-                        _print_info("You are using a strictly restricted python environment.")
-                        _print_info("Use: pipx upgrade ani-cli-arabic")
+                        _print_info("Your system utilizes a restricted Python environment.")
+                        _print_info("Please run: pipx upgrade ani-cli-arabic")
                     else:
-                        _print_info("Please try manually: pip install --upgrade ani-cli-arabic")
+                        _print_info("Please try installing the update manually: pip install --upgrade ani-cli-arabic")
                     print()
-                    _print_error("Error Output:")
+                    _print_error("Error details:")
                     print(result.stderr.strip()[:500])  # print up to 500 chars of error
                     print()
                     sys.exit(1)
             except Exception as e:
-                _print_error(f"Update script exception: {e}")
-                _print_info("Please try manually: pip install --upgrade ani-cli-arabic")
+                _print_error(f"An unexpected error occurred during the update process: {e}")
+                _print_info("Please try installing the update manually: pip install --upgrade ani-cli-arabic")
                 print()
                 sys.exit(1)
             
@@ -240,11 +241,11 @@ def check_executable_update():
         if latest > current:
             sys.stdout.write("\033[2J\033[H")
             sys.stdout.flush()
-            _print_header("🚨 CRITICAL UPDATE REQUIRED 🚨")
-            _print_info(f"Current: {__version__}  →  Latest: {latest_tag.lstrip('v')}")
+            _print_header("Update Required")
+            _print_info(f"Current version: {__version__}  →  Latest version: {latest_tag.lstrip('v')}")
             print()
-            _print_error("Standalone executables are no longer supported or auto-updatable.")
-            _print_info("Please uninstall this version and reinstall via:")
+            _print_error("Standalone executables are no longer supported and cannot be automatically updated.")
+            _print_info("Please uninstall this version and reinstall using one of the following methods:")
             _print_info("  - Pip: pip install ani-cli-arabic")
             _print_info("  - AUR: yay -S ani-cli-arabic")
             print()
@@ -303,12 +304,12 @@ def check_for_updates(console=None, auto_update=True):
                 if parse_version(latest_tag) > parse_version(current):
                     sys.stdout.write("\033[2J\033[H")
                     sys.stdout.flush()
-                    _print_header("🚨 CRITICAL UPDATE REQUIRED 🚨")
-                    _print_info(f"Current: {current}  →  Latest: {latest_tag}")
+                    _print_header("Update Required")
+                    _print_info(f"Current version: {current}  →  Latest version: {latest_tag}")
                     print()
-                    _print_info("You installed via a system package manager (AUR/Pacman/Apt).")
-                    _print_info("The app cannot be used until updated.")
-                    _print_error("Please update using your package manager (e.g., yay -Syu ani-cli-arabic).")
+                    _print_info("Your installation is managed by a system package manager (e.g., AUR, APT).")
+                    _print_info("A mandatory update is available. Please update to continue using the application.")
+                    _print_error("Kindly update using your package manager (e.g., yay -Syu ani-cli-arabic).")
                     print()
                     sys.exit(1)
         elif install_type == 'source':
