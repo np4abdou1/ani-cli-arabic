@@ -1,10 +1,7 @@
 import sys
-import os
 import re
 import platform
 import subprocess
-import tempfile
-import time
 import requests
 from pathlib import Path
 
@@ -13,49 +10,20 @@ from .config import COLOR_PROMPT
 from .utils import is_bundled
 
 
-def _get_ansi_color(hex_color):
-    hex_color = hex_color.lstrip('#')
-    r, g, b = int(hex_color[:2], 16), int(hex_color[2:4], 16), int(hex_color[4:], 16)
-    return f'\033[38;2;{r};{g};{b}m'
-
-def _reset_color():
-    return '\033[0m'
+from rich.console import Console
+console = Console()
 
 def _print_header(title):
-    color = _get_ansi_color(COLOR_PROMPT)
-    reset = _reset_color()
-    print(f"\n{color}{title}{reset}\n")
+    console.print(f"\n[bold magenta]{title}[/bold magenta]\n")
 
 def _print_info(text):
-    print(f"  {text}")
+    console.print(f"  {text}")
 
 def _print_success(text):
-    color = _get_ansi_color(COLOR_PROMPT)
-    reset = _reset_color()
-    print(f"  {color}✓{reset} {text}")
+    console.print(f"  [green]✓[/green] {text}")
 
 def _print_error(text):
-    print(f"  ✗ {text}")
-
-def _format_bytes(bytes_val):
-    for unit in ['B', 'KB', 'MB', 'GB']:
-        if bytes_val < 1024.0:
-            return f"{bytes_val:.1f}{unit}"
-        bytes_val /= 1024.0
-    return f"{bytes_val:.1f}TB"
-
-def _format_speed(bytes_per_sec):
-    return f"{_format_bytes(bytes_per_sec)}/s"
-
-def _draw_progress_bar(progress, total, width=40):
-    if total == 0:
-        return "  [" + " " * width + "] 0%"
-    filled = int(width * progress / total)
-    percent = int(100 * progress / total)
-    color = _get_ansi_color(COLOR_PROMPT)
-    reset = _reset_color()
-    bar = color + "█" * filled + reset + "░" * (width - filled)
-    return f"  [{bar}] {percent}%"
+    console.print(f"  [red]✗[/red] {text}")
 
 def parse_version(ver_string):
     ver_string = ver_string.strip().lower()
@@ -90,34 +58,26 @@ def get_installation_type():
     
     # Check for AUR/System installation
     try:
-        file_path = Path(__file__).resolve()
-        path_str = str(file_path)
+        path_str = Path(__file__).resolve().as_posix()
         
         # System-managed check
         if '/usr/lib/python' in path_str and ('site-packages' in path_str or 'dist-packages' in path_str):
              return 'pkged'
         
-        if '/home/' in path_str and '/.local/lib/python' in path_str:
+        # Check pipx
+        if 'pipx' in path_str:
+            return 'pip'
+        
+        if '/.local/lib/python' in path_str or 'site-packages' in path_str or 'dist-packages' in path_str:
             return 'pip'
             
     except Exception:
         pass
     
     try:
-        file_path = Path(__file__).resolve()
-        if file_path.parent.name == 'src':
-            project_root = file_path.parent.parent
-            if (project_root / 'main.py').exists():
+        if Path(__file__).resolve().parent.name == 'src':
+            if (Path(__file__).resolve().parent.parent / 'main.py').exists():
                 return 'source'
-    except Exception:
-        pass
-    
-    # Fallback to general pip check if not caught above
-    try:
-        file_path = Path(__file__).resolve()
-        path_str = str(file_path)
-        if 'site-packages' in path_str or 'dist-packages' in path_str:
-            return 'pip'
     except Exception:
         pass
     
