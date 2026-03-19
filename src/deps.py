@@ -15,7 +15,11 @@ from rich.console import Console
 from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, DownloadColumn, TransferSpeedColumn
 
 console = Console()
-DEPS_DIR = Path.home() / ".ani-cli-arabic" / "deps"
+try:
+    DEPS_DIR = Path.home() / ".ani-cli-arabic" / "deps"
+except RuntimeError:
+    import tempfile
+    DEPS_DIR = Path(tempfile.gettempdir()) / ".ani-cli-arabic" / "deps"
 MPV_FALLBACK = "https://github.com/shinchiro/mpv-winbuild-cmake/releases/download/20260307/mpv-x86_64-v3-20260307-git-f9190e5.7z"
 FZF_FALLBACK = "https://github.com/junegunn/fzf/releases/download/v0.67.0/fzf-0.67.0-windows_amd64.zip"
 FFMPEG_FALLBACK = "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip"
@@ -178,7 +182,10 @@ def install_ytdlp():
     dest_path = DEPS_DIR / filename
     if download_file_with_progress(urls, dest_path, "yt-dlp"):
         if system != "Windows":
-            os.chmod(dest_path, 0o755)  # Make it executable for Linux/Mac
+            try:
+                os.chmod(dest_path, 0o755)  # Make it executable for Linux/Mac
+            except (OSError, PermissionError) as e:
+                console.print(f"[yellow]⚠ Could not make yt-dlp executable: {e}[/yellow]")
         console.print("[green]✔[/green] yt-dlp ready")
         _prepend_to_path(DEPS_DIR)
         _clean_deps_keep_important()
@@ -378,7 +385,7 @@ def install_deps_linux():
     for pm in pm_commands:
         if is_installed(pm["pm"]):
             console.print(f"[dim]Running: {pm['cmd']}[/dim]")
-            if os.system(pm['cmd']) == 0:
+            if subprocess.run(pm['cmd'], shell=True, check=False).returncode == 0:
                 console.print(f"[green]✔ Dependencies installed via {pm['pm']}[/green]")
                 return True
             else:
@@ -398,9 +405,14 @@ def ensure_dependencies():
     console.print("\n[dim]Auto-install available (mostly works)[/dim]")
     
     if platform.system() == "Darwin":
-        console.print("[yellow]Please run: brew install mpv ffmpeg yt-dlp[/yellow]")
+        if is_installed("brew"):
+            console.print("[dim]Running: brew install mpv ffmpeg yt-dlp fzf[/dim]")
+            if subprocess.run(["brew", "install", "mpv", "ffmpeg", "yt-dlp", "fzf"]).returncode == 0:
+                console.print("[green]✔ Dependencies installed via brew[/green]")
+                return True
+        console.print("[yellow]Please run: brew install mpv ffmpeg yt-dlp fzf[/yellow]")
         console.input("Press Enter after installation...")
-        return check_dependencies_status()["mpv"]
+        return all(check_dependencies_status().values())
 
     try:
         choice = console.input("\nInstall missing? [Y/n]: ").strip().lower()
