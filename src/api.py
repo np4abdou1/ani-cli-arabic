@@ -93,8 +93,6 @@ def get_trailers_base():
     return _creds.get('TRAILERS_BASE_URL', 'https://animeify.net/animeify/files/trailers/')
 
 class AnimeAPI:
-    def __init__(self):
-        pass
     
     def _parse_anime_result(self, item: dict) -> AnimeResult:
         thumbnail_filename = item.get('Thumbnail', '')
@@ -123,31 +121,21 @@ class AnimeAPI:
             yt_trailer=item.get('YTTrailer', '')
         )
 
-    def get_anime_list(self, filter_type: str = "", filter_data: str = "", anime_type: str = "SERIES", from_index: int = 0, limit: int = 30) -> List[AnimeResult]:
-        endpoint = get_api_base() + "anime/load_anime_list_v2.php"
+    def _paginate_requests(self, endpoint: str, limit: int, from_index: int, base_payload: dict) -> List[AnimeResult]:
         all_results = []
         current_from = from_index
         
         while len(all_results) < limit:
-            payload = {
-                'UserId': '0',
-                'Language': 'English',
-                'FilterType': filter_type,
-                'FilterData': filter_data,
-                'Type': anime_type,
-                'From': str(current_from),
-                'Token': get_api_token()
-            }
+            payload = base_payload.copy()
+            payload['From'] = str(current_from)
+            payload['Token'] = get_api_token()
             
             try:
                 response = requests.post(endpoint, data=payload, timeout=10)
                 response.raise_for_status()
                 data = response.json()
                 
-                if not isinstance(data, list):
-                    break
-                    
-                if not data:
+                if not isinstance(data, list) or not data:
                     break
                     
                 batch = [self._parse_anime_result(item) for item in data if isinstance(item, dict)]
@@ -163,41 +151,24 @@ class AnimeAPI:
                 
         return all_results[:limit]
 
+    def get_anime_list(self, filter_type: str = "", filter_data: str = "", anime_type: str = "SERIES", from_index: int = 0, limit: int = 30) -> List[AnimeResult]:
+        endpoint = get_api_base() + "anime/load_anime_list_v2.php"
+        payload = {
+            'UserId': '0',
+            'Language': 'English',
+            'FilterType': filter_type,
+            'FilterData': filter_data,
+            'Type': anime_type,
+        }
+        return self._paginate_requests(endpoint, limit, from_index, payload)
+
     def get_latest_anime(self, from_index: int = 0, limit: int = 30) -> List[AnimeResult]:
         endpoint = get_api_base() + "anime/load_latest_anime.php"
-        all_results = []
-        current_from = from_index
-        
-        while len(all_results) < limit:
-            payload = {
-                'UserId': '0',
-                'Language': 'English',
-                'From': str(current_from),
-                'Token': get_api_token()
-            }
-            
-            try:
-                response = requests.post(endpoint, data=payload, timeout=10)
-                response.raise_for_status()
-                data = response.json()
-                
-                if not isinstance(data, list):
-                    break
-                
-                if not data:
-                    break
-                
-                batch = [self._parse_anime_result(item) for item in data if isinstance(item, dict)]
-                all_results.extend(batch)
-                
-                if len(batch) < 10:
-                    break
-                    
-                current_from += len(batch)
-            except Exception:
-                break
-                
-        return all_results[:limit]
+        payload = {
+            'UserId': '0',
+            'Language': 'English',
+        }
+        return self._paginate_requests(endpoint, limit, from_index, payload)
 
     def search_anime(self, query: str) -> List[AnimeResult]:
         series_results = self.get_anime_list(filter_type="SEARCH", filter_data=query, anime_type="SERIES", limit=20)

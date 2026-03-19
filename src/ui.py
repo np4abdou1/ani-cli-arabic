@@ -357,7 +357,6 @@ class UIManager:
                     
                     if needs_update:
                         live.update(generate_renderable(), refresh=True)
-                    # No sleep needed - get_key() already has built-in timeout
 
     @lru_cache(maxsize=50)
     def _generate_poster_ansi(self, url, max_height):
@@ -366,22 +365,18 @@ class UIManager:
             return Text("No poster available", style="secondary")
         
         try:
-            # Download with timeout
             res = requests.get(url, timeout=5)
             img = Image.open(BytesIO(res.content)).convert("RGB")
             
-            # Enhance for terminal display
             enhancer = ImageEnhance.Sharpness(img)
             img = enhancer.enhance(1.8)
             enhancer = ImageEnhance.Contrast(img)
             img = enhancer.enhance(1.15)
             
-            # Calculate dimensions
             target_pixel_height = max_height * 2
             new_height = target_pixel_height
             new_width = int((img.width / img.height) * new_height * 2.0)
             
-            # Ensure even dimensions
             if new_width % 2 != 0:
                 new_width -= 1
             if new_height % 2 != 0:
@@ -404,7 +399,6 @@ class UIManager:
                     p2 = arr[y+1, x] if y+1 < new_height else p0
                     p3 = arr[y+1, x+1] if (y+1 < new_height and x+1 < new_width) else p0
                     
-                    # Fast 2-color quantization using luminance
                     def calculate_luminance(p):
                         return 0.299*p[0] + 0.587*p[1] + 0.114*p[2]
                     lums = [calculate_luminance(p0), calculate_luminance(p1), calculate_luminance(p2), calculate_luminance(p3)]
@@ -798,7 +792,6 @@ class UIManager:
                         return None
                     elif key == 'q' or key == 'ESC':
                         return -1
-                    # No sleep needed - get_key() already has built-in timeout
 
     def batch_selection_menu(self, episodes):
         selected = 0
@@ -865,7 +858,6 @@ class UIManager:
                         return sorted(list(marked))
                     elif key == 'b' or key == 'ESC':
                         return None
-                    # No sleep needed - get_key() already has built-in timeout
 
     def history_menu(self, history_items):
         selected = 0
@@ -930,7 +922,6 @@ class UIManager:
                         return selected
                     elif key == 'b' or key == 'ESC':
                         return None
-                    # No sleep needed - get_key() already has built-in timeout
 
     def favorites_menu(self, fav_items):
         selected = 0
@@ -994,7 +985,6 @@ class UIManager:
                         return (selected, 'remove')
                     elif key == 'b' or key == 'ESC':
                         return None
-                    # No sleep needed - get_key() already has built-in timeout
 
     def settings_menu(self, settings_mgr):
         options = [
@@ -1119,7 +1109,6 @@ class UIManager:
                         # Clear the screen before returning
                         self.clear()
                         return
-                    # No sleep needed - get_key() already has built-in timeout
 
     def quality_selection_menu(self, anime_title, episode_num, available_qualities, rpc_manager=None, anime_poster=None):
         if rpc_manager:
@@ -1168,7 +1157,6 @@ class UIManager:
                         return None
                     elif key == 'q' or key == 'ESC':
                         return -1
-                    # No sleep needed - get_key() already has built-in timeout
 
     def post_watch_menu(self):
         options = ["Next Episode", "Previous Episode", "Replay", "Back to List"]
@@ -1206,7 +1194,6 @@ class UIManager:
                         return options[selected]
                     elif key == 'q' or key == 'b' or key == 'ESC':
                         return "Back to List"
-                    # No sleep needed - get_key() already has built-in timeout
 
     def show_credits(self):
         """Display credits and contributors."""

@@ -183,7 +183,6 @@ class AniCliWrapper:
             if len(t) > max_len: max_len = len(t)
         
         for idx, res in enumerate(results):
-            # Colors
             C_CYAN = "\033[36m"
             C_RESET = "\033[0m"
             C_DIM = "\033[90m"
@@ -216,12 +215,10 @@ class AniCliWrapper:
             # Map the exact line
             anime_map[line] = res
             
-            # Helper to strip ansi for robust lookup
             ansi_escape = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
             clean_line = ansi_escape.sub('', line)
             anime_map[clean_line] = res
 
-        # Loop for Anime Selection
         while True:
             selection = self._launcher(display_lines, title)
             if selection is None:
@@ -311,12 +308,10 @@ class AniCliWrapper:
                         if cmd == "Next":
                             next_ep_num = self._get_next_ep_num(episodes, ep)
                             if next_ep_num:
-                                # Find the ep object
                                 next_ep = next((e for e in episodes if e.number == next_ep_num), None)
                                 if next_ep:
                                     ep = next_ep
                                     self.play_video(selected_anime, ep, current_quality)
-                                    # Loop continues with new 'ep'
                             else:
                                 print("\033[1;33mNo next episode.\033[0m")
                         

@@ -82,11 +82,9 @@ class PlayerManager:
                 input("Press Enter to continue...")
 
     def _play_vlc(self, url: str, title: str):
-        # Check for VLC in common paths if not in PATH
         vlc_path = shutil.which('vlc')
         if not vlc_path:
             if os.name == 'nt':
-                # Common Windows paths
                 paths = [
                     r"C:\Program Files\VideoLAN\VLC\vlc.exe",
                     r"C:\Program Files (x86)\VideoLAN\VLC\vlc.exe"
@@ -96,7 +94,6 @@ class PlayerManager:
                         vlc_path = p
                         break
             elif sys.platform == 'darwin':
-                # Common macOS paths
                 paths = [
                     "/Applications/VLC.app/Contents/MacOS/VLC",
                     os.path.expanduser("~/Applications/VLC.app/Contents/MacOS/VLC")
@@ -157,10 +154,7 @@ class PlayerManager:
             url
         ]
         
-        # Remove aggressive options that might cause issues with some drivers/setup
-        # '--gpu-api=d3d11' caused issues on some systems, letting MPV choose is safer
         
-        # Add force-window to ensure window appears even if audio-only (rare for anime but good safety)
         mpv_args.append('--force-window=yes')
 
         result = subprocess.run(

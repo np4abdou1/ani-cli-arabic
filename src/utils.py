@@ -327,7 +327,6 @@ def download_file(url, filename, console):
     os.makedirs(download_dir, exist_ok=True)
     filepath = os.path.join(download_dir, filename)
 
-    # 1. Check for IDM (Windows Only)
     idm_path = get_idm_path()
     if idm_path:
         # Prompt the user to use IDM if found
@@ -336,8 +335,6 @@ def download_file(url, filename, console):
         if use_idm:
             try:
                 console.print("[green]Sending to IDM...[/green]")
-                # /d: URL, /p: Local Path, /f: Local Filename, /n: Silent
-                # /a: Add to queue, /s: Start queue
                 subprocess.Popen([
                     idm_path, 
                     '/d', url, 
@@ -350,7 +347,6 @@ def download_file(url, filename, console):
                 console.print("[bold green]✓ Added to IDM Queue.[/bold green]")
                 console.print(f"[dim]File: {filename}[/dim]")
                 
-                # Added Manual Start Message
                 console.print("[yellow]⚠ Note: If the download does not start automatically, please open IDM and click 'Start Queue'.[/yellow]")
                 
                 input("\nPress ENTER to continue...")
@@ -359,7 +355,6 @@ def download_file(url, filename, console):
                 console.print(f"[red]Failed to start IDM: {e}[/red]")
                 # Fallback to other methods if IDM fails
 
-    # 2. Try using aria2c (Fast Method) with cleaner output
     aria2_path = shutil.which("aria2c")
     if aria2_path:
         console.print("[bold green]🚀 Starting aria2c download...[/bold green]")
@@ -390,7 +385,6 @@ def download_file(url, filename, console):
         except Exception as e:
             console.print(f"[yellow]⚠ Error running aria2c: {e}. Switching...[/yellow]")
 
-    # 3. Fallback to Requests (Standard Clean UI)
     try:
         headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
         with requests.get(url, stream=True, headers=headers) as r:

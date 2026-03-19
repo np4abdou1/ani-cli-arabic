@@ -40,7 +40,6 @@ class AniCliArApp:
         self.force_cli = False
 
     def run(self):
-        # Argument parsing
         parser = argparse.ArgumentParser(
             description="ani-cli-arabic: A CLI tool to browse and watch anime in Arabic.",
             formatter_class=argparse.RawTextHelpFormatter
@@ -269,19 +268,10 @@ class AniCliArApp:
 
             self.rpc.update_viewing_anime(selected_anime.title_en, selected_anime.thumbnail)
             
-            def load_episodes_and_poster():
-                eps = self.api.get_episodes(selected_anime.id)
-                if selected_anime.thumbnail:
-                    screen_height = self.ui.console.height
-                    target_height = min(screen_height, 35)
-                    poster_height = target_height - 8
-                    if poster_height > 0:
-                        self.ui._generate_poster_ansi(selected_anime.thumbnail, poster_height)
-                return eps
             
             episodes = self.ui.run_with_loading(
                 "Loading episodes & poster...",
-                load_episodes_and_poster
+                lambda: self._fetch_episodes_and_poster(selected_anime)
             )
             
             if not episodes:
@@ -365,13 +355,11 @@ class AniCliArApp:
             history_items = self.history.get_history()
 
     def resume_anime(self, history_item):
-        # We need to fetch anime details first
         results = self.ui.run_with_loading("Resuming...", self.api.search_anime, history_item['title'])
         if not results:
             self.ui.render_message("Error", "Could not find anime details.", "error")
             return
 
-        # Find the matching anime
         selected_anime = None
         for res in results:
             if str(res.id) == str(history_item['anime_id']):
@@ -423,20 +411,10 @@ class AniCliArApp:
 
             self.rpc.update_viewing_anime(selected_anime.title_en, selected_anime.thumbnail)
             
-            def load_episodes_and_poster():
-                eps = self.api.get_episodes(selected_anime.id)
-                # Cache poster if possible
-                if selected_anime.thumbnail:
-                    screen_height = self.ui.console.height
-                    target_height = min(screen_height, 35)
-                    poster_height = target_height - 8
-                    if poster_height > 0:
-                        self.ui._generate_poster_ansi(selected_anime.thumbnail, poster_height)
-                return eps
             
             episodes = self.ui.run_with_loading(
                 "Loading episodes & poster...",
-                load_episodes_and_poster
+                lambda: self._fetch_episodes_and_poster(selected_anime)
             )
             
             if not episodes:
@@ -451,9 +429,19 @@ class AniCliArApp:
             if not back_pressed:
                 break
     
+
+    def _fetch_episodes_and_poster(self, selected_anime):
+        eps = self.api.get_episodes(selected_anime.id)
+        if selected_anime.thumbnail:
+            screen_height = self.ui.console.height
+            target_height = min(screen_height, 35)
+            poster_height = target_height - 8
+            if poster_height > 0:
+                self.ui._generate_poster_ansi(selected_anime.thumbnail, poster_height)
+        return eps
+
     def play_trailer(self, anime):
         import requests
-        import time
         
         trailer_url = None
         
@@ -474,10 +462,8 @@ class AniCliArApp:
             if anime.yt_trailer.startswith(('http://', 'https://')):
                 trailer_url = anime.yt_trailer
             else:
-                # Assume it's a YouTube video ID
                 trailer_url = f"https://www.youtube.com/watch?v={anime.yt_trailer}"
         
-        # Fallback to Jikan API using MAL ID
         if not trailer_url and anime.mal_id and anime.mal_id not in ["0", "N/A", "None", None, ""]:
             try:
                 jikan_response = requests.get(
