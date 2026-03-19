@@ -145,53 +145,76 @@ def check_pip_update():
         latest = parse_version(latest_version)
         
         if latest > current:
-            _print_header("Update Available")
+            sys.stdout.write("\033[2J\033[H")  # Clear screen for better UI
+            sys.stdout.flush()
+            _print_header("🚨 CRITICAL UPDATE REQUIRED 🚨")
             _print_info(f"Current: {__version__}  →  Latest: {latest_version}")
             print()
-            _print_info("Installing update...")
+            _print_info("A mandatory update is available. The app cannot be used until updated.")
             print()
             
             # Auto-update without asking
             try:
+                pip_cmd = [sys.executable, '-m', 'pip', 'install', '--upgrade', 'ani-cli-arabic']
+                
+                # Safely handle pipx and user installs
+                path_str = str(Path(__file__).resolve())
+                if 'pipx' in path_str:
+                    _print_error("Cannot auto-update isolated pipx installation.")
+                    _print_info("Please run in your terminal: pipx upgrade ani-cli-arabic")
+                    print()
+                    sys.exit(1)
+                
+                is_venv = sys.prefix != getattr(sys, "base_prefix", sys.prefix)
+                if platform.system() != 'Windows' and not is_venv:
+                    # System python on Linux/Mac, try using --user first 
+                    pip_cmd.append('--user')
+                
+                _print_info("Running auto-update... please wait.")
                 result = subprocess.run(
-                    [sys.executable, '-m', 'pip', 'install', '--upgrade', 'ani-cli-arabic'],
+                    pip_cmd,
                     capture_output=True,
                     text=True
                 )
                 
+                # If it fails with PEP 668 internally managed error, retry aggressively with break-system-packages
+                if result.returncode != 0 and 'externally-managed-environment' in result.stderr:
+                    _print_info("System package restricted environment detected. Retrying override...")
+                    # Remove --user if appending break-system-packages for cleaner retry, though both can work.
+                    if '--user' in pip_cmd:
+                        pip_cmd.remove('--user')
+                    pip_cmd.append('--break-system-packages')
+                    
+                    result = subprocess.run(
+                        pip_cmd,
+                        capture_output=True,
+                        text=True
+                    )
+
                 if result.returncode == 0:
-                    _print_success("Update successful! Restarting application...")
+                    _print_success("Update successfully installed!")
                     print()
-                    input("Press Enter to restart...")
-                    
-                    # Restart using the entry point command
-                    # Determine which command was used to launch
-                    if 'ani-cli-ar' in str(sys.argv[0]).lower():
-                        cmd = 'ani-cli-ar'
-                    else:
-                        cmd = 'ani-cli-arabic'
-                    
-                    # Restart application
-                    if platform.system() == 'Windows':
-                        subprocess.Popen([cmd], creationflags=subprocess.CREATE_NEW_CONSOLE)
-                        sys.exit(0)
-                    else:
-                        # On Unix, replace the process
-                        try:
-                            os.execvp(cmd, [cmd] + sys.argv[1:])
-                        except FileNotFoundError:
-                            subprocess.Popen([sys.executable] + sys.argv)
-                            sys.exit(0)
+                    _print_info("The application will now terminate.")
+                    _print_info("Please RELAUNCH the app to use the new version.")
+                    print()
+                    sys.exit(0)
                 else:
-                    _print_error(f"Update failed: {result.stderr}")
-                    _print_info("Please try manually: pip install --upgrade ani-cli-arabic")
+                    _print_error(f"Auto-update failed. (Return code: {result.returncode})")
+                    if "externally-managed-environment" in result.stderr:
+                        _print_info("You are using a strictly restricted python environment.")
+                        _print_info("Use: pipx upgrade ani-cli-arabic")
+                    else:
+                        _print_info("Please try manually: pip install --upgrade ani-cli-arabic")
                     print()
-                    input("Press ENTER to continue...")
+                    _print_error("Error Output:")
+                    print(result.stderr.strip()[:500])  # print up to 500 chars of error
+                    print()
+                    sys.exit(1)
             except Exception as e:
-                _print_error(f"Update failed: {e}")
+                _print_error(f"Update script exception: {e}")
                 _print_info("Please try manually: pip install --upgrade ani-cli-arabic")
                 print()
-                input("Press ENTER to continue...")
+                sys.exit(1)
             
             return True
     except Exception:
@@ -215,16 +238,17 @@ def check_executable_update():
         latest = parse_version(latest_tag)
         
         if latest > current:
-            _print_header("Update Available")
+            sys.stdout.write("\033[2J\033[H")
+            sys.stdout.flush()
+            _print_header("🚨 CRITICAL UPDATE REQUIRED 🚨")
             _print_info(f"Current: {__version__}  →  Latest: {latest_tag.lstrip('v')}")
             print()
-            _print_error("Standalone executables are no longer supported.")
+            _print_error("Standalone executables are no longer supported or auto-updatable.")
             _print_info("Please uninstall this version and reinstall via:")
             _print_info("  - Pip: pip install ani-cli-arabic")
             _print_info("  - AUR: yay -S ani-cli-arabic")
             print()
-            input("Press ENTER to continue...")
-            return False
+            sys.exit(1)
         
     except Exception:
         pass
@@ -277,14 +301,16 @@ def check_for_updates(console=None, auto_update=True):
                 latest_tag = release_data.get('tag_name', '').lstrip('v')
                 current = __version__
                 if parse_version(latest_tag) > parse_version(current):
-                    _print_header("Update Available")
+                    sys.stdout.write("\033[2J\033[H")
+                    sys.stdout.flush()
+                    _print_header("🚨 CRITICAL UPDATE REQUIRED 🚨")
                     _print_info(f"Current: {current}  →  Latest: {latest_tag}")
-                    _print_info("You installed via a package manager (AUR/System).")
-                    _print_info("Please update using your package manager (e.g., yay -Syu).")
                     print()
-                    if console:
-                        input("Press Enter to continue...")
-                    return True
+                    _print_info("You installed via a system package manager (AUR/Pacman/Apt).")
+                    _print_info("The app cannot be used until updated.")
+                    _print_error("Please update using your package manager (e.g., yay -Syu ani-cli-arabic).")
+                    print()
+                    sys.exit(1)
         elif install_type == 'source':
             pass
     except Exception:
