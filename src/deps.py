@@ -31,7 +31,7 @@ def _clean_deps_keep_important():
         return
         
     for item in DEPS_DIR.iterdir():
-        if item.name.lower() in ("mpv.exe", "fzf.exe", "7zr.exe", "ffmpeg.exe", "ffprobe.exe"):
+        if item.name.lower() in ("mpv.exe", "fzf.exe", "7zr.exe", "ffmpeg.exe", "ffprobe.exe", "yt-dlp.exe", "yt-dlp"):
             continue
         try:
             if item.is_dir():
@@ -49,17 +49,22 @@ def _prepend_to_path(dir_path: Path) -> None:
         os.environ["PATH"] = dir_str + os.pathsep + current
 
 
-def _windows_local_deps_root() -> Path | None:
-    if (DEPS_DIR / "mpv.exe").exists() or (DEPS_DIR / "fzf.exe").exists() or (DEPS_DIR / "ffmpeg.exe").exists():
+def _local_deps_root() -> Path | None:
+    executables = ["mpv.exe", "fzf.exe", "ffmpeg.exe", "yt-dlp.exe", "mpv", "fzf", "ffmpeg", "yt-dlp"]
+    if any((DEPS_DIR / f).exists() for f in executables):
         return DEPS_DIR
     return None
 
 
 def check_dependencies_status():
-    if platform.system() == "Windows":
-        deps_root = _windows_local_deps_root()
-        if deps_root:
-            _prepend_to_path(deps_root)
+    if platform.system() != "Windows":
+        local_bin = str(Path.home() / ".local" / "bin")
+        if local_bin not in os.environ.get("PATH", ""):
+            os.environ["PATH"] = local_bin + os.pathsep + os.environ.get("PATH", "")
+
+    deps_root = _local_deps_root()
+    if deps_root:
+        _prepend_to_path(deps_root)
 
     return {
         "mpv": is_installed("mpv"),
@@ -144,15 +149,42 @@ def download_file_with_progress(urls, dest_path, description="Downloading"):
 
 
 def install_ytdlp():
-    with console.status("[cyan]Installing yt-dlp...[/cyan]", spinner="dots"):
-        try:
-            subprocess.check_call([sys.executable, "-m", "pip", "install", "-U", "yt-dlp"], 
-                                  stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-            console.print("[green]✔[/green] yt-dlp installed")
-            return True
-        except Exception:
-            console.print("[red]✘[/red] yt-dlp installation failed")
-            return False
+    console.print("[cyan]Installing yt-dlp...[/cyan]")
+    DEPS_DIR.mkdir(parents=True, exist_ok=True)
+    
+    system = platform.system()
+    filename = "yt-dlp.exe" if system == "Windows" else "yt-dlp"
+    
+    if (DEPS_DIR / filename).exists():
+        console.print("[green]✔[/green] yt-dlp already present")
+        _prepend_to_path(DEPS_DIR)
+        return True
+        
+    if system == "Windows":
+        asset_name = "yt-dlp.exe"
+        fallback_url = "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe"
+    elif system == "Darwin":
+        asset_name = "yt-dlp_macos"
+        fallback_url = "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_macos"
+    else:
+        asset_name = "yt-dlp_linux"
+        fallback_url = "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_linux"
+        
+    urls = [
+        get_latest_github_release("yt-dlp/yt-dlp", asset_name),
+        fallback_url
+    ]
+    
+    dest_path = DEPS_DIR / filename
+    if download_file_with_progress(urls, dest_path, "yt-dlp"):
+        if system != "Windows":
+            os.chmod(dest_path, 0o755)  # Make it executable for Linux/Mac
+        console.print("[green]✔[/green] yt-dlp ready")
+        _prepend_to_path(DEPS_DIR)
+        _clean_deps_keep_important()
+        return True
+        
+    return False
 
 
 def get_7z_extractor():
@@ -175,7 +207,7 @@ def get_7z_extractor():
 def install_mpv_windows():
     console.print("[cyan]Installing MPV...[/cyan]")
     
-    existing_root = _windows_local_deps_root()
+    existing_root = _local_deps_root()
     if existing_root and (existing_root / "mpv.exe").exists():
         _prepend_to_path(existing_root)
         console.print("[green]✔[/green] MPV ready")
