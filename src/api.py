@@ -7,8 +7,8 @@ from .models import AnimeResult, Episode
 
 # Default credentials - can be overridden with environment variables
 # This is for analytics and also api credentials fetching.
-ENDPOINT_URL = "https://ani-cli-arabic-analytics.talego4955.workers.dev"
-AUTH_SECRET = "8GltlSgyTHwNJ-77n8R4T2glZ_EDQHcU4AB4Wjuu75M"
+ENDPOINT_URL = "https://api.ani-cli-arabic.dev"
+AUTH_SECRET = "6rK9z0XyW8vQ3J7pL2mN4sB1tH5gD0fA"
 
 def _get_endpoint_config() -> tuple[str, str]:
     """Get API endpoint configuration from environment or hardcoded defaults."""
@@ -39,14 +39,14 @@ class APICache:
                     'ANI_CLI_AR_API_BASE': '',
                     'ANI_CLI_AR_TOKEN': '',
                     'THUMBNAILS_BASE_URL': '',
-                    'TRAILERS_BASE_URL': 'https://animeify.net/animeify/files/trailers/'
+                    'TRAILERS_BASE_URL': ''
                 }
         except Exception:
             return {
                 'ANI_CLI_AR_API_BASE': '',
                 'ANI_CLI_AR_TOKEN': '',
                 'THUMBNAILS_BASE_URL': '',
-                'TRAILERS_BASE_URL': 'https://animeify.net/animeify/files/trailers/'
+                'TRAILERS_BASE_URL': ''
             }
     
     def get_keys(self) -> dict:
@@ -90,7 +90,7 @@ def get_thumbnails_base():
 
 def get_trailers_base():
     _ensure_creds()
-    return _creds.get('TRAILERS_BASE_URL', 'https://animeify.net/animeify/files/trailers/')
+    return _creds.get('TRAILERS_BASE_URL', '')
 
 class AnimeAPI:
     
