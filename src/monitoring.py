@@ -2,7 +2,7 @@ import platform
 import hashlib
 import threading
 import requests
-from datetime import datetime
+from datetime import datetime, timezone
 from .api import _get_endpoint_config
 from .config import CURRENT_VERSION
 
@@ -52,7 +52,7 @@ class MonitoringSystem:
                 
                 payload = {
                     "fingerprint": self.user_fingerprint,
-                    "timestamp": datetime.now().isoformat(),
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
                     "action": action,
                     "details": details
                 }
