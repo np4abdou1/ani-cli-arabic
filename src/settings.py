@@ -1,5 +1,6 @@
 import json
 from pathlib import Path
+from .storage import atomic_write_json
 
 class SettingsManager:
     def __init__(self):
@@ -15,6 +16,9 @@ class SettingsManager:
     def _load_settings(self) -> dict:
         defaults = {
             "default_quality": "1080p",
+            "default_download_quality": "1080p",
+            "download_mode": "internal",
+            "download_directory": "downloads",
             "player": "mpv",
             "auto_next": False,
             "discord_rpc": True,
@@ -36,9 +40,8 @@ class SettingsManager:
 
     def save(self):
         try:
-            with open(self.config_file, 'w', encoding='utf-8') as f:
-                json.dump(self.settings, f, indent=4)
-        except (IOError, OSError) as e:
+            atomic_write_json(self.config_file, self.settings, indent=4, ensure_ascii=False)
+        except (IOError, OSError, ValueError, TypeError) as e:
             import sys
             print(f"Warning: Failed to save settings: {e}", file=sys.stderr)
 

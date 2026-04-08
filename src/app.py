@@ -38,6 +38,7 @@ class AniCliArApp:
         self.version_info = None
         self.current_mode = "tui"
         self.force_cli = False
+        self._cleaned_up = False
 
     def run(self):
         parser = argparse.ArgumentParser(
@@ -137,6 +138,12 @@ class AniCliArApp:
                 return "SWITCH_TO_CLI"
 
             self.ui.clear()
+
+            if hasattr(self, 'rpc_status') and self.settings.get('discord_rpc'):
+                if self.rpc.connected:
+                    self.rpc_status['status'] = True
+                elif self.rpc_status.get('status') is not None:
+                    self.rpc_status['status'] = False
             
             vertical_space = self.ui.console.height - 14
             top_padding = (vertical_space // 2) - 2
@@ -354,15 +361,41 @@ class AniCliArApp:
             # Refresh history after watching
             history_items = self.history.get_history()
 
+    def _find_episode_index(self, episodes, episode_value):
+        if episode_value is None:
+            return 0
+
+        target_raw = str(episode_value).strip()
+        if not target_raw:
+            return 0
+
+        for idx, ep in enumerate(episodes):
+            if str(ep.display_num) == target_raw or str(ep.number) == target_raw:
+                return idx
+
+        try:
+            target_float = float(target_raw)
+            for idx, ep in enumerate(episodes):
+                try:
+                    if float(ep.display_num) == target_float:
+                        return idx
+                except (TypeError, ValueError):
+                    continue
+        except (TypeError, ValueError):
+            pass
+
+        return 0
+
     def resume_anime(self, history_item):
         results = self.ui.run_with_loading("Resuming...", self.api.search_anime, history_item['title'])
         if not results:
             self.ui.render_message("Error", "Could not find anime details.", "error")
             return
 
+        target_anime_id = str(history_item.get('anime_id') or history_item.get('id') or "")
         selected_anime = None
         for res in results:
-            if str(res.id) == str(history_item['anime_id']):
+            if target_anime_id and str(res.id) == target_anime_id:
                 selected_anime = res
                 break
         
@@ -373,7 +406,8 @@ class AniCliArApp:
         episodes = self.api.get_episodes(selected_anime.id)
         
         if episodes:
-            self.handle_episode_selection(selected_anime, episodes)
+            initial_idx = self._find_episode_index(episodes, history_item.get('episode'))
+            self.handle_episode_selection(selected_anime, episodes, initial_idx=initial_idx)
 
     def handle_favorites(self):
         while True:
@@ -508,12 +542,14 @@ class AniCliArApp:
         
         self.player.play(trailer_url, f"Trailer - {anime.title_en}")
 
-    def handle_episode_selection(self, selected_anime, episodes):
-        current_idx = 0 
+    def handle_episode_selection(self, selected_anime, episodes, initial_idx=0):
+        current_idx = max(0, min(int(initial_idx or 0), len(episodes) - 1))
         
         while True:
             last_watched = self.history.get_last_watched(selected_anime.id)
             is_fav = self.favorites.is_favorite(selected_anime.id)
+            default_download_quality = self._get_default_download_quality()
+            download_mode = self._get_download_mode()
             
             anime_details = {
                 'score': selected_anime.score,
@@ -536,7 +572,11 @@ class AniCliArApp:
                 selected_anime.thumbnail,
                 last_watched_ep=last_watched,
                 is_favorite=is_fav,
-                anime_details=anime_details
+                anime_details=anime_details,
+                default_download_quality=default_download_quality,
+                download_mode=download_mode,
+                download_path=self._get_download_directory(),
+                initial_selected=current_idx
             )
             
             if ep_idx == -1:
@@ -544,6 +584,11 @@ class AniCliArApp:
             elif ep_idx is None:
                 self.rpc.update_browsing()
                 return True
+            elif isinstance(ep_idx, tuple) and ep_idx[0] == 'download_current':
+                target_idx = ep_idx[1]
+                if 0 <= target_idx < len(episodes):
+                    self.download_episode_with_defaults(selected_anime, episodes[target_idx])
+                continue
             elif ep_idx == 'toggle_fav':
                 if is_fav:
                     self.favorites.remove(selected_anime.id)
@@ -580,9 +625,9 @@ class AniCliArApp:
                 
                 action_taken = self.handle_quality_selection(selected_anime, selected_ep, server_data)
                 
-                if action_taken == "watch" or action_taken == "download":
+                if action_taken == "watch":
                     auto_next = self.settings.get('auto_next')
-                    if auto_next and action_taken == "watch":
+                    if auto_next:
                         if current_idx + 1 < len(episodes):
                             current_idx += 1
                             continue
@@ -610,61 +655,153 @@ class AniCliArApp:
                         continue
                     else:
                         break
+                elif action_taken == "download":
+                    # For downloads, return directly to the episodes list instead of watch navigation.
+                    break
                 else:
                     break
+
+    def _get_default_download_quality(self):
+        return self.settings.get('default_download_quality') or self.settings.get('default_quality') or "1080p"
+
+    def _get_download_mode(self):
+        return (self.settings.get('download_mode') or "internal").lower()
+
+    def _get_download_directory(self):
+        return self.settings.get('download_directory') or "downloads"
+
+    def _extract_quality_tag(self, quality_name):
+        quality_match = re.search(r"\b(\d{3,4}p)\b", quality_name or "")
+        return quality_match.group(1) if quality_match else (quality_name or "auto")
+
+    def _pick_default_download_quality_option(self, current_ep_data):
+        qualities = [
+            QualityOption("1080p", 'FRFhdQ', "info"),
+            QualityOption("720p", 'FRLink', "info"),
+            QualityOption("480p", 'FRLowQ', "info"),
+        ]
+
+        preferred_quality = self._get_default_download_quality()
+
+        for quality in qualities:
+            if preferred_quality in quality.name and current_ep_data.get(quality.server_key):
+                return quality
+
+        for quality in qualities:
+            if current_ep_data.get(quality.server_key):
+                return quality
+
+        return None
+
+    def resolve_default_download_target(self, selected_anime, selected_ep, show_loading=False):
+        if show_loading:
+            server_data = self.ui.run_with_loading(
+                "Loading servers...",
+                self.api.get_streaming_servers,
+                selected_anime.id,
+                selected_ep.number,
+                selected_anime.type
+            )
+        else:
+            server_data = self.api.get_streaming_servers(selected_anime.id, selected_ep.number, selected_anime.type)
+
+        if not server_data:
+            return None, None, "No servers found for this episode."
+
+        current_ep_data = server_data.get('CurrentEpisode', {})
+        selected_quality = self._pick_default_download_quality_option(current_ep_data)
+        if not selected_quality:
+            return None, None, "No suitable quality found for this episode."
+
+        server_id = current_ep_data.get(selected_quality.server_key)
+        if not server_id:
+            return None, None, "Missing server id for selected quality."
+
+        mediafire_url = self.api.build_mediafire_url(server_id)
+        if show_loading:
+            direct_url = self.ui.run_with_loading(
+                "Extracting direct link...",
+                self.api.extract_mediafire_direct,
+                mediafire_url
+            )
+        else:
+            direct_url = self.api.extract_mediafire_direct(mediafire_url)
+
+        if not direct_url:
+            return None, None, "Failed to extract direct link from MediaFire."
+
+        quality_tag = self._extract_quality_tag(selected_quality.name)
+        filename = f"{selected_anime.title_en} - Ep {selected_ep.display_num} [{quality_tag}].mp4"
+        return direct_url, filename, None
+
+    def download_episode_with_defaults(self, selected_anime, selected_ep):
+        direct_url, filename, error = self.resolve_default_download_target(selected_anime, selected_ep, show_loading=True)
+
+        if error:
+            self.ui.render_message("✗ Download Error", error, "error")
+            return False
+
+        success = download_file(
+            direct_url,
+            filename,
+            self.ui.console,
+            mode=self._get_download_mode(),
+            download_dir=self._get_download_directory()
+        )
+
+        if success:
+            self.history.mark_watched(selected_anime.id, selected_ep.display_num, selected_anime.title_en)
+
+        return success
 
     def handle_batch_download(self, selected_anime, episodes):
         selected_indices = self.ui.batch_selection_menu(episodes)
         if not selected_indices:
             return
 
-        self.ui.print(f"\n[info]Preparing to download {len(selected_indices)} episodes...[/info]")
+        self.ui.render_timed_message(
+            "Batch Download",
+            f"Preparing {len(selected_indices)} episode(s) for download...",
+            "info",
+            duration=1.0
+        )
+        download_mode = self._get_download_mode()
+        download_directory = self._get_download_directory()
+        success_count = 0
+        failed_count = 0
         
         for idx in selected_indices:
             ep = episodes[idx]
-            self.ui.print(f"Processing Episode {ep.display_num}...")
-            
-            server_data = self.api.get_streaming_servers(selected_anime.id, ep.number, selected_anime.type)
-            if not server_data:
-                self.ui.print(f"[error]Skipping Ep {ep.display_num}: No servers found[/error]")
+            direct_url, filename, error = self.resolve_default_download_target(selected_anime, ep, show_loading=False)
+
+            if error:
+                failed_count += 1
                 continue
-            
-            current_ep_data = server_data.get('CurrentEpisode', {})
-            qualities = [
-                QualityOption("1080p", 'FRFhdQ', "info"),
-                QualityOption("720p", 'FRLink', "info"),
-                QualityOption("480p", 'FRLowQ', "info"),
-            ]
-            
-            target_quality = self.settings.get('default_quality')
-            selected_q = None
-            
-            for q in qualities:
-                if target_quality in q.name and current_ep_data.get(q.server_key):
-                    selected_q = q
-                    break
-            
-            # Fallback to best available
-            if not selected_q:
-                for q in qualities:
-                    if current_ep_data.get(q.server_key):
-                        selected_q = q
-                        break
-            
-            if selected_q:
-                server_id = current_ep_data.get(selected_q.server_key)
-                direct_url = self.api.extract_mediafire_direct(self.api.build_mediafire_url(server_id))
-                
-                if direct_url:
-                    filename = f"{selected_anime.title_en} - Ep {ep.display_num} [{selected_q.name}].mp4"
-                    download_file(direct_url, filename, self.ui.console)
-                    self.history.mark_watched(selected_anime.id, ep.display_num, selected_anime.title_en)
-                else:
-                    self.ui.print(f"[error]Failed to extract link for Ep {ep.display_num}[/error]")
+
+            success = download_file(
+                direct_url,
+                filename,
+                self.ui.console,
+                mode=download_mode,
+                download_dir=download_directory
+            )
+            if success:
+                success_count += 1
+                self.history.mark_watched(selected_anime.id, ep.display_num, selected_anime.title_en)
             else:
-                self.ui.print(f"[error]No suitable quality found for Ep {ep.display_num}[/error]")
+                failed_count += 1
         
-        self.ui.render_message("Success", "Batch download completed!", "success")
+        summary_style = "error" if success_count == 0 else "info"
+        summary_message = f"Completed: {success_count}"
+        if failed_count:
+            summary_message += f" | Failed: {failed_count}"
+
+        self.ui.render_timed_message(
+            "Batch Download Finished",
+            summary_message,
+            summary_style,
+            duration=1.6
+        )
 
     def handle_quality_selection(self, selected_anime, selected_ep, server_data):
         current_ep_data = server_data.get('CurrentEpisode', {})
@@ -708,12 +845,22 @@ class AniCliArApp:
         )
         
         if direct_url:
-            filename = f"{selected_anime.title_en} - Ep {selected_ep.display_num} [{quality.name.split()[1]}].mp4"
+            quality_match = re.search(r"\b(\d{3,4}p)\b", quality.name)
+            quality_tag = quality_match.group(1) if quality_match else quality.name
+            filename = f"{selected_anime.title_en} - Ep {selected_ep.display_num} [{quality_tag}].mp4"
             
             if action == 'download':
-                download_file(direct_url, filename, self.ui.console)
-                self.history.mark_watched(selected_anime.id, selected_ep.display_num, selected_anime.title_en)
-                return "download"
+                success = download_file(
+                    direct_url,
+                    filename,
+                    self.ui.console,
+                    mode=self._get_download_mode(),
+                    download_dir=self._get_download_directory()
+                )
+                if success:
+                    self.history.mark_watched(selected_anime.id, selected_ep.display_num, selected_anime.title_en)
+                    return "download"
+                return None
             else:
                 player_type = self.settings.get('player')
                 
@@ -789,6 +936,10 @@ class AniCliArApp:
         input("\nPress ENTER to exit...")
 
     def cleanup(self):
+        if self._cleaned_up:
+            return
+        self._cleaned_up = True
+
         try:
             self.rpc.disconnect()
         except Exception:

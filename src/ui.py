@@ -3,6 +3,7 @@ import threading
 import importlib
 import os
 import sys
+import re
 import requests
 from io import BytesIO
 from functools import lru_cache
@@ -75,6 +76,29 @@ class UIManager:
         
         self.console.print(Align.center(panel, vertical="middle", height=self.console.height))
         Prompt.ask(f" {Text('Press ENTER to continue...', style='dim')} ", console=self.console)
+
+    def render_timed_message(self, title: str, message: str, style_name: str = "info", duration: float = 1.4):
+        self.clear()
+
+        message_text = Text(message, style="info", justify="center")
+        border_style = "#FF6B6B" if style_name == "error" else COLOR_BORDER
+
+        panel = Panel(
+            Align.center(message_text, vertical="middle"),
+            title=Text(title, style="title"),
+            box=HEAVY,
+            border_style=border_style,
+            padding=(2, 4),
+            width=68
+        )
+
+        with Live(
+            Align.center(panel, vertical="middle", height=self.console.height),
+            console=self.console,
+            refresh_per_second=10,
+            screen=True
+        ):
+            time.sleep(max(0.5, duration))
 
     def run_with_loading(self, message: str, target_func, *args):
         self.clear()
@@ -507,8 +531,21 @@ class UIManager:
                     elif key == 'q' or key == 'b':
                         return None
 
-    def episode_selection_menu(self, anime_title, episodes, rpc_manager=None, anime_poster=None, last_watched_ep=None, is_favorite=False, anime_details=None):
-        selected = 0
+    def episode_selection_menu(
+        self,
+        anime_title,
+        episodes,
+        rpc_manager=None,
+        anime_poster=None,
+        last_watched_ep=None,
+        is_favorite=False,
+        anime_details=None,
+        default_download_quality="1080p",
+        download_mode="internal",
+        download_path="downloads",
+        initial_selected=0
+    ):
+        selected = max(0, min(int(initial_selected or 0), len(episodes) - 1)) if episodes else 0
         scroll_offset = 0
         
         if rpc_manager:
@@ -521,6 +558,12 @@ class UIManager:
         
         vertical_pad = (screen_height - target_height) // 2
         poster_height = target_height - 8
+        footer_hint = f"Default D: {default_download_quality} via {download_mode} -> {download_path}"
+
+        # Keep selected episode visible on first render when resuming.
+        max_display_first = max(1, target_height - 3 - 3 - 2)
+        if selected >= max_display_first:
+            scroll_offset = selected - (max_display_first // 2)
 
         # Get poster from cache (already pre-generated during loading)
         poster_renderable = None
@@ -571,7 +614,11 @@ class UIManager:
 
         def generate_renderable():
             content_layout["header"].update(Panel(Text(anime_title, justify="center", style="title"), box=HEAVY, border_style=COLOR_BORDER))
-            content_layout["footer"].update(Panel(Text("↑↓ Navigate | ENTER Select | g Jump | F Fav | M Batch | b Back", justify="center", style="secondary"), box=HEAVY, border_style=COLOR_BORDER))
+
+            footer_text = Text(justify="center")
+            footer_text.append("↑↓ Navigate | ENTER Select | D Quick Download | G Jump | F Fav | M Batch | B Back\n", style="secondary")
+            footer_text.append(footer_hint, style="dim")
+            content_layout["footer"].update(Panel(footer_text, box=HEAVY, border_style=COLOR_BORDER))
             
             max_display = target_height - 3 - 3 - 2
             left_content = Text()
@@ -736,6 +783,8 @@ class UIManager:
                         return selected
                     elif key == 'f' or key == 'F':
                         return 'toggle_fav'
+                    elif key == 'd' or key == 'D':
+                        return ('download_current', selected)
                     elif key == 'm' or key == 'M':
                         return 'batch_mode'
                     elif key == 't' or key == 'T':
@@ -797,10 +846,66 @@ class UIManager:
         selected = 0
         scroll_offset = 0
         marked = set()
+
+        def _episode_value(ep, idx):
+            try:
+                return float(ep.display_num)
+            except (TypeError, ValueError):
+                return float(idx + 1)
+
+        def _find_episode_index(ep_input):
+            ep_input = (ep_input or "").strip()
+            if not ep_input:
+                return -1
+
+            try:
+                target = float(ep_input)
+                for idx, ep in enumerate(episodes):
+                    if _episode_value(ep, idx) == target:
+                        return idx
+                return -1
+            except ValueError:
+                if ep_input.isdigit():
+                    idx = int(ep_input) - 1
+                    if 0 <= idx < len(episodes):
+                        return idx
+                return -1
+
+        def _prompt_centered(title_text):
+            prompt_panel = Panel(
+                Text(title_text, style="info", justify="center"),
+                box=HEAVY,
+                border_style=COLOR_BORDER,
+            )
+
+            self.console.print(Align.center(prompt_panel, vertical="middle", height=7))
+            prompt_string = f" {Text('›', style=COLOR_PROMPT)} "
+            pad_width = (self.console.width - 30) // 2
+            padding = " " * max(0, pad_width)
+            return Prompt.ask(f"{padding}{prompt_string}", console=self.console).strip()
+
+        def _mark_episode_range(range_text):
+            match = re.match(r"^\s*([0-9]+(?:\.[0-9]+)?)\s*-\s*([0-9]+(?:\.[0-9]+)?)\s*$", range_text or "")
+            if not match:
+                return 0
+
+            start_val = float(match.group(1))
+            end_val = float(match.group(2))
+            if start_val > end_val:
+                start_val, end_val = end_val, start_val
+
+            added = 0
+            for idx, ep in enumerate(episodes):
+                ep_val = _episode_value(ep, idx)
+                if start_val <= ep_val <= end_val:
+                    if idx not in marked:
+                        added += 1
+                    marked.add(idx)
+            return added
         
         def generate_renderable():
             content = Text()
-            max_display = self.console.height - 10
+            max_display = max(6, self.console.height - 12)
             visible_episodes = episodes[scroll_offset:scroll_offset + max_display]
             
             for idx, ep in enumerate(visible_episodes):
@@ -815,13 +920,19 @@ class UIManager:
                     style = "secondary"
                 
                 content.append(f"{prefix} {mark} Episode {ep.display_num}\n", style=style)
+
+            content.append("\n", style="dim")
+            content.append(
+                f"Selected: {len(marked)}/{len(episodes)} | Tip: use R to mark ranges quickly",
+                style="dim"
+            )
             
             return Panel(
                 Align.center(content, vertical="middle"),
                 title=Text(f"Batch Download ({len(marked)} selected)", style="title"),
                 box=HEAVY,
                 border_style=COLOR_BORDER,
-                subtitle=Text("SPACE Toggle | A All | N None | ENTER Download | B Back", style="secondary")
+                subtitle=Text("SPACE Toggle | A All | N None | R Range | G Jump | ENTER Download | B Back", style="secondary")
             )
 
         self.clear()
@@ -830,7 +941,7 @@ class UIManager:
             with Live(Align.center(generate_renderable(), vertical="middle", height=self.console.height), console=self.console, auto_refresh=False, screen=True, refresh_per_second=10) as live:
                 while True:
                     key = get_key()
-                    max_display = self.console.height - 10
+                    max_display = max(6, self.console.height - 12)
                     
                     if key == 'UP' and selected > 0:
                         selected -= 1
@@ -853,6 +964,37 @@ class UIManager:
                         live.update(Align.center(generate_renderable(), vertical="middle", height=self.console.height), refresh=True)
                     elif key == 'n' or key == 'N':
                         marked.clear()
+                        live.update(Align.center(generate_renderable(), vertical="middle", height=self.console.height), refresh=True)
+                    elif key == 'g' or key == 'G':
+                        live.stop()
+                        try:
+                            restore_terminal_for_input()
+                            ep_input = _prompt_centered("Jump to episode number:")
+                            target_idx = _find_episode_index(ep_input)
+                            if target_idx != -1:
+                                selected = target_idx
+                                scroll_offset = max(0, selected - (max_display // 2))
+                        except Exception:
+                            pass
+                        finally:
+                            enter_raw_mode_after_input()
+
+                        self.clear()
+                        live.start()
+                        live.update(Align.center(generate_renderable(), vertical="middle", height=self.console.height), refresh=True)
+                    elif key == 'r' or key == 'R':
+                        live.stop()
+                        try:
+                            restore_terminal_for_input()
+                            range_text = _prompt_centered("Mark range (example: 1-24):")
+                            _mark_episode_range(range_text)
+                        except Exception:
+                            pass
+                        finally:
+                            enter_raw_mode_after_input()
+
+                        self.clear()
+                        live.start()
                         live.update(Align.center(generate_renderable(), vertical="middle", height=self.console.height), refresh=True)
                     elif key == 'ENTER':
                         return sorted(list(marked))
@@ -989,6 +1131,9 @@ class UIManager:
     def settings_menu(self, settings_mgr):
         options = [
             ("Default Quality", ["1080p", "720p", "480p"], "default_quality"),
+            ("Default Download Quality", ["1080p", "720p", "480p"], "default_download_quality"),
+            ("Download Engine", ["internal", "aria2c", "idm", "auto"], "download_mode"),
+            ("Download Path", [], "download_directory"),
             ("Player", ["mpv", "vlc"], "player"),
             ("Auto Next Episode", [True, False], "auto_next"),
             ("Discord Rich Presence", [True, False], "discord_rpc"),
@@ -1001,6 +1146,9 @@ class UIManager:
         
         def generate_renderable():
             content = Text()
+            default_download_quality = settings_mgr.get("default_download_quality") or settings_mgr.get("default_quality")
+            download_mode = settings_mgr.get("download_mode") or "internal"
+            download_path = settings_mgr.get("download_directory") or "downloads"
             
             for idx, (label, choices, key) in enumerate(options):
                 current_val = settings_mgr.get(key)
@@ -1021,7 +1169,10 @@ class UIManager:
                 box=HEAVY,
                 padding=(2, 4),
                 border_style=config_module.COLOR_BORDER,
-                subtitle=Text("ENTER Toggle | B Back", style="secondary")
+                subtitle=Text(
+                    f"ENTER Edit/Toggle | B Back | D Quick Download: {default_download_quality} via {download_mode} -> {download_path}",
+                    style="secondary"
+                )
             )
 
         self.clear()
@@ -1040,6 +1191,38 @@ class UIManager:
                     elif key == 'ENTER':
                         label, choices, key_name = options[selected]
                         current_val = settings_mgr.get(key_name)
+
+                        if key_name == "download_directory":
+                            live.stop()
+                            try:
+                                restore_terminal_for_input()
+                                self.clear()
+                                prompt_panel = Panel(
+                                    Text("Set custom download path\n(absolute or relative)", style="info", justify="center"),
+                                    box=HEAVY,
+                                    border_style=COLOR_BORDER,
+                                )
+                                self.console.print(Align.center(prompt_panel, vertical="middle", height=7))
+
+                                prompt_string = f" {Text('›', style=COLOR_PROMPT)} "
+                                pad_width = (self.console.width - 30) // 2
+                                padding = " " * max(0, pad_width)
+                                new_path = Prompt.ask(
+                                    f"{padding}{prompt_string}",
+                                    console=self.console,
+                                    default=str(current_val or "downloads")
+                                ).strip()
+
+                                settings_mgr.set("download_directory", new_path or "downloads")
+                            except Exception:
+                                pass
+                            finally:
+                                enter_raw_mode_after_input()
+
+                            self.clear()
+                            live.start()
+                            live.update(Align.center(generate_renderable(), vertical="middle", height=self.console.height), refresh=True)
+                            continue
                         
                         # Cycle through choices
                         try:

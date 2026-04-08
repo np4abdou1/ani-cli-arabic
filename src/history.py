@@ -1,6 +1,7 @@
 import json
 from pathlib import Path
 from datetime import datetime
+from .storage import atomic_write_json
 
 class HistoryManager:
     # Maximum history entries to maintain reasonable file size and load times
@@ -37,10 +38,9 @@ class HistoryManager:
                     reverse=True
                 )
                 self.history = dict(sorted_items[:self.MAX_HISTORY_SIZE])
-            
-            with open(self.history_file, 'w', encoding='utf-8') as f:
-                json.dump(self.history, f, indent=4, ensure_ascii=False)
-        except (IOError, OSError) as e:
+
+            atomic_write_json(self.history_file, self.history, indent=4, ensure_ascii=False)
+        except (IOError, OSError, ValueError, TypeError) as e:
             import sys
             print(f"Warning: Failed to save history: {e}", file=sys.stderr)
 

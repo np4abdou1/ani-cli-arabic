@@ -1,9 +1,12 @@
+import json
 import re
 import threading
+from pathlib import Path
 from typing import Dict, List, Optional
 
 import requests
 from .models import AnimeResult, Episode
+from .storage import atomic_write_json
 
 # Default credentials - can be overridden with environment variables
 # This is for analytics and also api credentials fetching.
@@ -19,8 +22,59 @@ def _get_endpoint_config() -> tuple[str, str]:
 
 
 class APICache:
+    CACHE_FILENAME = "api_credentials.json"
+
+    def __init__(self):
+        home_dir = Path.home()
+        db_dir = home_dir / ".ani-cli-arabic" / "database"
+        db_dir.mkdir(parents=True, exist_ok=True)
+        self.cache_file = db_dir / self.CACHE_FILENAME
+
+    @staticmethod
+    def _default_keys() -> dict:
+        return {
+            'ANI_CLI_AR_API_BASE': '',
+            'ANI_CLI_AR_TOKEN': '',
+            'THUMBNAILS_BASE_URL': '',
+            'TRAILERS_BASE_URL': ''
+        }
+
+    @staticmethod
+    def _normalize_keys(data: dict) -> dict:
+        defaults = APICache._default_keys()
+        if not isinstance(data, dict):
+            return defaults
+        return {key: str(data.get(key, defaults[key]) or '') for key in defaults}
+
+    def _load_cached_keys(self) -> Optional[dict]:
+        if not self.cache_file.exists():
+            return None
+
+        try:
+            with open(self.cache_file, 'r', encoding='utf-8') as cache_handle:
+                cached = json.load(cache_handle)
+
+            normalized = self._normalize_keys(cached)
+            if normalized['ANI_CLI_AR_API_BASE'] and normalized['ANI_CLI_AR_TOKEN']:
+                return normalized
+        except (json.JSONDecodeError, OSError, IOError, ValueError, TypeError):
+            return None
+
+        return None
+
+    def _save_cached_keys(self, keys: dict) -> None:
+        normalized = self._normalize_keys(keys)
+        if not normalized['ANI_CLI_AR_API_BASE'] or not normalized['ANI_CLI_AR_TOKEN']:
+            return
+
+        try:
+            atomic_write_json(self.cache_file, normalized, indent=2, ensure_ascii=False)
+        except OSError:
+            pass
+
     def _fetch_from_remote(self) -> dict:
         endpoint_url, auth_secret = _get_endpoint_config()
+        cached = self._load_cached_keys()
         
         try:
             response = requests.get(
@@ -32,22 +86,17 @@ class APICache:
                 timeout=10
             )
             
-            if response.status_code == 200:
-                return response.json()
-            else:
-                return {
-                    'ANI_CLI_AR_API_BASE': '',
-                    'ANI_CLI_AR_TOKEN': '',
-                    'THUMBNAILS_BASE_URL': '',
-                    'TRAILERS_BASE_URL': ''
-                }
-        except Exception:
-            return {
-                'ANI_CLI_AR_API_BASE': '',
-                'ANI_CLI_AR_TOKEN': '',
-                'THUMBNAILS_BASE_URL': '',
-                'TRAILERS_BASE_URL': ''
-            }
+            response.raise_for_status()
+            remote_keys = self._normalize_keys(response.json())
+            if remote_keys['ANI_CLI_AR_API_BASE'] and remote_keys['ANI_CLI_AR_TOKEN']:
+                self._save_cached_keys(remote_keys)
+                return remote_keys
+        except (requests.RequestException, ValueError, TypeError):
+            pass
+
+        if cached:
+            return cached
+        return self._default_keys()
     
     def get_keys(self) -> dict:
         return self._fetch_from_remote()
@@ -78,15 +127,15 @@ def _ensure_creds():
 
 def get_api_base():
     _ensure_creds()
-    return _creds['ANI_CLI_AR_API_BASE']
+    return _creds.get('ANI_CLI_AR_API_BASE', '')
 
 def get_api_token():
     _ensure_creds()
-    return _creds['ANI_CLI_AR_TOKEN']
+    return _creds.get('ANI_CLI_AR_TOKEN', '')
 
 def get_thumbnails_base():
     _ensure_creds()
-    return _creds['THUMBNAILS_BASE_URL']
+    return _creds.get('THUMBNAILS_BASE_URL', '')
 
 def get_trailers_base():
     _ensure_creds()

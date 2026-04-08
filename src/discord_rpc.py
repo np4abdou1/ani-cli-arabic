@@ -350,6 +350,10 @@ class DiscordRPCManager:
         self.running = False
         if self.connected and self.rpc:
             try:
+                self.rpc.clear()
+            except Exception:
+                pass
+            try:
                 self.rpc.close()
             except Exception:
                 pass

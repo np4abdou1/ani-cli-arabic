@@ -1,6 +1,7 @@
 import json
 from pathlib import Path
 from datetime import datetime
+from .storage import atomic_write_json
 
 class FavoritesManager:
     # Maximum favorites to prevent database bloat and ensure performance
@@ -30,9 +31,8 @@ class FavoritesManager:
 
     def save(self):
         try:
-            with open(self.file_path, 'w', encoding='utf-8') as f:
-                json.dump(self.favorites, f, indent=4, ensure_ascii=False)
-        except (IOError, OSError) as e:
+            atomic_write_json(self.file_path, self.favorites, indent=4, ensure_ascii=False)
+        except (IOError, OSError, ValueError, TypeError) as e:
             import sys
             print(f"Warning: Failed to save favorites: {e}", file=sys.stderr)
 
@@ -66,7 +66,7 @@ class FavoritesManager:
     def get_all(self):
         # Return list sorted by added date (newest first)
         return sorted(
-            [{'id': k, **v} for k, v in self.favorites.items()],
+            [{'anime_id': k, 'id': k, **v} for k, v in self.favorites.items()],
             key=lambda x: x['added_at'],
             reverse=True
         )

@@ -5,9 +5,15 @@ import shutil
 import subprocess
 import threading
 import platform
+import re
 import requests
-from rich.progress import Progress, SpinnerColumn, BarColumn, TextColumn, TransferSpeedColumn, TimeRemainingColumn
-from rich.prompt import Confirm
+from rich.progress import Progress, BarColumn, TextColumn, TransferSpeedColumn, TimeRemainingColumn, DownloadColumn
+from rich.live import Live
+from rich.align import Align
+from rich.panel import Panel
+from rich.text import Text
+from rich.spinner import Spinner
+from rich.box import HEAVY
 
 if os.name == 'nt':
     import msvcrt
@@ -20,6 +26,13 @@ else:
 _linux_terminal_fd = None
 _linux_old_settings = None
 _linux_raw_mode = False
+
+_WINDOWS_INVALID_FILENAME_CHARS = re.compile(r'[<>:"/\\|?*\x00-\x1f]')
+_WINDOWS_RESERVED_FILENAMES = {
+    "CON", "PRN", "AUX", "NUL",
+    "COM1", "COM2", "COM3", "COM4", "COM5", "COM6", "COM7", "COM8", "COM9",
+    "LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9",
+}
 
 def is_bundled():
     return getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS')
@@ -321,97 +334,286 @@ def get_idm_path():
             return path
     return None
 
-def download_file(url, filename, console):
+
+def sanitize_download_filename(filename):
+    """Return a filesystem-safe filename for downloads."""
+    filename = os.path.basename((filename or "").strip())
+    if not filename:
+        filename = "download.mp4"
+
+    name, ext = os.path.splitext(filename)
+    system = platform.system()
+
+    if system == 'Windows':
+        name = _WINDOWS_INVALID_FILENAME_CHARS.sub("_", name).rstrip(" .")
+        ext = _WINDOWS_INVALID_FILENAME_CHARS.sub("_", ext).rstrip(" .")
+
+        if not name:
+            name = "download"
+
+        if name.upper() in _WINDOWS_RESERVED_FILENAMES:
+            name = f"{name}_"
+    else:
+        name = name.replace("/", "_").replace("\\", "_")
+        ext = ext.replace("/", "_").replace("\\", "_")
+        if not name:
+            name = "download"
+
+    if ext and not ext.startswith("."):
+        ext = f".{ext}"
+
+    safe_name = f"{name}{ext}" if ext else name
+
+    # Keep headroom for parent path length on systems with tighter limits.
+    if len(safe_name) > 240:
+        max_name_len = max(1, 240 - len(ext))
+        safe_name = f"{name[:max_name_len]}{ext}" if ext else name[:240]
+
+    return safe_name
+
+
+def _show_centered_download_message(console, title, message, is_error=False, duration=1.3):
+    border_style = "red" if is_error else "panel.border"
+    body = Text(message, justify="center", style="info")
+    panel = Panel(
+        Align.center(body, vertical="middle"),
+        title=Text(title, style="title"),
+        box=HEAVY,
+        border_style=border_style,
+        padding=(2, 4),
+        width=72,
+    )
+
+    with Live(
+        Align.center(panel, vertical="middle", height=console.height),
+        console=console,
+        refresh_per_second=10,
+        screen=True,
+    ):
+        time.sleep(max(0.5, duration))
+
+
+def _download_with_idm(url, filename, download_dir):
+    idm_path = get_idm_path()
+    if not idm_path:
+        return False
+
+    try:
+        subprocess.Popen([
+            idm_path,
+            '/d', url,
+            '/p', download_dir,
+            '/f', filename,
+            '/n',
+            '/a',
+            '/s'
+        ])
+        return True
+    except Exception:
+        return False
+
+
+def _download_with_aria2(url, filename, download_dir, filepath, console):
+    aria2_path = shutil.which("aria2c")
+    if not aria2_path:
+        return False
+
+    spinner = Spinner("dots", text=Text("Downloading with aria2c...", style="loading"))
+    panel = Panel(
+        Align.center(spinner, vertical="middle"),
+        title=Text("DOWNLOAD", style="title"),
+        box=HEAVY,
+        border_style="panel.border",
+        padding=(2, 4),
+        width=72,
+    )
+
+    cmd = [
+        aria2_path,
+        url,
+        "--dir", download_dir,
+        "--out", filename,
+        "--file-allocation=none",
+        "--split=16",
+        "--max-connection-per-server=16",
+        "--min-split-size=1M",
+        "--console-log-level=error",
+        "--summary-interval=0",
+        "--download-result=hide",
+        "--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+    ]
+
+    try:
+        with Live(
+            Align.center(panel, vertical="middle", height=console.height),
+            console=console,
+            refresh_per_second=12,
+            screen=True,
+        ):
+            subprocess.run(
+                cmd,
+                check=True,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                stdin=subprocess.DEVNULL,
+            )
+    except Exception:
+        return False
+
+    _show_centered_download_message(console, "Download Complete", filepath, is_error=False, duration=1.0)
+    return True
+
+
+def _download_with_builtin(url, filename, filepath, console):
+    headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
+    last_error = None
+
+    for _ in range(2):
+        try:
+            with requests.get(url, stream=True, headers=headers, timeout=(10, 45)) as response:
+                response.raise_for_status()
+                total_size = int(response.headers.get('content-length', 0))
+
+                progress = Progress(
+                    TextColumn("[bold blue]{task.fields[filename]}", justify="center"),
+                    BarColumn(bar_width=36),
+                    "[progress.percentage]{task.percentage:>3.1f}%",
+                    "•",
+                    DownloadColumn(binary_units=True),
+                    "•",
+                    TransferSpeedColumn(),
+                    "•",
+                    TimeRemainingColumn(),
+                    console=console,
+                    expand=False,
+                )
+
+                panel = Panel(
+                    Align.center(progress, vertical="middle"),
+                    title=Text("DOWNLOADING", style="title"),
+                    subtitle=Text("Please wait...", style="secondary"),
+                    box=HEAVY,
+                    border_style="panel.border",
+                    padding=(2, 2),
+                    width=92,
+                )
+
+                with Live(
+                    Align.center(panel, vertical="middle", height=console.height),
+                    console=console,
+                    refresh_per_second=16,
+                    screen=True,
+                ):
+                    progress.start()
+                    try:
+                        task_id = progress.add_task("download", filename=filename, total=total_size if total_size > 0 else None)
+                        with open(filepath, 'wb') as file_handle:
+                            for chunk in response.iter_content(chunk_size=32768):
+                                if not chunk:
+                                    continue
+                                file_handle.write(chunk)
+                                progress.update(task_id, advance=len(chunk))
+                    finally:
+                        progress.stop()
+
+            _show_centered_download_message(console, "Download Complete", filepath, is_error=False, duration=1.0)
+            return True
+        except requests.RequestException as error:
+            last_error = error
+
+    if last_error:
+        raise last_error
+
+    raise RuntimeError("Download failed")
+
+def download_file(url, filename, console, mode="internal", download_dir=None):
+    filename = sanitize_download_filename(filename)
+
     # Use absolute path for compatibility with external tools (IDM/aria2)
-    download_dir = os.path.abspath("downloads")
+    resolved_dir = os.path.abspath((download_dir or "downloads").strip() or "downloads")
+    download_dir = resolved_dir
     os.makedirs(download_dir, exist_ok=True)
     filepath = os.path.join(download_dir, filename)
 
-    idm_path = get_idm_path()
-    if idm_path:
-        # Prompt the user to use IDM if found
-        use_idm = Confirm.ask("[bold cyan]Internet Download Manager detected.[/bold cyan] Use it?", default=True, console=console)
-        
-        if use_idm:
-            try:
-                console.print("[green]Sending to IDM...[/green]")
-                subprocess.Popen([
-                    idm_path, 
-                    '/d', url, 
-                    '/p', download_dir, 
-                    '/f', filename,
-                    '/n', 
-                    '/a', # Add to queue
-                    '/s'  # Start queue
-                ])
-                console.print("[bold green]✓ Added to IDM Queue.[/bold green]")
-                console.print(f"[dim]File: {filename}[/dim]")
-                
-                console.print("[yellow]⚠ Note: If the download does not start automatically, please open IDM and click 'Start Queue'.[/yellow]")
-                
-                input("\nPress ENTER to continue...")
-                return True
-            except Exception as e:
-                console.print(f"[red]Failed to start IDM: {e}[/red]")
-                # Fallback to other methods if IDM fails
+    selected_mode = (mode or "internal").lower()
+    valid_modes = {"internal", "aria2c", "idm", "auto"}
+    if selected_mode not in valid_modes:
+        selected_mode = "internal"
 
-    aria2_path = shutil.which("aria2c")
-    if aria2_path:
-        console.print("[bold green]🚀 Starting aria2c download...[/bold green]")
-        try:
-            cmd = [
-                aria2_path,
-                url,
-                "--dir", download_dir,
-                "--out", filename,
-                "--file-allocation=none",
-                "--split=16",
-                "--max-connection-per-server=16",
-                "--min-split-size=1M",
-                "--console-log-level=error",
-                "--summary-interval=0",
-                "--download-result=hide",
-                "--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
-            ]
-            
-            subprocess.run(cmd, check=True)
-            
-            console.print(f"\n[bold green]✓ Download complete:[/bold green] {filepath}")
-            input("\nPress ENTER to continue...")
-            return True
-            
-        except subprocess.CalledProcessError:
-             console.print("[yellow]⚠ aria2c error. Switching to standard downloader...[/yellow]")
-        except Exception as e:
-            console.print(f"[yellow]⚠ Error running aria2c: {e}. Switching...[/yellow]")
+    if selected_mode == "auto":
+        if get_idm_path():
+            selected_mode = "idm"
+        elif shutil.which("aria2c"):
+            selected_mode = "aria2c"
+        else:
+            selected_mode = "internal"
 
     try:
-        headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
-        with requests.get(url, stream=True, headers=headers) as r:
-            r.raise_for_status()
-            total_size = int(r.headers.get('content-length', 0))
-            
-            with Progress(
-                SpinnerColumn(),
-                TextColumn("[bold blue]{task.fields[filename]}", justify="right"),
-                BarColumn(bar_width=None),
-                "[progress.percentage]{task.percentage:>3.1f}%",
-                "•",
-                TransferSpeedColumn(),
-                "•",
-                TimeRemainingColumn(),
-                console=console
-            ) as progress:
-                task_id = progress.add_task("download", filename=filename, total=total_size)
-                with open(filepath, 'wb') as f:
-                    for chunk in r.iter_content(chunk_size=8192):
-                        f.write(chunk)
-                        progress.update(task_id, advance=len(chunk))
-            
-            console.print(f"\n[bold green]✓ Download complete:[/bold green] {filepath}")
-            input("\nPress ENTER to continue...")
-            return True
-    except Exception as e:
-        console.print(f"\n[bold red]✗ Download failed:[/bold red] {e}")
-        input("\nPress ENTER to continue...")
+        if selected_mode == "idm":
+            if _download_with_idm(url, filename, download_dir):
+                _show_centered_download_message(
+                    console,
+                    "Queued in IDM",
+                    f"{filename}\nQueued successfully in Internet Download Manager.",
+                    is_error=False,
+                    duration=1.2,
+                )
+                return True
+
+            _show_centered_download_message(
+                console,
+                "IDM Not Found",
+                "IDM is not installed. Falling back to built-in downloader.",
+                is_error=False,
+                duration=1.0,
+            )
+            selected_mode = "internal"
+
+        if selected_mode == "aria2c":
+            if _download_with_aria2(url, filename, download_dir, filepath, console):
+                return True
+
+            _show_centered_download_message(
+                console,
+                "aria2c Fallback",
+                "aria2c is unavailable or failed. Falling back to built-in downloader.",
+                is_error=False,
+                duration=1.0,
+            )
+            selected_mode = "internal"
+
+        if selected_mode == "internal":
+            return _download_with_builtin(url, filename, filepath, console)
+
+        return False
+
+    except KeyboardInterrupt:
+        try:
+            if os.path.exists(filepath):
+                os.remove(filepath)
+        except OSError:
+            pass
+
+        _show_centered_download_message(
+            console,
+            "Download Cancelled",
+            "The download was cancelled by user.",
+            is_error=True,
+            duration=1.0,
+        )
+        return False
+    except Exception as error:
+        try:
+            if os.path.exists(filepath):
+                os.remove(filepath)
+        except OSError:
+            pass
+
+        _show_centered_download_message(
+            console,
+            "Download Failed",
+            str(error),
+            is_error=True,
+            duration=1.8,
+        )
         return False
