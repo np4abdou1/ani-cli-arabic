@@ -38,6 +38,12 @@ Terminal-based anime streaming with Arabic subtitles
 </a>
 
 <br>
+
+<a href="https://paypal.me/np4abdou">
+  <img src="https://img.shields.io/badge/Donate-PayPal-blue.svg?style=for-the-badge&logo=paypal" alt="Donate with PayPal">
+</a>
+
+<br>
 <br>
 
 
