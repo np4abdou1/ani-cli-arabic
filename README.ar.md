@@ -5,10 +5,7 @@
 <a href="https://paypal.me/np4abdou">
   <img src="https://img.shields.io/badge/Donate_with_PayPal-00457C?style=for-the-badge&logo=paypal&logoColor=white" alt="Donate with PayPal">
 </a>
-
 <br><br><br>
-
-</div>
 
 <p>To select English language click the button:  </p>
 <a href="README.md">
@@ -71,6 +68,15 @@ pip install --upgrade ani-cli-arabic
 ```
 
 <div dir="rtl">
+
+<br>
+<br>
+
+## 📑 التنقل
+
+[التثبيت](#-التثبيت) • [الميزات](#-ماذا-يمكنك-أن-تفعل) • [كيفية الاستخدام](#-كيفية-الاستخدام) • [اختصارات لوحة المفاتيح](#️-اختصارات-لوحة-المفاتيح) • [الإعدادات](#️-الإعدادات) • [المساهمون](#-المساهمون) • [الترخيص](#-الرخصة)
+
+<br>
 
 ### الطريقة الثانية: آرتش لينكس (AUR)
 
