@@ -7,12 +7,6 @@
 </a>
 <br><br><br>
 
-## 📑 Navigation
-
-[Installation](#-installation) • [Features](#-what-can-you-do) • [How to Use](#-how-to-use) • [Keyboard Shortcuts](#️-keyboard-shortcuts) • [Configuration](#%EF%B8%8F-configuration) • [Contributors](#-contributors) • [License](#-license)
-
----
-
 Terminal-based anime streaming with Arabic subtitles
 
 <p align="center">
@@ -38,6 +32,14 @@ Terminal-based anime streaming with Arabic subtitles
   <img src="https://img.shields.io/badge/Python-3.8+-3776AB?style=for-the-badge&logo=python&logoColor=white" />
   <img src="https://img.shields.io/badge/License-GPL--3.0-green?style=for-the-badge" />
 </p>
+
+<br>
+
+## 📑 Navigation
+
+[Installation](#-installation) • [Features](#-what-can-you-do) • [How to Use](#-how-to-use) • [Keyboard Shortcuts](#️-keyboard-shortcuts) • [Configuration](#%EF%B8%8F-configuration) • [Contributors](#-contributors) • [License](#-license)
+
+<br><br>
 
 <p>لإختيار اللغة العربية اضغط على الزر: </p>
 <a href="README.ar.md">
