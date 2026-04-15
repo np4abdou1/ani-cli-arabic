@@ -1,5 +1,12 @@
 <div align="center">
 
+<h2>💖 Support This Open Source Project</h2>
+<p>Your support helps maintain the project and keeps the updates coming!</p>
+<a href="https://paypal.me/np4abdou">
+  <img src="https://img.shields.io/badge/Donate_with_PayPal-00457C?style=for-the-badge&logo=paypal&logoColor=white" alt="Donate with PayPal">
+</a>
+<br><br><br>
+
 ## 📑 Navigation
 
 [Installation](#-installation) • [Features](#-what-can-you-do) • [How to Use](#-how-to-use) • [Keyboard Shortcuts](#️-keyboard-shortcuts) • [Configuration](#%EF%B8%8F-configuration) • [Contributors](#-contributors) • [License](#-license)
@@ -38,14 +45,7 @@ Terminal-based anime streaming with Arabic subtitles
 </a>
 
 <br>
-
-<a href="https://paypal.me/np4abdou">
-  <img src="https://img.shields.io/badge/Donate-PayPal-blue.svg?style=for-the-badge&logo=paypal" alt="Donate with PayPal">
-</a>
-
 <br>
-<br>
-
 
 https://github.com/user-attachments/assets/a6c6882a-7c50-4a8d-aa9c-e56a6d4ff7eb
 

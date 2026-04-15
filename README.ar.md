@@ -1,14 +1,18 @@
+<div align="center" dir="rtl">
 
+<h2>💖 ادعم هذا المشروع المفتوح المصدر</h2>
+<p>دعمك يساعدنا في صيانة الخوادم واستمرار تطوير التحديثات!</p>
+<a href="https://paypal.me/np4abdou">
+  <img src="https://img.shields.io/badge/Donate_with_PayPal-00457C?style=for-the-badge&logo=paypal&logoColor=white" alt="Donate with PayPal">
+</a>
+
+<br><br><br>
+
+</div>
 
 <p>To select English language click the button:  </p>
 <a href="README.md">
   <img src="https://img.shields.io/badge/Language-English-blue?style=for-the-badge&logo=google-translate&logoColor=white" alt="English">
-</a>
-
-<br>
-
-<a href="https://paypal.me/np4abdou">
-  <img src="https://img.shields.io/badge/Donate-PayPal-blue.svg?style=for-the-badge&logo=paypal" alt="Donate with PayPal">
 </a>
 
 <br>
