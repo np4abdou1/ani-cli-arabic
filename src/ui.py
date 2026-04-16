@@ -1137,6 +1137,7 @@ class UIManager:
             ("Player", ["mpv", "vlc"], "player"),
             ("Auto Next Episode", [True, False], "auto_next"),
             ("Discord Rich Presence", [True, False], "discord_rpc"),
+            ("Show Donation Link", [True, False], "show_donation"),
             ("Analytics", [True, False], "analytics"),
             ("Theme", ["blue", "red", "green", "purple", "cyan", "yellow", "pink", "orange", "teal", "magenta", "lime", "coral", "lavender", "gold", "mint", "rose", "sunset"], "theme")
         ]

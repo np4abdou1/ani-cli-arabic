@@ -383,15 +383,21 @@ class AniCliWrapper:
                 else:
                     self.console.print() # Spacer if no RPC status
                 
+                if self.settings_manager.get('show_donation'):
+                    donation_markup = "   💖 [bold magenta dim]Support the project:[/bold magenta dim] [link=https://paypal.me/np4abdou][cyan underline dim]Donate via PayPal[/cyan underline dim][/link] ☕"
+                    self.console.print(Text.from_markup(donation_markup))
+                    self.console.print()
+                
                 # Show Menu / Prompt
                 margin = "   "
                 self.console.print(margin + "[cyan]T[/cyan]: Trending   [cyan]P[/cyan]: Popular", style="dim")
-                self.console.print(margin + "[cyan]G[/cyan]: Genres     [cyan]D[/cyan]: Studios", style="dim")
+                self.console.print(margin + "[cyan]G[/cyan]: Genres     [cyan]S[/cyan]: Studios", style="dim")
+                self.console.print(margin + "[cyan]D[/cyan]: 💖 Donate", style="dim")
                 self.console.print()
-                
+
                 # Input
                 try:
-                    self.console.print(f"  [{border_color}]╭─   Search (or T,P,D,G)[/{border_color}]")
+                    self.console.print(f"  [{border_color}]╭─   Search (or T,P,S,G,D)[/{border_color}]")
                     self.console.print(f"  [{border_color}]╰─>[/{border_color}] ", end="")
                     query = input().strip()
                 except (KeyboardInterrupt, EOFError):
@@ -447,12 +453,12 @@ class AniCliWrapper:
                 self._print_header()
                 continue
             
-            if cmd == 'd':
+            if cmd == 's':
                 studios = [
-                    "Toei Animation", "Sunrise", "Madhouse", "Production I.G", "J.C.Staff", 
-                    "TMS Entertainment", "Studio Pierrot", "Studio Deen", "A-1 Pictures", 
-                    "Bones", "Kyoto Animation", "MAPPA", "Wit Studio", "ufotable", 
-                    "White Fox", "David Production", "Shaft", "Trigger", "CloverWorks", 
+                    "Toei Animation", "Sunrise", "Madhouse", "Production I.G", "J.C.Staff",
+                    "TMS Entertainment", "Studio Pierrot", "Studio Deen", "A-1 Pictures",
+                    "Bones", "Kyoto Animation", "MAPPA", "Wit Studio", "ufotable",
+                    "White Fox", "David Production", "Shaft", "Trigger", "CloverWorks",
                     "Lerche", "P.A. Works", "CoMix Wave Films", "Gainax", "Tatsunoko Production"
                 ]
                 studios.sort()
@@ -463,7 +469,15 @@ class AniCliWrapper:
                          results = self.api.get_anime_list("STUDIOS", studio, "SERIES", limit=100)
                     self.console.print(f"[green]Got {len(results)} results for {studio}[/green]")
                     self._process_anime_list(results, f"Studio: {studio}")
+
+                os.system('cls' if os.name == 'nt' else 'clear')
+                self._print_header()
+                continue
                 
+            if cmd == 'd':
+                import webbrowser
+                webbrowser.open("https://paypal.me/np4abdou")
+                # Clear and redisplay
                 os.system('cls' if os.name == 'nt' else 'clear')
                 self._print_header()
                 continue

@@ -164,10 +164,16 @@ class AniCliArApp:
                         self.ui.print(Align.center(Text.from_markup("Discord Rich Presence [dim](enabled, not connected)[/dim]", style="dim")))
             else:
                 self.ui.print(Align.center(Text.from_markup("Discord Rich Presence [dim](disabled)[/dim]", style="dim")))
-            self.ui.print()
             
+            if self.settings.get('show_donation'):
+                self.ui.print()
+                donation_markup = "💖 [bold magenta dim]Support the project:[/bold magenta dim] [link=https://paypal.me/np4abdou][cyan underline dim]Click here to donate via PayPal[/cyan underline dim][/link] ☕"
+                self.ui.print(Align.center(Text.from_markup(donation_markup)))
+                
+            self.ui.print()
+
             keybinds_panel = Panel(
-                Text("S: Search | T: Trending | P: Popular | G: Genres | D: Studios | L: History | F: Favorites | C: Settings | Q: Quit", style="info", justify="center"),
+                Text("T: Trending | P: Popular | G: Genres | S: Studios | D: 💖 Donate | L: History | F: Favorites | C: Settings | Q: Quit", style="info", justify="center"),
                 box=HEAVY,
                 border_style=COLOR_BORDER
             )
@@ -222,15 +228,15 @@ class AniCliArApp:
                 self.rpc.update_genres()
                 self.handle_genres()
                 continue
-            elif query == 'd':
+            elif query == 's':
                 self.rpc.update_studios()
                 self.handle_studios()
                 continue
-            elif query == 's':
-                 term = Prompt.ask(f"{padding} Enter Search Term: ", console=self.ui.console).strip()
-                 if term:
-                    self.rpc.update_searching()
-                    results = self.ui.run_with_loading("Searching...", self.api.search_anime, term)
+            elif query == 'd':
+                import webbrowser
+                webbrowser.open("https://paypal.me/np4abdou")
+                # Redraw
+                continue
             elif query == 'l':
                 self.rpc.update_history()
                 self.handle_history()

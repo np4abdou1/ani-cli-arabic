@@ -22,6 +22,7 @@ class SettingsManager:
             "player": "mpv",
             "auto_next": False,
             "discord_rpc": True,
+            "show_donation": True,
             "theme": "blue",
             "analytics": True  # Allow users to opt-out of analytics
         }
