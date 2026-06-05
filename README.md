@@ -1,3 +1,5 @@
+<h1 align="center">                          NEW MAJOR UPDATE COMING IN SUMMER </h1> 
+
 <div align="center">
 
 <h2>💖 Support This Open Source Project</h2>
