@@ -57,31 +57,10 @@ class PlayerManager:
             except (OSError, PermissionError):
                 pass
 
-    def play(self, url: str, title: str, player_type: str = 'mpv'):
-        try:
-            if player_type == 'vlc':
-                self._play_vlc(url, title)
-            else:
-                self._play_mpv(url, title)
-
-        except FileNotFoundError:
-            if self.console:
-                from rich.text import Text
-                self.console.print(Text(f"{player_type.upper()} executable not found. Please install it or check path.", style="bold red"))
-                input("Press Enter to continue...")
-            else:
-                print(f"{player_type.upper()} executable not found. Please install it or check path.", file=sys.stderr)
-                input("Press Enter to continue...")
-        except Exception as e:
-            if self.console:
-                from rich.text import Text
-                self.console.print(Text(f"Error launching player: {str(e)}", style="bold red"))
-                input("Press Enter to continue...")
-            else:
-                print(f"Error launching player: {str(e)}", file=sys.stderr)
-                input("Press Enter to continue...")
-
-    def _play_vlc(self, url: str, title: str):
+    def get_available_players(self) -> dict:
+        players = {}
+        
+        # Check VLC
         vlc_path = shutil.which('vlc')
         if not vlc_path:
             if os.name == 'nt':
@@ -102,6 +81,110 @@ class PlayerManager:
                     if os.path.exists(p):
                         vlc_path = p
                         break
+        if vlc_path:
+            players['VLC'] = vlc_path
+
+        # Check MPV
+        mpv_path = self.get_mpv_path()
+        if mpv_path == 'mpv':
+            if shutil.which('mpv'):
+                 players['MPV'] = 'mpv'
+        elif os.path.exists(mpv_path):
+            players['MPV'] = mpv_path
+
+        # Check MPC-HC
+        mpc_path = shutil.which('mpc-hc64') or shutil.which('mpc-hc')
+        if not mpc_path and os.name == 'nt':
+            paths = [
+                r"C:\Program Files\MPC-HC\mpc-hc64.exe",
+                r"C:\Program Files\MPC-HC\mpc-hc.exe",
+                r"C:\Program Files (x86)\MPC-HC\mpc-hc.exe",
+                r"C:\Program Files\K-Lite Codec Pack\MPC-HC64\mpc-hc64.exe"
+            ]
+            for p in paths:
+                if os.path.exists(p):
+                    mpc_path = p
+                    break
+        if mpc_path:
+            players['MPC-HC'] = mpc_path
+
+        return players
+
+    def play(self, url: str, title: str, player_type: str = 'ask'):
+        available_players = self.get_available_players()
+        
+        if not available_players:
+            msg = "No video players found on your computer. Please download and install VLC Media Player from https://www.videolan.org/vlc/"
+            if self.console:
+                from rich.text import Text
+                self.console.print(Text(msg, style="bold red"))
+                input("Press Enter to continue...")
+            else:
+                print(msg, file=sys.stderr)
+                input("Press Enter to continue...")
+            return
+
+        player_names = list(available_players.keys())
+        selected_player = None
+
+        if len(player_names) == 1:
+            selected_player = player_names[0]
+        else:
+            if self.console:
+                from rich.prompt import Prompt
+                from rich.panel import Panel
+                from rich.text import Text
+                from rich.align import Align
+                
+                options_text = "\n".join([f"[{i+1}] {name}" for i, name in enumerate(player_names)])
+                panel = Panel(options_text, title=Text("Select Video Player", style="bold cyan"), border_style="cyan", padding=(1, 4))
+                self.console.print()
+                self.console.print(Align.center(panel))
+                
+                choice = Prompt.ask(
+                    "Enter the number of the player", 
+                    choices=[str(i+1) for i in range(len(player_names))], 
+                    default="1", 
+                    console=self.console
+                )
+                selected_player = player_names[int(choice)-1]
+            else:
+                print("\nAvailable Video Players:")
+                for i, name in enumerate(player_names):
+                    print(f"{i+1}. {name}")
+                
+                while True:
+                    try:
+                        choice = input(f"Choose a video player (1-{len(player_names)}) [1]: ")
+                        if not choice.strip():
+                            choice = "1"
+                        choice_idx = int(choice) - 1
+                        if 0 <= choice_idx < len(player_names):
+                            selected_player = player_names[choice_idx]
+                            break
+                        print("Invalid choice.")
+                    except ValueError:
+                        print("Invalid input.")
+
+        try:
+            if selected_player == 'VLC':
+                self._play_vlc(url, title, available_players['VLC'])
+            elif selected_player == 'MPV':
+                self._play_mpv(url, title, available_players['MPV'])
+            elif selected_player == 'MPC-HC':
+                self._play_mpc(url, title, available_players['MPC-HC'])
+        except Exception as e:
+            if self.console:
+                from rich.text import Text
+                self.console.print(Text(f"Error launching player: {str(e)}", style="bold red"))
+                input("Press Enter to continue...")
+            else:
+                print(f"Error launching player: {str(e)}", file=sys.stderr)
+                input("Press Enter to continue...")
+
+    def _play_vlc(self, url: str, title: str, vlc_path: str = None):
+        if not vlc_path:
+            vlc_path = self.get_available_players().get('VLC')
         
         if not vlc_path:
             raise FileNotFoundError("VLC not found")
@@ -121,10 +204,11 @@ class PlayerManager:
             stderr=subprocess.DEVNULL
         )
 
-    def _play_mpv(self, url: str, title: str):
-        mpv_path = self.get_mpv_path()
+    def _play_mpv(self, url: str, title: str, mpv_path: str = None):
+        if not mpv_path:
+            mpv_path = self.get_available_players().get('MPV')
         
-        if mpv_path != 'mpv' and not os.path.exists(mpv_path):
+        if not mpv_path or (mpv_path != 'mpv' and not os.path.exists(mpv_path)):
             raise FileNotFoundError(f"MPV not found at: {mpv_path}")
 
         mpv_args = [
@@ -154,7 +238,6 @@ class PlayerManager:
             url
         ]
         
-        
         mpv_args.append('--force-window=yes')
 
         result = subprocess.run(
@@ -170,3 +253,25 @@ class PlayerManager:
                 from rich.text import Text
                 self.console.print(Text(f"MPV exited with error code {result.returncode}", style="bold red"))
                 input("Press Enter to continue...")
+
+    def _play_mpc(self, url: str, title: str, mpc_path: str = None):
+        if not mpc_path:
+            mpc_path = self.get_available_players().get('MPC-HC')
+            
+        if not mpc_path:
+            raise FileNotFoundError("MPC-HC not found")
+            
+        mpc_args = [
+            mpc_path,
+            url,
+            '/fullscreen',
+            '/play',
+            '/close'
+        ]
+        
+        subprocess.run(
+            mpc_args,
+            check=False,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL
+        )
