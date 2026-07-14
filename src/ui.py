@@ -406,8 +406,8 @@ class UIManager:
             if new_height % 2 != 0:
                 new_height -= 1
             
-            # Use BILINEAR for speed (still good quality)
-            img = img.resize((new_width, new_height), Image.Resampling.BILINEAR)
+            # Use LANCZOS for better downsampling quality (prevent pixelation)
+            img = img.resize((new_width, new_height), Image.Resampling.LANCZOS)
             arr = np.array(img, dtype=np.uint8)
             
             quadrants = [' ', '▘', '▝', '▀', '▖', '▌', '▞', '▛', '▗', '▚', '▐', '▜', '▄', '▙', '▟', '█']

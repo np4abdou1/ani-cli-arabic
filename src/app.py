@@ -474,7 +474,7 @@ class AniCliArApp:
         eps = self.api.get_episodes(selected_anime.id)
         if selected_anime.thumbnail:
             screen_height = self.ui.console.height
-            target_height = min(screen_height, 35)
+            target_height = min(screen_height, 50)
             poster_height = target_height - 8
             if poster_height > 0:
                 self.ui._generate_poster_ansi(selected_anime.thumbnail, poster_height)
