@@ -27,7 +27,7 @@ from .config import (
     COLOR_BORDER, COLOR_PROMPT, COLOR_PRIMARY_TEXT, COLOR_TITLE, COLOR_SUBTITLE,
     COLOR_SECONDARY_TEXT, COLOR_HIGHLIGHT_FG, COLOR_HIGHLIGHT_BG,
     COLOR_ERROR, COLOR_LOADING_SPINNER, COLOR_ASCII, HEADER_ART, POPULAR_GENRES,
-    BOUNCING_BAR_FRAMES
+    BOUNCING_BAR_FRAMES, COLOR_BOLT, COLOR_BOLT_GLOW
 )
 from .utils import (
     get_key, RawTerminal, restore_terminal_for_input, enter_raw_mode_after_input,
@@ -98,11 +98,13 @@ class UIManager:
         """
         grid = Table.grid(padding=0)
         grid.add_column(width=32, justify="left")
-        bolt_colors = ["#5af78e", "#7df9a6", "#a6fbbe", "#7df9a6", "#5af78e", "#38e070"]
-        bolt_col = bolt_colors[frame_idx % len(bolt_colors)] if frame_idx > 0 else "#5af78e"
+        bolt_colors = getattr(config_module, "COLOR_BOLT_GLOW", COLOR_BOLT_GLOW)
+        bolt_col = bolt_colors[frame_idx % len(bolt_colors)] if frame_idx > 0 else getattr(config_module, "COLOR_BOLT", COLOR_BOLT)
+        title_col = getattr(config_module, "COLOR_TITLE", COLOR_TITLE)
+        border_col = getattr(config_module, "COLOR_BORDER", COLOR_BORDER)
         grid.add_row(Text("     ⚡", style=f"bold {bolt_col}"))
-        grid.add_row(Text("█▀█ █▄ █ █   █▀▀ █   █   █▀█ █▀▄", style=f"bold {COLOR_TITLE}"))
-        grid.add_row(Text("█▀█ █ ▀█ █   █▄▄ █▄▄ █   █▀█ █▀▄", style=f"bold {COLOR_BORDER}"))
+        grid.add_row(Text("█▀█ █▄ █ █   █▀▀ █   █   █▀█ █▀▄", style=f"bold {title_col}"))
+        grid.add_row(Text("█▀█ █ ▀█ █   █▄▄ █▄▄ █   █▀█ █▀▄", style=f"bold {border_col}"))
         return grid
 
     def render_message(self, title: str, message: str, style_name: str = "info"):
@@ -217,8 +219,13 @@ class UIManager:
         loading_thread = threading.Thread(target=worker, daemon=True)
         loading_thread.start()
 
-        bouncing_frames = BOUNCING_BAR_FRAMES
-        accent_colors = ["#5af78e", COLOR_TITLE, COLOR_SUBTITLE, COLOR_BORDER, COLOR_TITLE, "#5af78e"]
+        bouncing_frames = getattr(config_module, "BOUNCING_BAR_FRAMES", BOUNCING_BAR_FRAMES)
+        b_col = getattr(config_module, "COLOR_BOLT", COLOR_BOLT)
+        t_col = getattr(config_module, "COLOR_TITLE", COLOR_TITLE)
+        sub_col = getattr(config_module, "COLOR_SUBTITLE", COLOR_SUBTITLE)
+        bor_col = getattr(config_module, "COLOR_BORDER", COLOR_BORDER)
+        spin_col = getattr(config_module, "COLOR_LOADING_SPINNER", COLOR_LOADING_SPINNER)
+        accent_colors = [b_col, t_col, spin_col, sub_col, bor_col, b_col]
         
         clean_msg = "Searching..."
         if message:
@@ -1158,12 +1165,13 @@ class UIManager:
                     content.append("\n")
                 else:
                     content.append(prefix, style="white")
-                    style = "bold #5af78e" if is_last_watched else "white"
+                    bolt_color = getattr(config_module, "COLOR_BOLT", COLOR_BOLT)
+                    style = f"bold {bolt_color}" if is_last_watched else "white"
                     content.append(disp_title, style=style)
                     if type_str:
                         content.append(type_str, style=f"bold {COLOR_SUBTITLE}")
                     if suffix:
-                        content.append(suffix, style="bold #5af78e")
+                        content.append(suffix, style=f"bold {bolt_color}")
                     content.append(pad_spaces)
                     content.append("\n")
 
@@ -1397,8 +1405,8 @@ class UIManager:
                 if is_selected:
                     content.append(" ▶ ", style=f"bold {COLOR_HIGHLIGHT_FG} on {COLOR_BORDER}")
                     content.append(f"{mark} {ep_num_fmt}\n", style=f"bold {COLOR_HIGHLIGHT_FG} on {COLOR_BORDER}")
-                else:
-                    style = "bold #5af78e" if is_marked else "white"
+                    bolt_color = getattr(config_module, "COLOR_BOLT", COLOR_BOLT)
+                    style = f"bold {bolt_color}" if is_marked else "white"
                     content.append(f"   {mark} {ep_num_fmt}\n", style=style)
 
             panel_content = Table.grid(expand=True)
@@ -1834,7 +1842,7 @@ class UIManager:
                 val_text = Text()
                 if isinstance(current_val, bool):
                     if current_val:
-                        val_text.append("● on", style="bold #5af78e")
+                        val_text.append("● on", style=f"bold {getattr(config_module, 'COLOR_BOLT', COLOR_BOLT)}")
                     else:
                         val_text.append("○ off", style="dim #707a8c")
                 else:
@@ -2017,7 +2025,8 @@ class UIManager:
                                 msg_lines.append(f"Discord RPC: {rpc_status}")
 
                             msg_text = Text()
-                            msg_text.append("✔ Settings Applied\n\n", style="bold #5af78e")
+                            bolt_color = getattr(config_module, "COLOR_BOLT", COLOR_BOLT)
+                            msg_text.append("✔ Settings Applied\n\n", style=f"bold {bolt_color}")
                             for line in msg_lines:
                                 msg_text.append(f"• {line}\n", style="white")
 
