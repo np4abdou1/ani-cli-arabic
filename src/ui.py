@@ -324,21 +324,9 @@ class UIManager:
 
             # 3. Reimagined Metadata Badges (No yellow, clean bracket badges)
             meta = Text()
-            
-            if active_provider:
-                meta.append("[ ", style="dim")
-                meta.append(f"📡 {active_provider}", style=f"bold {COLOR_BOLT}")
-                meta.append(" ]   ", style="dim")
-                
-            if rpc_status is not None:
-                rpc_color = "#5af78e" if rpc_status else "dim #ff5555"
-                rpc_text = "RPC ON" if rpc_status else "RPC OFF"
-                meta.append("[ ", style="dim")
-                meta.append(f"🎮 {rpc_text}", style=rpc_color)
-                meta.append(" ]   ", style="dim")
 
             meta.append("[ ", style="dim")
-            meta.append(f"v{APP_VERSION}", style="bold white")
+            meta.append(f"{APP_VERSION}", style="bold white")
             meta.append(" ]   ", style="dim")
             meta.append("[ ", style="dim")
             meta.append("@np4abdou1", style=f"bold {COLOR_TITLE}")
@@ -349,7 +337,6 @@ class UIManager:
             
             table.add_row(Align.center(meta))
             table.add_row(Text(""))
-
 
             # 4. Compact Search Box with Embedded Title Border
             box_width = min(68, screen_w - 4)
@@ -428,6 +415,18 @@ class UIManager:
             grid.add_row(*row3)
 
             table.add_row(Align.center(grid))
+            table.add_row(Text(""))
+
+            # 6. Status Bar (Provider & RPC) - Greyed out
+            status_text = Text()
+            if active_provider:
+                status_text.append(f"provider: {active_provider.lower()}   ", style="dim")
+            if rpc_status is not None:
+                rpc_state = "on" if rpc_status else "off"
+                status_text.append(f"rpc: {rpc_state}", style="dim")
+                
+            if status_text.plain:
+                table.add_row(Align.center(status_text))
 
             return Align.center(table, vertical="middle", height=self.console.height)
 
