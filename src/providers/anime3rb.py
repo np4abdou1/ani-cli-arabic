@@ -33,14 +33,22 @@ class Anime3rbProvider(BaseAnimeProvider):
             return []
 
     def get_anime_details(self, anime_id: str) -> AnimeResult:
-        res = self.api.get_anime_details(anime_id)
-        if res and res.thumbnail and res.title_en and res.title_en != anime_id:
+        aid = str(anime_id).strip()
+        if aid.isdigit():
+            try:
+                from .manager import ProviderManager
+                return ProviderManager.get_provider("anime_slayer").get_anime_details(aid)
+            except Exception:
+                pass
+
+        res = self.api.get_anime_details(aid)
+        if res and res.thumbnail and res.title_en and res.title_en != aid:
             return res
         # Fallback to Anime Slayer if Anime3rb is blocked/429
         try:
             from .manager import ProviderManager
             slayer = ProviderManager.get_provider("anime_slayer")
-            slayer_res = slayer.search_anime(anime_id.replace("-", " "))
+            slayer_res = slayer.search_anime(aid.replace("-", " "))
             if slayer_res:
                 return slayer.get_anime_details(slayer_res[0].id)
         except Exception:
@@ -48,14 +56,22 @@ class Anime3rbProvider(BaseAnimeProvider):
         return res
 
     def get_episodes(self, anime_id: str) -> List[Episode]:
-        eps = self.api.get_episodes(anime_id)
+        aid = str(anime_id).strip()
+        if aid.isdigit():
+            try:
+                from .manager import ProviderManager
+                return ProviderManager.get_provider("anime_slayer").get_episodes(aid)
+            except Exception:
+                pass
+
+        eps = self.api.get_episodes(aid)
         if eps:
             return eps
         # Fallback to Anime Slayer if Anime3rb is blocked/429
         try:
             from .manager import ProviderManager
             slayer = ProviderManager.get_provider("anime_slayer")
-            slayer_res = slayer.search_anime(anime_id.replace("-", " "))
+            slayer_res = slayer.search_anime(aid.replace("-", " "))
             if slayer_res:
                 return slayer.get_episodes(slayer_res[0].id)
         except Exception:
@@ -81,14 +97,22 @@ class Anime3rbProvider(BaseAnimeProvider):
         return []
 
     def get_streaming_servers(self, anime_id: str, episode_num: str, anime_type: str = "SERIES") -> Optional[Dict[str, Any]]:
-        streams = self.api.get_streaming_servers(anime_id, episode_num, anime_type)
+        aid = str(anime_id).strip()
+        if aid.isdigit():
+            try:
+                from .manager import ProviderManager
+                return ProviderManager.get_provider("anime_slayer").get_streaming_servers(aid, episode_num, anime_type)
+            except Exception:
+                pass
+
+        streams = self.api.get_streaming_servers(aid, episode_num, anime_type)
         if streams and streams.get("Qualities"):
             return streams
         
         # Smart Cross-Provider Fallback: Resolve via Anime Slayer by title
         try:
             from .manager import ProviderManager
-            details = self.get_anime_details(anime_id)
+            details = self.get_anime_details(aid)
             title = (details.title_en or details.title_ar or anime_id).strip()
             slayer = ProviderManager.get_provider("anime_slayer")
             slayer_results = slayer.search_anime(title)
