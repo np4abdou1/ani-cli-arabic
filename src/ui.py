@@ -1159,13 +1159,13 @@ class UIManager:
                 
                 # Progress info
                 prog_info = (episodes_progress or {}).get(str(ep.display_num), {})
-                prog_pct = prog_info.get('percent', 0)
-                prog_done = prog_info.get('completed', False) or (prog_pct >= 90)
+                prog_pct = int(prog_info.get('percent', 0))
+                prog_done = bool(prog_info.get('completed', False)) and (prog_pct >= 85)
                 
-                if prog_done:
-                    prog_str = " [100% ✔]"
+                if prog_done or prog_pct >= 85:
+                    prog_str = " [Completed ✔]"
                 elif prog_pct > 0:
-                    prog_str = f" [{int(prog_pct)}%]"
+                    prog_str = f" [{prog_pct}%]"
                 else:
                     prog_str = ""
 
@@ -1582,10 +1582,14 @@ class UIManager:
             c_hl_fg = getattr(config_module, 'COLOR_HIGHLIGHT_FG', COLOR_HIGHLIGHT_FG)
             c_bolt = getattr(config_module, 'COLOR_BOLT', COLOR_BOLT)
             
-            content = Text()
             visible_items = history_items[scroll_offset:scroll_offset + max_display]
-            box_width = min(78, self.console.width - 4)
-            inner_w = box_width - 6
+            box_width = min(80, self.console.width - 4)
+
+            table = Table.grid(expand=True)
+            table.add_column("title", ratio=1, justify="left", no_wrap=True)
+            table.add_column("ep", width=12, justify="center")
+            table.add_column("prog", width=20, justify="center")
+            table.add_column("date", width=15, justify="right")
             
             for idx, item in enumerate(visible_items):
                 real_idx = idx + scroll_offset
@@ -1595,57 +1599,62 @@ class UIManager:
                 date_str = item.get('last_updated', '').split('T')[0]
                 ep_num = str(item.get('episode', '?'))
                 percent = int(item.get('percent', 0))
-                time_str = item.get('time_str', '00:00')
-                completed = item.get('completed', False) or (percent >= 90)
+                time_pos = float(item.get('time_pos', 0.0))
+                time_str = item.get('time_str') or format_seconds(time_pos)
+                completed = bool(item.get('completed', False)) and (percent >= 85)
                 
                 ep_badge = f"[ Ep {ep_num} ]"
                 date_badge = f"[ {date_str} ]"
                 
                 if completed:
-                    prog_badge = "[ 100% ✔ ]"
+                    prog_badge = "[ Completed ✔ ]"
+                    prog_style = f"bold {c_bolt}"
                 elif percent > 0:
-                    prog_badge = f"[ {percent}% • {time_str} ]"
+                    if time_str and time_str != "00:00":
+                        prog_badge = f"[ {percent}% • {time_str} ]"
+                    else:
+                        prog_badge = f"[ {percent}% ]"
+                    prog_style = f"bold {c_title}"
+                elif time_pos > 0:
+                    prog_badge = f"[ {time_str} ]"
+                    prog_style = f"bold {c_title}"
                 else:
-                    prog_badge = "[ Unwatched ]"
+                    prog_badge = "[ Started ]"
+                    prog_style = f"dim {c_sub}"
 
-                right_part = f"{ep_badge}  {prog_badge}  {date_badge}"
-                right_len = cell_len(right_part)
-                
-                avail_for_title = max(10, inner_w - right_len - 6)
-                disp_title = raw_title
-                if cell_len(disp_title) > avail_for_title:
-                    while cell_len(disp_title) > avail_for_title - 3 and len(disp_title) > 0:
-                        disp_title = disp_title[:-1]
-                    disp_title += "..."
-                    
-                pad_len = max(1, inner_w - cell_len(disp_title) - right_len - 4)
-                pad = " " * pad_len
-
+                title_cell = Text()
                 if is_selected:
-                    row_text = Text()
-                    row_text.append(" ▶ ", style=f"bold {c_hl_fg}")
-                    row_text.append(disp_title, style=f"bold {c_hl_fg}")
-                    row_text.append(pad)
-                    row_text.append(f"{ep_badge}  ", style=f"bold {c_hl_fg}")
-                    row_text.append(f"{prog_badge}  ", style=f"bold {c_hl_fg}")
-                    row_text.append(date_badge, style=f"bold {c_hl_fg}")
-                    row_text.stylize(f"bold {c_hl_fg} on {c_border}")
-                    content.append_text(row_text)
-                    content.append("\n")
+                    title_cell.append("▶ ", style=f"bold {c_hl_fg}")
+                    title_cell.append(raw_title, style=f"bold {c_hl_fg}")
+                    
+                    ep_cell = Text(ep_badge, style=f"bold {c_hl_fg}")
+                    prog_cell = Text(prog_badge, style=f"bold {c_hl_fg}")
+                    date_cell = Text(date_badge, style=f"bold {c_hl_fg}")
+                    
+                    table.add_row(
+                        title_cell,
+                        ep_cell,
+                        prog_cell,
+                        date_cell,
+                        style=f"bold {c_hl_fg} on {c_border}"
+                    )
                 else:
-                    content.append("   ", style="white")
-                    content.append(disp_title, style="white")
-                    content.append(pad)
-                    content.append(ep_badge, style=f"bold {c_sub}")
-                    content.append("  ")
-                    prog_style = f"bold {c_bolt}" if (completed or percent > 0) else "dim white"
-                    content.append(prog_badge, style=prog_style)
-                    content.append("  ")
-                    content.append(date_badge, style=f"dim {c_title}")
-                    content.append("\n")
+                    title_cell.append("  ", style="white")
+                    title_cell.append(raw_title, style="white")
+                    
+                    ep_cell = Text(ep_badge, style=f"bold {c_sub}")
+                    prog_cell = Text(prog_badge, style=prog_style)
+                    date_cell = Text(date_badge, style=f"dim {c_title}")
+                    
+                    table.add_row(
+                        title_cell,
+                        ep_cell,
+                        prog_cell,
+                        date_cell
+                    )
             
             panel = Panel(
-                content,
+                table,
                 title=f"[bold {c_title}] 🕒 Watch History & Continue Watching [/bold {c_title}]",
                 box=ROUNDED,
                 border_style=c_border,

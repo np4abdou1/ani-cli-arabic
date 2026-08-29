@@ -346,6 +346,9 @@ class PlayerManager:
             '--sub-auto=fuzzy',
             '--slang=ara,ar,eng,en',
             '--alang=jpn,ja,eng,en',
+            '--really-quiet',
+            '--terminal=no',
+            '--msg-level=all=no',
             f'--force-media-title={title}',
         ]
         
@@ -370,7 +373,9 @@ class PlayerManager:
         t_start = time.time()
         result = subprocess.run(
             mpv_args,
-            check=False
+            check=False,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL
         )
         duration = time.time() - t_start
         logger.log_player("MPV", mpv_args, exit_code=result.returncode, duration=duration)
