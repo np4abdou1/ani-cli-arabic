@@ -67,6 +67,7 @@ class AnimeAPI:
         self._search_cache: Dict[str, List[AnimeResult]] = {}
         self._lw_token: Optional[str] = None
         self._lw_snapshot: Optional[str] = None
+        self._lw_cookies: Dict[str, str] = {}
         self._lw_token_time: float = 0
         
         # Pre-warm Livewire session & context in a background daemon thread
@@ -85,6 +86,12 @@ class AnimeAPI:
                 timeout=DEFAULT_TIMEOUT,
                 proxies=proxies
             )
+        
+        # Ensure session on any thread has active Livewire cookies
+        if self._lw_cookies:
+            for k, v in self._lw_cookies.items():
+                self._local.session.cookies.set(k, v)
+
         return self._local.session
 
     def _prewarm_context(self):
@@ -96,28 +103,30 @@ class AnimeAPI:
     def _ensure_livewire_context(self):
         import time
         now = time.time()
-        if self._lw_token and self._lw_snapshot and (now - self._lw_token_time < 1800):
-            return self._lw_token, self._lw_snapshot
-        
-        s = self._get_session()
-        try:
-            r_home = s.get(BASE_URL, headers=DEFAULT_HEADERS, timeout=8)
-            if r_home.status_code != 200:
-                return None, None
+        with self._cache_lock:
+            if self._lw_token and self._lw_snapshot and (now - self._lw_token_time < 1800):
+                return self._lw_token, self._lw_snapshot, self._lw_cookies
             
-            csrf_match = re.search(r'csrf-token.*?content="(.*?)"', r_home.text)
-            self._lw_token = csrf_match.group(1) if csrf_match else ""
-            
-            for m in re.finditer(r'wire:snapshot=(["\'])([^"\']+?)\1', r_home.text):
-                dec = m.group(2).replace('&quot;', '"').replace('&amp;', '&')
-                if '"name":"search"' in dec:
-                    self._lw_snapshot = dec
-                    break
-            
-            self._lw_token_time = now
-            return self._lw_token, self._lw_snapshot
-        except Exception:
-            return None, None
+            s = self._get_session()
+            try:
+                r_home = s.get(BASE_URL, headers=DEFAULT_HEADERS, timeout=8)
+                if r_home.status_code != 200:
+                    return None, None, {}
+                
+                csrf_match = re.search(r'csrf-token.*?content="(.*?)"', r_home.text)
+                self._lw_token = csrf_match.group(1) if csrf_match else ""
+                
+                for m in re.finditer(r'wire:snapshot=(["\'])([^"\']+?)\1', r_home.text):
+                    dec = m.group(2).replace('&quot;', '"').replace('&amp;', '&')
+                    if '"name":"search"' in dec:
+                        self._lw_snapshot = dec
+                        break
+                
+                self._lw_cookies = dict(r_home.cookies)
+                self._lw_token_time = now
+                return self._lw_token, self._lw_snapshot, self._lw_cookies
+            except Exception:
+                return None, None, {}
 
     @retry_with_backoff()
     def search_anime(self, query: str) -> List[AnimeResult]:
@@ -131,75 +140,90 @@ class AnimeAPI:
             if q_key in self._search_cache:
                 return self._search_cache[q_key]
 
-        token, snapshot = self._ensure_livewire_context()
-        if not token or not snapshot:
-            return []
-
+        token, snapshot, cookies = self._ensure_livewire_context()
         s = self._get_session()
-        lw_headers = {
-            "Referer": BASE_URL + "/",
-            "X-Livewire": "true",
-            "X-CSRF-TOKEN": token,
-            "Content-Type": "application/json",
-            **DEFAULT_HEADERS
-        }
+        if cookies:
+            for k, v in cookies.items():
+                s.cookies.set(k, v)
 
-        # 1. Fast Primary Search pass
-        payload = {
-            "_token": token,
-            "components": [
-                {
-                    "snapshot": snapshot,
-                    "updates": {"query": query, "deep": False},
-                    "calls": []
-                }
-            ]
-        }
+        if token and snapshot:
+            lw_headers = {
+                "Referer": BASE_URL + "/",
+                "X-Livewire": "true",
+                "X-CSRF-TOKEN": token,
+                "Content-Type": "application/json",
+                **DEFAULT_HEADERS
+            }
 
+            # 1. Fast Primary Search pass
+            payload = {
+                "_token": token,
+                "components": [
+                    {
+                        "snapshot": snapshot,
+                        "updates": {"query": query, "deep": False},
+                        "calls": []
+                    }
+                ]
+            }
+
+            try:
+                r_lw = s.post(f"{BASE_URL}/livewire/update", json=payload, headers=lw_headers, timeout=6)
+                if r_lw.status_code == 200:
+                    data = r_lw.json()
+                    comp = data.get("components", [{}])[0]
+                    if "snapshot" in comp:
+                        self._lw_snapshot = comp["snapshot"]
+                    if "html" in comp.get("effects", {}):
+                        items = self._parse_search_html(comp["effects"]["html"])
+                        if items:
+                            with self._cache_lock:
+                                self._search_cache[q_key] = items
+                            return items
+            except Exception:
+                pass
+
+            # 2. Fallback: clean sub-query
+            words = [w for w in query.split() if len(w) >= 3 and w.lower() not in ["the", "and", "for", "with", "season", "movie"]]
+            if words:
+                for sub_q in [" ".join(words[:2]), words[0]]:
+                    if sub_q.lower() == q_key:
+                        continue
+                    try:
+                        payload = {
+                            "_token": token,
+                            "components": [
+                                {
+                                    "snapshot": self._lw_snapshot or snapshot,
+                                    "updates": {"query": sub_q, "deep": False},
+                                    "calls": []
+                                }
+                            ]
+                        }
+                        r_lw = s.post(f"{BASE_URL}/livewire/update", json=payload, headers=lw_headers, timeout=5)
+                        if r_lw.status_code == 200:
+                            data = r_lw.json()
+                            comp = data.get("components", [{}])[0]
+                            if "html" in comp.get("effects", {}):
+                                items = self._parse_search_html(comp["effects"]["html"])
+                                if items:
+                                    with self._cache_lock:
+                                        self._search_cache[q_key] = items
+                                    return items
+                    except Exception:
+                        pass
+
+        # 3. Direct HTML search fallback if Livewire is temporarily blocked or unavailable
         try:
-            r_lw = s.post(f"{BASE_URL}/livewire/update", json=payload, headers=lw_headers, timeout=6)
-            if r_lw.status_code == 200:
-                data = r_lw.json()
-                comp = data.get("components", [{}])[0]
-                if "snapshot" in comp:
-                    self._lw_snapshot = comp["snapshot"]
-                if "html" in comp.get("effects", {}):
-                    items = self._parse_search_html(comp["effects"]["html"])
-                    if items:
-                        with self._cache_lock:
-                            self._search_cache[q_key] = items
-                        return items
+            r_fallback = s.get(f"{BASE_URL}/titles?q={query}", headers=DEFAULT_HEADERS, timeout=6)
+            if r_fallback.status_code == 200:
+                items = self._parse_search_html(r_fallback.text)
+                if items:
+                    with self._cache_lock:
+                        self._search_cache[q_key] = items
+                    return items
         except Exception:
             pass
-
-        # 2. Fallback only if primary returned 0 results: try clean sub-query
-        words = [w for w in query.split() if len(w) >= 3 and w.lower() not in ["the", "and", "for", "with", "season", "movie"]]
-        if words:
-            for sub_q in [" ".join(words[:2]), words[0]]:
-                if sub_q.lower() == q_key:
-                    continue
-                try:
-                    payload = {
-                        "_token": token,
-                        "components": [
-                            {
-                                "snapshot": self._lw_snapshot or snapshot,
-                                "updates": {"query": sub_q, "deep": False},
-                                "calls": []
-                            }
-                        ]
-                    }
-                    r_lw = s.post(f"{BASE_URL}/livewire/update", json=payload, headers=lw_headers, timeout=5)
-                    if r_lw.status_code == 200:
-                        data = r_lw.json()
-                        comp = data.get("components", [{}])[0]
-                        if "html" in comp.get("effects", {}):
-                            items = self._parse_search_html(comp["effects"]["html"])
-                            if items:
-                                self._search_cache[q_key] = items
-                                return items
-                except Exception:
-                    pass
 
         return []
 
