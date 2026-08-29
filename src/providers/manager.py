@@ -7,6 +7,8 @@ from typing import Dict, List, Type, Optional
 from .base import BaseAnimeProvider
 from .anime3rb import Anime3rbProvider
 from .anime_slayer import AnimeSlayerProvider
+from .anidb import AniDBProvider
+from .animeify import AnimeifyProvider
 
 
 class ProviderManager:
@@ -15,6 +17,10 @@ class ProviderManager:
     _PROVIDERS: Dict[str, Type[BaseAnimeProvider]] = {
         "anime3rb": Anime3rbProvider,
         "anime_slayer": AnimeSlayerProvider,
+        "animeify": AnimeifyProvider,
+        "animefy": AnimeifyProvider,
+        "anidb": AniDBProvider,
+        "ani-cli": AniDBProvider,
     }
 
     _INSTANCES: Dict[str, BaseAnimeProvider] = {}
@@ -54,10 +60,14 @@ class ProviderManager:
     @classmethod
     def list_providers(cls) -> List[Dict[str, str]]:
         """List all available providers with their metadata."""
+        seen = set()
         providers = []
         for pid, p_cls in cls._PROVIDERS.items():
+            if p_cls in seen:
+                continue
+            seen.add(p_cls)
             providers.append({
-                "id": pid,
+                "id": getattr(p_cls, "id", pid),
                 "name": getattr(p_cls, "name", pid.title()),
                 "description": getattr(p_cls, "description", "")
             })
