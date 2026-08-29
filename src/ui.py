@@ -287,7 +287,7 @@ class UIManager:
         
         return result_container.get('result')
 
-    def home_screen_menu(self, rpc_status=None, version_info=None):
+    def home_screen_menu(self, rpc_status=None, version_info=None, active_provider=None):
         """
         Interactive, ultra-minimal home screen with live character input,
         tactile mechanical keycaps, mouse click & hover support, and zero box clutter.
@@ -324,17 +324,32 @@ class UIManager:
 
             # 3. Reimagined Metadata Badges (No yellow, clean bracket badges)
             meta = Text()
+            
+            if active_provider:
+                meta.append("[ ", style="dim")
+                meta.append(f"📡 {active_provider}", style=f"bold {COLOR_BOLT}")
+                meta.append(" ]   ", style="dim")
+                
+            if rpc_status is not None:
+                rpc_color = "#5af78e" if rpc_status else "dim #ff5555"
+                rpc_text = "RPC ON" if rpc_status else "RPC OFF"
+                meta.append("[ ", style="dim")
+                meta.append(f"🎮 {rpc_text}", style=rpc_color)
+                meta.append(" ]   ", style="dim")
+
             meta.append("[ ", style="dim")
-            meta.append(f"{APP_VERSION}", style="bold white")
-            meta.append(" ]", style="dim")
-            meta.append("   [ ", style="dim")
+            meta.append(f"v{APP_VERSION}", style="bold white")
+            meta.append(" ]   ", style="dim")
+            meta.append("[ ", style="dim")
             meta.append("@np4abdou1", style=f"bold {COLOR_TITLE}")
-            meta.append(" ]", style="dim")
-            meta.append("   [ ", style="dim")
+            meta.append(" ]   ", style="dim")
+            meta.append("[ ", style="dim")
             meta.append(f"★ {get_github_stars()}", style=f"bold {COLOR_TITLE}")
             meta.append(" ]", style="dim")
+            
             table.add_row(Align.center(meta))
             table.add_row(Text(""))
+
 
             # 4. Compact Search Box with Embedded Title Border
             box_width = min(68, screen_w - 4)
