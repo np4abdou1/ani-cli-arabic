@@ -166,9 +166,11 @@ class AniCliArApp:
                 action, payload = "search", query_override
                 query_override = None
             else:
+                provider_name = getattr(self.api, 'name', 'Unknown')
                 action, payload = self.ui.home_screen_menu(
                     rpc_status=getattr(self, 'rpc_status', None),
-                    version_info=self.version_info
+                    version_info=self.version_info,
+                    active_provider=provider_name
                 )
 
             if action in ["quit", "exit"] or action is None:
