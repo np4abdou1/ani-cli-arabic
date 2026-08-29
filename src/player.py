@@ -322,7 +322,7 @@ class PlayerManager:
         mpv_args = [
             mpv_path,
             '--fullscreen',
-            '--fs-screen=0',
+            '--force-window=yes',
             '--keep-open=yes',
             '--ontop',
             '--cache=yes',
@@ -358,7 +358,10 @@ class PlayerManager:
             mpv_args.append(f'--referrer={referer}')
 
         mpv_args.append(url)
-        mpv_args.append('--force-window=yes')
+
+        from .utils import restore_terminal_for_input, enter_raw_mode_after_input, show_cursor, hide_cursor
+        restore_terminal_for_input()
+        show_cursor()
 
         tracker = MpvTracker(sock_path)
         tracker.start()
@@ -367,16 +370,15 @@ class PlayerManager:
         t_start = time.time()
         result = subprocess.run(
             mpv_args,
-            check=False,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.PIPE,
-            stdin=subprocess.DEVNULL,
-            text=True
+            check=False
         )
         duration = time.time() - t_start
-        logger.log_player("MPV", mpv_args, exit_code=result.returncode, stderr_output=result.stderr, duration=duration)
+        logger.log_player("MPV", mpv_args, exit_code=result.returncode, duration=duration)
         
         tracker.stop()
+        enter_raw_mode_after_input()
+        hide_cursor()
+
         if not is_win and os.path.exists(sock_path):
             try:
                 os.remove(sock_path)
