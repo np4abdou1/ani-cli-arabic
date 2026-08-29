@@ -61,10 +61,10 @@ class AnimeAPI:
     
     def __init__(self):
         self._cache_lock = threading.Lock()
+        self._local = threading.local()
         self._anime_cache: Dict[str, AnimeResult] = {}
         self._episodes_cache: Dict[str, List[Episode]] = {}
         self._search_cache: Dict[str, List[AnimeResult]] = {}
-        self._session: Optional[requests.Session] = None
         self._lw_token: Optional[str] = None
         self._lw_snapshot: Optional[str] = None
         self._lw_token_time: float = 0
@@ -73,19 +73,19 @@ class AnimeAPI:
         threading.Thread(target=self._prewarm_context, daemon=True).start()
 
     def _get_session(self) -> requests.Session:
-        if self._session is None:
+        if not hasattr(self._local, "session") or self._local.session is None:
             proxies = None
             http_proxy = os.environ.get("HTTP_PROXY") or os.environ.get("http_proxy")
             https_proxy = os.environ.get("HTTPS_PROXY") or os.environ.get("https_proxy")
             if http_proxy or https_proxy:
                 proxies = {"http": http_proxy, "https": https_proxy}
             
-            self._session = requests.Session(
+            self._local.session = requests.Session(
                 impersonate=DEFAULT_IMPERSONATE,
                 timeout=DEFAULT_TIMEOUT,
                 proxies=proxies
             )
-        return self._session
+        return self._local.session
 
     def _prewarm_context(self):
         try:
@@ -712,7 +712,7 @@ class AnimeAPI:
             return []
 
     @retry_with_backoff()
-    def get_pinned_anime(self) -> List[AnimeResult]:
+    def get_pinned_anime(self, limit: int = 20) -> List[AnimeResult]:
         """Fetch pinned / spotlight featured anime from homepage."""
         s = self._get_session()
         try:
@@ -764,6 +764,8 @@ class AnimeAPI:
                             thumbnail=poster
                         )
                         results.append(res)
+                        if len(results) >= limit:
+                            break
 
             # 2. If nothing found in pinned container, fallback to slider cards
             if not results:
@@ -792,8 +794,10 @@ class AnimeAPI:
                             premiered="Spotlight",
                             thumbnail=poster
                         ))
+                        if len(results) >= limit:
+                            break
 
-            return results
+            return results[:limit]
         except Exception:
             return []
 

@@ -10,6 +10,7 @@ import html
 import json
 import re
 import urllib.parse
+import threading
 from typing import List, Optional, Dict, Any
 from bs4 import BeautifulSoup
 
@@ -26,6 +27,49 @@ from .base import BaseAnimeProvider
 from ..models import AnimeResult, Episode, QualityOption
 from ..config import POPULAR_STUDIOS_MAP, GENRE_NAME_TO_SLUG
 from ..logger import logger
+
+# Complete official Anime Slayer Genre Map (from animes/get-anime-dropdowns)
+SLAYER_GENRE_MAP: Dict[str, str] = {
+    "action": "1", "adventure": "2", "cars": "3", "comedy": "4", "dementia": "5",
+    "demons": "6", "mystery": "7", "drama": "8", "ecchi": "9", "fantasy": "10",
+    "game": "11", "historical": "12", "horror": "13", "kids": "14", "magic": "15",
+    "martial-arts": "16", "martial arts": "16", "mecha": "17", "music": "18",
+    "parody": "19", "samurai": "20", "romance": "21", "school": "22", "sci-fi": "23",
+    "scifi": "23", "shoujo": "24", "shounen": "25", "space": "26", "sports": "27",
+    "super-power": "28", "super power": "28", "vampire": "29", "harem": "30",
+    "slice-of-life": "31", "slice of life": "31", "supernatural": "32", "military": "33",
+    "police": "34", "detective": "34", "psychological": "35", "suspense": "36",
+    "thriller": "36", "seinen": "37", "josei": "38", "isekai": "39",
+    # Arabic mappings
+    "اكشن": "1", "أكشن": "1", "مغامرات": "2", "مغامرة": "2", "سيارات": "3",
+    "كوميديا": "4", "كوميدي": "4", "جنون": "5", "شياطين": "6", "غموض": "7",
+    "دراما": "8", "ايتشي": "9", "إيتشي": "9", "خيال": "10", "العاب": "11", "ألعاب": "11",
+    "تاريخي": "12", "رعب": "13", "اطفال": "14", "أطفال": "14", "سحر": "15",
+    "فنون قتالية": "16", "ميكا": "17", "موسيقى": "18", "محاكاة ساخرة": "19",
+    "ساموراي": "20", "رومانسي": "21", "مدرسي": "22", "خيال علمي": "23",
+    "شوجو": "24", "شوچو": "24", "شونين": "25", "فضاء": "26", "رياضي": "27",
+    "قوى خارقة": "28", "مصاص دماء": "29", "مصاصي دماء": "29", "حريم": "30",
+    "شريحة من الحياة": "31", "الحياة اليومية": "31", "خارق للطبيعة": "32",
+    "عسكري": "33", "بوليسي": "34", "نفسي": "35", "اثارة": "36", "إثارة": "36",
+    "تشويق": "36", "سينين": "37", "جوسي": "38", "ايسيكاي": "39", "إيسيكاي": "39",
+}
+
+# Complete official Anime Slayer Studio Map (from animes/get-anime-dropdowns)
+SLAYER_STUDIO_MAP: Dict[str, str] = {
+    "mappa": "132", "ufotable": "52", "madhouse": "24", "wit studio": "144", "wit": "144",
+    "bones": "41", "kyoto animation": "47", "toei animation": "2", "studio pierrot": "447",
+    "pierrot": "447", "a-1 pictures": "82", "a1 pictures": "82", "cloverworks": "192",
+    "white fox": "101", "david production": "93", "shaft": "42", "trigger": "137",
+    "production i.g": "23", "production ig": "23", "j.c.staff": "22", "jcstaff": "22",
+    "tms entertainment": "30", "studio deen": "15", "deen": "15", "lerche": "108",
+    "p.a. works": "87", "pa works": "87", "comix wave films": "70", "gainax": "20",
+    "sunrise": "12", "studio ghibli": "4", "ghibli": "4", "8bit": "124", "doga kobo": "71",
+    "silver link.": "95", "silver link": "95", "kinema citrus": "92", "studio bind": "253",
+    "lidenfilms": "134", "feel.": "48", "feel": "48", "brain's base": "33", "troyca": "147",
+    "passione": "119", "science saru": "236", "bandai namco pictures": "125",
+    "studio colorido": "189", "orange": "138", "gonzo": "39", "tezuka productions": "131",
+    "nippon animation": "6"
+}
 
 
 class AnimeSlayerProvider(BaseAnimeProvider):
@@ -53,17 +97,18 @@ class AnimeSlayerProvider(BaseAnimeProvider):
     }
 
     def __init__(self):
-        self._session = None
+        self._local = threading.local()
+        self._cache_lock = threading.Lock()
         self._anime_cache: Dict[str, AnimeResult] = {}
         self._episode_cache: Dict[str, List[Episode]] = {}
 
     def _get_session(self) -> requests.Session:
-        if self._session is None:
-            self._session = requests.Session(
+        if not hasattr(self._local, "session") or self._local.session is None:
+            self._local.session = requests.Session(
                 impersonate="chrome120",
                 timeout=12
             )
-        return self._session
+        return self._local.session
 
     def _api_get(self, endpoint: str, params: Optional[Dict[str, Any]] = None) -> Optional[Dict[str, Any]]:
         s = self._get_session()
@@ -112,38 +157,13 @@ class AnimeSlayerProvider(BaseAnimeProvider):
 
         payload = {"list_type": "anime_list", "anime_name": query, "limit": 30}
         data = self._api_get("animes/get-published-animes", params={"json": json.dumps(payload)})
-        
-        results = []
-        if not data:
-            return results
-
-        items = data.get("response", {}).get("data", []) or []
-        for it in items:
-            aid = str(it.get("anime_id") or "")
-            title_ar = it.get("anime_name") or ""
-            title_en = it.get("anime_english_title") or title_ar
-            score = str(it.get("anime_rating") or "N/A")
-            cover = it.get("anime_cover_image_url") or ""
-            story = it.get("anime_story") or ""
-            atype = it.get("anime_type") or "مسلسل"
-
-            if aid:
-                results.append(AnimeResult(
-                    id=aid,
-                    title_en=title_en,
-                    title_ar=title_ar,
-                    thumbnail=cover,
-                    score=score,
-                    type=atype,
-                    synopsis=story
-                ))
-
-        return results
+        return self._parse_results(data)
 
     def get_anime_details(self, anime_id: str) -> AnimeResult:
         """Fetch complete anime details and metadata."""
-        if anime_id in self._anime_cache:
-            return self._anime_cache[anime_id]
+        with self._cache_lock:
+            if anime_id in self._anime_cache:
+                return self._anime_cache[anime_id]
 
         data = self._api_get("anime/get-anime-details", params={
             "anime_id": anime_id,
@@ -193,7 +213,8 @@ class AnimeSlayerProvider(BaseAnimeProvider):
                     servers=servers
                 ))
             episodes.sort(key=lambda x: x.display_num)
-            self._episode_cache[anime_id] = episodes
+            with self._cache_lock:
+                self._episode_cache[anime_id] = episodes
 
         res = AnimeResult(
             id=anime_id,
@@ -204,16 +225,19 @@ class AnimeSlayerProvider(BaseAnimeProvider):
             type=atype,
             synopsis=story
         )
-        self._anime_cache[anime_id] = res
+        with self._cache_lock:
+            self._anime_cache[anime_id] = res
         return res
 
     def get_episodes(self, anime_id: str) -> List[Episode]:
         """Fetch all episodes with server links for the anime."""
-        if anime_id in self._episode_cache:
-            return self._episode_cache[anime_id]
+        with self._cache_lock:
+            if anime_id in self._episode_cache:
+                return self._episode_cache[anime_id]
 
         self.get_anime_details(anime_id)
-        return self._episode_cache.get(anime_id, [])
+        with self._cache_lock:
+            return self._episode_cache.get(anime_id, [])
 
     def get_episode_streams(self, episode: Episode) -> List[QualityOption]:
         """
@@ -944,7 +968,12 @@ class AnimeSlayerProvider(BaseAnimeProvider):
         return episodes
 
     def get_pinned_anime(self, limit: int = 20) -> List[AnimeResult]:
-        return self.get_top_rated_anime(0, limit)
+        payload = {"list_type": "featured", "limit": limit}
+        data = self._api_get("animes/get-published-animes", params={"json": json.dumps(payload)})
+        items = self._parse_results(data)
+        if not items:
+            return self.get_top_rated_anime(0, limit)
+        return items[:limit]
 
     def get_trending_anime(self, from_index: int = 0, limit: int = 20) -> List[AnimeResult]:
         payload = {"list_type": "top_tv", "limit": limit, "offset": from_index}
@@ -956,57 +985,144 @@ class AnimeSlayerProvider(BaseAnimeProvider):
         data = self._api_get("animes/get-published-animes", params={"json": json.dumps(payload)})
         return self._parse_results(data)
 
+    def get_top_currently_airing(self, from_index: int = 0, limit: int = 20) -> List[AnimeResult]:
+        payload = {"list_type": "top_currently_airing", "limit": limit, "offset": from_index}
+        data = self._api_get("animes/get-published-animes", params={"json": json.dumps(payload)})
+        return self._parse_results(data)
+
+    def get_top_anime_mal(self, from_index: int = 0, limit: int = 20) -> List[AnimeResult]:
+        payload = {"list_type": "top_anime_mal", "limit": limit, "offset": from_index}
+        data = self._api_get("animes/get-published-animes", params={"json": json.dumps(payload)})
+        return self._parse_results(data)
+
     def get_movies(self, from_index: int = 0, limit: int = 20) -> List[AnimeResult]:
         payload = {"list_type": "top_movie", "limit": limit, "offset": from_index}
         data = self._api_get("animes/get-published-animes", params={"json": json.dumps(payload)})
         return self._parse_results(data)
 
     def get_genre_anime(self, genre_slug: str, from_index: int = 0, limit: int = 20) -> List[AnimeResult]:
-        payload = {"list_type": "anime_list", "anime_name": genre_slug, "limit": limit, "offset": from_index}
+        g_key = (genre_slug or "").strip().lower()
+        genre_id = SLAYER_GENRE_MAP.get(g_key) or SLAYER_GENRE_MAP.get(g_key.replace("-", " ")) or SLAYER_GENRE_MAP.get(g_key.replace(" ", "-"))
+        
+        if genre_id:
+            payload = {"list_type": "filter", "anime_genre_ids": str(genre_id), "limit": limit, "offset": from_index}
+        else:
+            payload = {"list_type": "anime_list", "anime_name": genre_slug, "limit": limit, "offset": from_index}
+            
         data = self._api_get("animes/get-published-animes", params={"json": json.dumps(payload)})
         return self._parse_results(data)
 
     def get_studio_anime(self, studio_name: str, from_index: int = 0, limit: int = 20) -> List[AnimeResult]:
-        curated_items = POPULAR_STUDIOS_MAP.get(studio_name) or []
+        s_key = (studio_name or "").strip().lower()
+        studio_id = SLAYER_STUDIO_MAP.get(s_key) or SLAYER_STUDIO_MAP.get(s_key.replace(" ", ""))
+        
         results = []
         seen = set()
 
         if from_index == 0:
-            for item in curated_items:
-                if isinstance(item, dict):
-                    slug = item.get("id", "")
-                    if slug and slug not in seen:
-                        results.append(AnimeResult(
-                            id=slug,
-                            title_en=item.get("title_en", slug),
-                            title_ar=item.get("title_ar", ""),
-                            score=str(item.get("score", "N/A")),
-                            type=item.get("type", "مسلسل"),
-                            thumbnail=item.get("thumbnail", "")
-                        ))
-                        seen.add(slug)
+            curated_items = POPULAR_STUDIOS_MAP.get(studio_name) or POPULAR_STUDIOS_MAP.get(studio_name.title())
+            if not curated_items:
+                for k, v in POPULAR_STUDIOS_MAP.items():
+                    if k.lower() == s_key:
+                        curated_items = v
+                        break
+            if curated_items:
+                for item in curated_items:
+                    if isinstance(item, dict):
+                        slug = str(item.get("id") or "")
+                        if slug and slug not in seen:
+                            results.append(AnimeResult(
+                                id=slug,
+                                title_en=item.get("title_en", slug),
+                                title_ar=item.get("title_ar", ""),
+                                score=str(item.get("score", "N/A")),
+                                type=item.get("type", "مسلسل"),
+                                thumbnail=item.get("thumbnail", "")
+                            ))
+                            seen.add(slug)
 
-        # Also search studio name on Anime Slayer
-        search_hits = self.search_anime(studio_name)
-        for h in search_hits:
-            if h.id not in seen:
-                results.append(h)
-                seen.add(h.id)
+        # Query Anime Slayer native studio filter
+        if studio_id:
+            payload = {"list_type": "filter", "anime_studio_ids": str(studio_id), "limit": limit, "offset": from_index}
+            data = self._api_get("animes/get-published-animes", params={"json": json.dumps(payload)})
+            live_items = self._parse_results(data)
+            for it in live_items:
+                if it.id not in seen:
+                    results.append(it)
+                    seen.add(it.id)
+        else:
+            search_hits = self.search_anime(studio_name)
+            for h in search_hits:
+                if h.id not in seen:
+                    results.append(h)
+                    seen.add(h.id)
 
         return results
 
-    def _parse_results(self, data: Optional[Dict[str, Any]]) -> List[AnimeResult]:
+    def get_seasonal_anime(self, season: str = None, year: int = None, from_index: int = 0, limit: int = 20) -> List[AnimeResult]:
+        import datetime
+        now = datetime.datetime.now()
+        if not year:
+            year = now.year
+        if not season:
+            month = now.month
+            if month in [1, 2, 3]:
+                season = "Winter"
+            elif month in [4, 5, 6]:
+                season = "Spring"
+            elif month in [7, 8, 9]:
+                season = "Summer"
+            else:
+                season = "Fall"
+        else:
+            season = season.capitalize()
+
+        payload = {
+            "list_type": "filter",
+            "anime_season": season,
+            "anime_release_year": str(year),
+            "limit": limit,
+            "offset": from_index
+        }
+        data = self._api_get("animes/get-published-animes", params={"json": json.dumps(payload)})
+        return self._parse_results(data)
+
+    def get_ovas_and_specials(self, category: str = "ova", from_index: int = 0, limit: int = 20) -> List[AnimeResult]:
+        atype = "OVA" if category.lower() == "ova" else "Special"
+        payload = {"list_type": "filter", "anime_type": atype, "limit": limit, "offset": from_index}
+        data = self._api_get("animes/get-published-animes", params={"json": json.dumps(payload)})
+        return self._parse_results(data)
+
+    def _parse_results(self, data: Optional[Any]) -> List[AnimeResult]:
         results = []
         if not data:
             return results
-        items = data.get("response", {}).get("data", []) or []
+
+        if isinstance(data, list):
+            items = data
+        elif isinstance(data, dict):
+            resp = data.get("response")
+            if isinstance(resp, dict):
+                items = resp.get("data", []) or []
+            elif isinstance(resp, list):
+                items = resp
+            else:
+                items = data.get("data", []) or []
+        else:
+            items = []
+
+        if not isinstance(items, list):
+            return results
+
         for it in items:
+            if not isinstance(it, dict):
+                continue
             aid = str(it.get("anime_id") or "")
             title_ar = it.get("anime_name") or ""
             title_en = it.get("anime_english_title") or title_ar
             score = str(it.get("anime_rating") or "N/A")
-            cover = it.get("anime_cover_image_url") or ""
-            story = it.get("anime_story") or ""
+            cover = it.get("anime_cover_image_url") or it.get("anime_cover_image_full_url") or ""
+            story = it.get("anime_story") or it.get("anime_description") or ""
             atype = it.get("anime_type") or "مسلسل"
 
             if aid:
@@ -1040,4 +1156,16 @@ class AnimeSlayerProvider(BaseAnimeProvider):
             return self.get_movies(from_index, limit)
         elif ftype == "TOP_RATED":
             return self.get_top_rated_anime(from_index, limit)
+        elif ftype == "TRENDING":
+            return self.get_trending_anime(from_index, limit)
+        elif ftype == "SEASONAL":
+            return self.get_seasonal_anime(None, None, from_index, limit)
+        elif ftype == "OVA":
+            return self.get_ovas_and_specials("ova", from_index, limit)
+        elif ftype == "SPECIAL":
+            return self.get_ovas_and_specials("special", from_index, limit)
+        elif ftype in ("AIRING", "CURRENTLY_AIRING"):
+            return self.get_top_currently_airing(from_index, limit)
+        elif ftype == "MAL":
+            return self.get_top_anime_mal(from_index, limit)
         return self.get_trending_anime(from_index, limit)
