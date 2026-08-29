@@ -17,7 +17,7 @@ from .player import PlayerManager
 from .discord_rpc import DiscordRPCManager
 from .models import QualityOption
 from .utils import download_file, flush_stdin, show_cursor, hide_cursor
-from .history import HistoryManager
+from .history import HistoryManager, format_seconds
 from .settings import SettingsManager
 from .favorites import FavoritesManager
 from .updater import check_for_updates, get_version_status
@@ -443,7 +443,9 @@ class AniCliArApp:
                 self.history.remove(item['anime_id'])
                 continue
             elif action == 'resume':
-                self.resume_anime(item)
+                self.resume_anime(item, direct_watch=True)
+            elif action == 'episodes':
+                self.resume_anime(item, direct_watch=False)
 
     def _find_episode_index(self, episodes, episode_value):
         if episode_value is None:
@@ -470,7 +472,7 @@ class AniCliArApp:
 
         return 0
 
-    def resume_anime(self, history_item):
+    def resume_anime(self, history_item, direct_watch=True):
         results = self.ui.run_with_loading("Resuming...", self.api.search_anime, history_item['title'])
         if not results:
             self.ui.render_message("Error", "Could not find anime details.", "error")
@@ -495,6 +497,97 @@ class AniCliArApp:
         
         if episodes:
             initial_idx = self._find_episode_index(episodes, history_item.get('episode'))
+            if direct_watch:
+                target_ep = episodes[initial_idx]
+                server_data = self.ui.run_with_loading(
+                    f"Loading servers for Ep {target_ep.display_num}...",
+                    self.api.get_streaming_servers,
+                    selected_anime.id, 
+                    target_ep.number,
+                    selected_anime.type
+                )
+                if server_data:
+                    action_taken = self.handle_quality_selection(selected_anime, target_ep, server_data)
+                    if action_taken == "watch":
+                        current_idx = initial_idx
+                        while True:
+                            auto_next = self.settings.get('auto_next')
+                            if auto_next:
+                                if current_idx + 1 < len(episodes):
+                                    current_idx += 1
+                                    selected_ep = episodes[current_idx]
+                                    s_data = self.ui.run_with_loading(
+                                        "Loading servers...",
+                                        self.api.get_streaming_servers,
+                                        selected_anime.id,
+                                        selected_ep.number,
+                                        selected_anime.type
+                                    )
+                                    if s_data:
+                                        self.handle_quality_selection(selected_anime, selected_ep, s_data)
+                                        continue
+                                    else:
+                                        break
+                                else:
+                                    self.ui.render_message("Info", "No more episodes!", "info")
+                                    break
+                            
+                            next_action = self.ui.post_watch_menu(selected_anime.title_en, str(episodes[current_idx].display_num))
+                            if next_action == "Next Episode":
+                                if current_idx + 1 < len(episodes):
+                                    current_idx += 1
+                                    selected_ep = episodes[current_idx]
+                                    s_data = self.ui.run_with_loading(
+                                        "Loading servers...",
+                                        self.api.get_streaming_servers,
+                                        selected_anime.id,
+                                        selected_ep.number,
+                                        selected_anime.type
+                                    )
+                                    if s_data:
+                                        self.handle_quality_selection(selected_anime, selected_ep, s_data)
+                                        continue
+                                    else:
+                                        break
+                                else:
+                                    self.ui.render_message("Info", "No more episodes!", "info")
+                                    break
+                            elif next_action == "Previous Episode":
+                                if current_idx > 0:
+                                    current_idx -= 1
+                                    selected_ep = episodes[current_idx]
+                                    s_data = self.ui.run_with_loading(
+                                        "Loading servers...",
+                                        self.api.get_streaming_servers,
+                                        selected_anime.id,
+                                        selected_ep.number,
+                                        selected_anime.type
+                                    )
+                                    if s_data:
+                                        self.handle_quality_selection(selected_anime, selected_ep, s_data)
+                                        continue
+                                    else:
+                                        break
+                                else:
+                                    self.ui.render_message("Info", "This is the first episode.", "info")
+                                    break
+                            elif next_action == "Replay":
+                                selected_ep = episodes[current_idx]
+                                s_data = self.ui.run_with_loading(
+                                    "Loading servers...",
+                                    self.api.get_streaming_servers,
+                                    selected_anime.id,
+                                    selected_ep.number,
+                                    selected_anime.type
+                                )
+                                if s_data:
+                                    self.handle_quality_selection(selected_anime, selected_ep, s_data, start_time=0.001)
+                                    continue
+                                else:
+                                    break
+                            else:
+                                break
+                        return
             self.handle_episode_selection(selected_anime, episodes, initial_idx=initial_idx)
 
     def handle_favorites(self):
@@ -649,6 +742,7 @@ class AniCliArApp:
         
         while True:
             last_watched = self.history.get_last_watched(selected_anime.id)
+            episodes_prog = self.history.get_all_episodes_progress(selected_anime.id)
             is_fav = self.favorites.is_favorite(selected_anime.id)
             default_download_quality = self._get_default_download_quality()
             download_mode = self._get_download_mode()
@@ -678,7 +772,8 @@ class AniCliArApp:
                 default_download_quality=default_download_quality,
                 download_mode=download_mode,
                 download_path=self._get_download_directory(),
-                initial_selected=current_idx
+                initial_selected=current_idx,
+                episodes_progress=episodes_prog
             )
             
             if ep_idx == -1:
@@ -904,7 +999,7 @@ class AniCliArApp:
             duration=1.6
         )
 
-    def handle_quality_selection(self, selected_anime, selected_ep, server_data):
+    def handle_quality_selection(self, selected_anime, selected_ep, server_data, start_time=None):
         current_ep_data = server_data.get('CurrentEpisode', {})
         available = server_data.get('Qualities')
         if not available:
@@ -959,14 +1054,41 @@ class AniCliArApp:
                 return None
             else:
                 player_type = self.settings.get('player')
-                self.ui.render_now_playing(selected_anime.title_en, f"Episode {selected_ep.display_num}", quality.name)
+                
+                # Determine resume timestamp
+                actual_start = 0.0
+                if start_time is not None and start_time > 0:
+                    actual_start = start_time
+                else:
+                    ep_prog = self.history.get_episode_progress(selected_anime.id, selected_ep.display_num)
+                    if ep_prog and 0 < ep_prog.get('percent', 0) < 90 and ep_prog.get('time_pos', 0) > 10:
+                        actual_start = ep_prog['time_pos']
+
+                time_hint = f" • Resuming at {format_seconds(actual_start)}" if (actual_start > 0) else ""
+                self.ui.render_now_playing(selected_anime.title_en, f"Episode {selected_ep.display_num}{time_hint}", quality.name)
                 
                 self.rpc.update_watching(selected_anime.title_en, str(selected_ep.display_num), selected_anime.thumbnail)
                 monitor.track_video_play(selected_anime.title_en, str(selected_ep.display_num))
                 
-                self.player.play(direct_url, f"{selected_anime.title_en} - Ep {selected_ep.display_num} ({quality.name})", player_type=player_type)
+                playback_info = self.player.play(
+                    direct_url, 
+                    f"{selected_anime.title_en} - Ep {selected_ep.display_num} ({quality.name})", 
+                    player_type=player_type,
+                    start_time=actual_start
+                )
                 self.ui.clear()
-                self.history.mark_watched(selected_anime.id, selected_ep.display_num, selected_anime.title_en)
+                
+                pos = playback_info.get('time_pos', 0.0) if isinstance(playback_info, dict) else 0.0
+                dur = playback_info.get('duration', 0.0) if isinstance(playback_info, dict) else 0.0
+                pct = playback_info.get('percent', 0.0) if isinstance(playback_info, dict) else 0.0
+                self.history.mark_watched(
+                    selected_anime.id, 
+                    selected_ep.display_num, 
+                    selected_anime.title_en,
+                    time_pos=pos,
+                    duration=dur,
+                    percent=pct
+                )
                 self.rpc.update_selecting_episode(selected_anime.title_en, selected_anime.thumbnail)
                 return "watch"
         else:
