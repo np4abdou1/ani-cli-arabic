@@ -560,6 +560,22 @@ class AniCliArApp:
                 selected_anime.thumbnail = detailed.thumbnail
 
         eps = self.api.get_episodes(selected_anime.id)
+        
+        # Fallback to alternate provider if no episodes returned
+        if not eps:
+            try:
+                from src.providers.manager import ProviderManager
+                other_pid = "anime_slayer" if getattr(self.api, "id", "") == "anime3rb" else "anime3rb"
+                other_prov = ProviderManager.get_provider(other_pid)
+                search_title = selected_anime.title_en or selected_anime.title_ar or selected_anime.id.replace("-", " ")
+                alt_results = other_prov.search_anime(search_title)
+                if alt_results:
+                    eps = other_prov.get_episodes(alt_results[0].id)
+                    if eps and not selected_anime.thumbnail and alt_results[0].thumbnail:
+                        selected_anime.thumbnail = alt_results[0].thumbnail
+            except Exception:
+                pass
+
         if selected_anime.thumbnail:
             screen_height = self.ui.console.height
             target_height = min(screen_height, 50)

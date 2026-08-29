@@ -161,18 +161,45 @@ class AnimeSlayerProvider(BaseAnimeProvider):
 
     def get_anime_details(self, anime_id: str) -> AnimeResult:
         """Fetch complete anime details and metadata."""
+        aid = str(anime_id).strip()
         with self._cache_lock:
-            if anime_id in self._anime_cache:
-                return self._anime_cache[anime_id]
+            if aid in self._anime_cache:
+                return self._anime_cache[aid]
+
+        # If anime_id is not numeric (e.g. slug "death-note"), resolve by search first
+        if not aid.isdigit():
+            clean_title = aid.replace("-", " ")
+            search_hits = self.search_anime(clean_title)
+            if search_hits:
+                resolved_aid = search_hits[0].id
+                details = self.get_anime_details(resolved_aid)
+                with self._cache_lock:
+                    self._anime_cache[aid] = details
+                return details
+            # Fallback to Anime3rb
+            try:
+                from .manager import ProviderManager
+                details = ProviderManager.get_provider("anime3rb").get_anime_details(aid)
+                if details and details.thumbnail and details.title_en != aid:
+                    with self._cache_lock:
+                        self._anime_cache[aid] = details
+                    return details
+            except Exception:
+                pass
 
         data = self._api_get("anime/get-anime-details", params={
-            "anime_id": anime_id,
+            "anime_id": aid,
             "fetch_episodes": "Yes",
             "more_info": "Yes"
         })
 
         if not data or "response" not in data:
-            return AnimeResult(id=anime_id, title_en=anime_id, thumbnail="")
+            # Fallback to Anime3rb
+            try:
+                from .manager import ProviderManager
+                return ProviderManager.get_provider("anime3rb").get_anime_details(aid)
+            except Exception:
+                return AnimeResult(id=aid, title_en=aid, thumbnail="")
 
         d = data["response"]
         title_ar = d.get("anime_name") or ""
@@ -214,10 +241,10 @@ class AnimeSlayerProvider(BaseAnimeProvider):
                 ))
             episodes.sort(key=lambda x: x.display_num)
             with self._cache_lock:
-                self._episode_cache[anime_id] = episodes
+                self._episode_cache[aid] = episodes
 
         res = AnimeResult(
-            id=anime_id,
+            id=aid,
             title_en=title_en,
             title_ar=title_ar,
             thumbnail=cover,
@@ -226,18 +253,53 @@ class AnimeSlayerProvider(BaseAnimeProvider):
             synopsis=story
         )
         with self._cache_lock:
-            self._anime_cache[anime_id] = res
+            self._anime_cache[aid] = res
         return res
 
     def get_episodes(self, anime_id: str) -> List[Episode]:
         """Fetch all episodes with server links for the anime."""
+        aid = str(anime_id).strip()
         with self._cache_lock:
-            if anime_id in self._episode_cache:
-                return self._episode_cache[anime_id]
+            if aid in self._episode_cache:
+                return self._episode_cache[aid]
 
-        self.get_anime_details(anime_id)
+        # If anime_id is not numeric (e.g. slug "death-note"), resolve by search first
+        if not aid.isdigit():
+            clean_title = aid.replace("-", " ")
+            search_hits = self.search_anime(clean_title)
+            if search_hits:
+                resolved_aid = search_hits[0].id
+                eps = self.get_episodes(resolved_aid)
+                if eps:
+                    with self._cache_lock:
+                        self._episode_cache[aid] = eps
+                    return eps
+            # Fallback to Anime3rb
+            try:
+                from .manager import ProviderManager
+                eps = ProviderManager.get_provider("anime3rb").get_episodes(aid)
+                if eps:
+                    with self._cache_lock:
+                        self._episode_cache[aid] = eps
+                    return eps
+            except Exception:
+                pass
+
+        self.get_anime_details(aid)
         with self._cache_lock:
-            return self._episode_cache.get(anime_id, [])
+            eps = self._episode_cache.get(aid, [])
+
+        # Fallback to Anime3rb if Slayer returned 0 eps
+        if not eps:
+            try:
+                from .manager import ProviderManager
+                eps = ProviderManager.get_provider("anime3rb").get_episodes(aid)
+                if eps:
+                    with self._cache_lock:
+                        self._episode_cache[aid] = eps
+            except Exception:
+                pass
+        return eps
 
     def get_episode_streams(self, episode: Episode) -> List[QualityOption]:
         """
