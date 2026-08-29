@@ -1773,7 +1773,7 @@ class UIManager:
     def settings_menu(self, settings_mgr):
         tabs = [
             ("General", [
-                ("Provider", ["anime3rb", "anime_slayer"], "anime_provider", "Active source provider (Anime3rb / Anime Slayer)"),
+                ("Provider", ["anime3rb", "anime_slayer", "animeify", "anidb"], "anime_provider", "Active source provider (Anime3rb / Anime Slayer / Animeify / AniDB English)"),
                 ("Default Player", ["mpv", "vlc"], "player", "Preferred media player executable (mpv / vlc)"),
                 ("Color Theme", ["auto", "blue", "purple", "cyan", "rose", "sunset", "gold", "mint", "lavender", "pink", "coral", "teal", "magenta", "red", "green"], "theme", "Color palette (auto-detects Omarchy / OS accent)"),
                 ("Show Donation Link", [True, False], "show_donation", "Display developer donation link in footer"),
@@ -1848,7 +1848,16 @@ class UIManager:
                 else:
                     display_str = str(current_val or "default")
                     if key_name == "anime_provider":
-                        display_str = "Anime3rb" if current_val == "anime3rb" else "Anime Slayer"
+                        if current_val == "anime3rb":
+                            display_str = "Anime3rb"
+                        elif current_val == "anime_slayer":
+                            display_str = "Anime Slayer"
+                        elif current_val in ["animeify", "animefy"]:
+                            display_str = "Animeify (Arabic)"
+                        elif current_val in ["anidb", "ani-cli"]:
+                            display_str = "AniDB (English)"
+                        else:
+                            display_str = str(current_val).title()
                     
                     val_style = f"bold {COLOR_TITLE}" if is_selected else "white"
                     val_text.append(display_str, style=val_style)
@@ -2016,7 +2025,17 @@ class UIManager:
                             self.console.clear()
                             msg_lines = []
                             if provider_changed:
-                                pname = "Anime3rb" if settings_mgr.get("anime_provider") == "anime3rb" else "Anime Slayer"
+                                cur_p = settings_mgr.get("anime_provider")
+                                if cur_p == "anime3rb":
+                                    pname = "Anime3rb"
+                                elif cur_p == "anime_slayer":
+                                    pname = "Anime Slayer"
+                                elif cur_p in ["animeify", "animefy"]:
+                                    pname = "Animeify (Arabic)"
+                                elif cur_p in ["anidb", "ani-cli"]:
+                                    pname = "AniDB (English)"
+                                else:
+                                    pname = str(cur_p).title()
                                 msg_lines.append(f"Provider: {pname}")
                             if theme_changed:
                                 msg_lines.append(f"Theme: {str(settings_mgr.get('theme') or 'Auto').capitalize()}")

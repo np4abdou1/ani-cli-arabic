@@ -55,6 +55,7 @@ class AniCliArApp:
             formatter_class=argparse.RawTextHelpFormatter
         )
         parser.add_argument('-i', '--interactive', action='store_true', help="Force minimal interactive CLI mode")
+        parser.add_argument('-p', '--provider', choices=ProviderManager.get_provider_choices(), help="Specify active anime provider (anime3rb, anime_slayer, anidb)")
         parser.add_argument('-d', '--debug', action='store_true', help="Enable verbose debug logging to file and console")
         parser.add_argument('-v', '--version', action='store_true', help="Show version information")
         parser.add_argument('query', nargs='*', help="Anime name to search for")
@@ -64,6 +65,12 @@ class AniCliArApp:
         if args.debug:
             logger.enable(console_mirror=True)
             logger.debug("APP", "CLI flag --debug specified, verbose console mirror enabled")
+
+        if args.provider:
+            self.provider = ProviderManager.get_provider(args.provider)
+            self.api = self.provider
+            ProviderManager.set_active_provider(args.provider)
+            logger.debug("APP", f"CLI flag --provider specified, active provider set to {args.provider}")
             
         if args.version:
             from .version import __version__
@@ -73,7 +80,7 @@ class AniCliArApp:
         self.force_cli = args.interactive
         initial_query = " ".join(args.query) if args.query else None
         
-        logger.debug("APP", f"App starting | interactive={args.interactive} | debug={args.debug} | provider={self.settings.get('anime_provider')} | query={initial_query}")
+        logger.debug("APP", f"App starting | interactive={args.interactive} | debug={args.debug} | provider={ProviderManager.get_active_provider_id()} | query={initial_query}")
 
         if not ensure_dependencies():
             print("\n[!] Cannot start without required dependencies.")
