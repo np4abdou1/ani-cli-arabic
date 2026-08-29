@@ -14,8 +14,8 @@ class Anime3rbProvider(BaseAnimeProvider):
     """Anime3rb Provider delivering high-speed multi-quality streams and rich Arabic/English metadata."""
 
     id: str = "anime3rb"
-    name: str = "Anime3rb (أنمي عرب)"
-    description: str = "Fast browserless scraper with 1080p/720p/480p streams and rich metadata"
+    name: str = "Anime3rb"
+    description: str = "Official web provider for Anime3rb (أنمي بالترجمة والدبلجة العربية)"
 
     def __init__(self, api: Optional[AnimeAPI] = None):
         self.api = api or AnimeAPI()

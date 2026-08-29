@@ -110,7 +110,7 @@ class AnimeifyProvider(BaseAnimeProvider):
     """
 
     id: str = "animeify"
-    name: str = "Animeify (Arabic)"
+    name: str = "Animeify"
     description: str = "Original Animeify API provider with remote credential authentication"
 
     DEFAULT_USER_AGENT: str = (
@@ -425,28 +425,6 @@ class AnimeifyProvider(BaseAnimeProvider):
                     res="480p"
                 ))
 
-        # 4. OK.ru embed server
-        ok_link = server_dict.get('OKLink')
-        if ok_link:
-            ok_url = f"https://ok.ru/videoembed/{ok_link}"
-            qualities.append(QualityOption(
-                name="OK.ru > 720p (HD)",
-                server_key="OKLink",
-                direct_url=ok_url,
-                res="720p"
-            ))
-
-        # 5. Google Drive embed
-        gd_link = server_dict.get('GDLink')
-        if gd_link:
-            gd_url = f"https://drive.google.com/file/d/{gd_link}/view"
-            qualities.append(QualityOption(
-                name="Google Drive > 720p (HD)",
-                server_key="GDLink",
-                direct_url=gd_url,
-                res="720p"
-            ))
-
         return qualities
 
     def get_streaming_servers(self, anime_id: str, episode_num: str, anime_type: str = "SERIES") -> Optional[Dict[str, Any]]:
@@ -457,48 +435,58 @@ class AnimeifyProvider(BaseAnimeProvider):
             'Episode': str(episode_num),
             'AnimeType': anime_type,
         })
-        if not resp:
-            return None
+        
+        data = None
+        if resp:
+            try:
+                data = resp.json()
+            except Exception:
+                data = None
 
-        try:
-            data = resp.json()
-            if not isinstance(data, dict):
-                return None
+        qualities: List[QualityOption] = []
+        current_ep: Dict[str, str] = {}
 
+        if isinstance(data, dict):
             current_ep = data.get('CurrentEpisode', {})
-            qualities = []
-
             # 1. 1080p Mediafire
             if current_ep.get('FRFhdQ'):
                 direct = self._extract_mediafire_direct(current_ep['FRFhdQ'])
                 if direct:
-                    qualities.append(QualityOption("Mediafire > 1080p", "FRFhdQ", "info", direct_url=direct, res="1080p"))
+                    current_ep['FRFhdQ'] = direct
+                    qualities.append(QualityOption("Mediafire > 1080p (FHD)", "FRFhdQ", "info", direct_url=direct, res="1080p"))
 
             # 2. 720p Mediafire
             if current_ep.get('FRLink'):
                 direct = self._extract_mediafire_direct(current_ep['FRLink'])
                 if direct:
-                    qualities.append(QualityOption("Mediafire > 720p", "FRLink", "info", direct_url=direct, res="720p"))
+                    current_ep['FRLink'] = direct
+                    qualities.append(QualityOption("Mediafire > 720p (HD)", "FRLink", "info", direct_url=direct, res="720p"))
 
             # 3. 480p Mediafire
             if current_ep.get('FRLowQ'):
                 direct = self._extract_mediafire_direct(current_ep['FRLowQ'])
                 if direct:
-                    qualities.append(QualityOption("Mediafire > 480p", "FRLowQ", "info", direct_url=direct, res="480p"))
+                    current_ep['FRLowQ'] = direct
+                    qualities.append(QualityOption("Mediafire > 480p (SD)", "FRLowQ", "info", direct_url=direct, res="480p"))
 
-            # 4. OK.ru
-            if current_ep.get('OKLink'):
-                qualities.append(QualityOption("OK.ru > 720p", "OKLink", "info", direct_url=f"https://ok.ru/videoembed/{current_ep['OKLink']}", res="720p"))
+        # Fallback to alternate providers if Animeify has no direct working streams for this episode
+        if not qualities:
+            try:
+                from .manager import ProviderManager
+                if str(anime_id).isdigit():
+                    return ProviderManager.get_provider("anime_slayer").get_streaming_servers(str(anime_id), episode_num, anime_type)
+                else:
+                    return ProviderManager.get_provider("anime3rb").get_streaming_servers(str(anime_id), episode_num, anime_type)
+            except Exception:
+                pass
 
-            # 5. Google Drive
-            if current_ep.get('GDLink'):
-                qualities.append(QualityOption("Google Drive > 720p", "GDLink", "info", direct_url=f"https://drive.google.com/file/d/{current_ep['GDLink']}/view", res="720p"))
+        if not current_ep and qualities:
+            current_ep["FRLink"] = qualities[0].url
 
-            data['Qualities'] = qualities
-            return data
-        except Exception as e:
-            logger.error(f"[Animeify] Error resolving servers: {e}")
-            return None
+        return {
+            'CurrentEpisode': current_ep,
+            'Qualities': qualities
+        }
 
     def get_latest_episodes(self, limit: int = 20) -> List[Episode]:
         """Fetch newly updated anime episodes."""

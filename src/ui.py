@@ -1803,20 +1803,21 @@ class UIManager:
 
         def generate_renderable():
             tab_name, options = tabs[cur_tab]
-            box_width = min(68, self.console.width - 4)
-            inner_w = box_width - 6
+            box_width = min(70, self.console.width - 4)
+            bolt_color = getattr(config_module, 'COLOR_BOLT', COLOR_BOLT)
             
-            # Horizontal Tab Bar
+            # Modern Horizontal Segmented Tabs Bar
             tabs_bar = Text()
             for idx, (tname, _) in enumerate(tabs):
+                num_badge = f"{idx+1}"
                 if idx == cur_tab:
-                    tabs_bar.append(f" {tname} ", style=f"bold {COLOR_HIGHLIGHT_FG} on {COLOR_HIGHLIGHT_BG}")
+                    tabs_bar.append(f" [{num_badge}] {tname} ", style=f"bold {COLOR_HIGHLIGHT_FG} on {COLOR_HIGHLIGHT_BG}")
                 else:
-                    tabs_bar.append(f" {tname} ", style=f"{COLOR_SUBTITLE}")
+                    tabs_bar.append(f" [{num_badge}] {tname} ", style=f"dim {COLOR_SUBTITLE}")
                 if idx < len(tabs) - 1:
                     tabs_bar.append(" ")
 
-            # Key-Value Options List Table (clean two-column layout)
+            # Key-Value Options List Table
             list_table = Table.grid(expand=True, padding=(0, 2))
             list_table.add_column("label", justify="left")
             list_table.add_column("value", justify="right")
@@ -1832,7 +1833,7 @@ class UIManager:
                 # Label part
                 label_text = Text()
                 if is_selected:
-                    label_text.append("▸ ", style=f"bold {COLOR_TITLE}")
+                    label_text.append("▌ ", style=f"bold {COLOR_TITLE}")
                     label_text.append(label, style=f"bold {COLOR_TITLE}")
                 else:
                     label_text.append("  ", style="dim")
@@ -1842,9 +1843,9 @@ class UIManager:
                 val_text = Text()
                 if isinstance(current_val, bool):
                     if current_val:
-                        val_text.append("● on", style=f"bold {getattr(config_module, 'COLOR_BOLT', COLOR_BOLT)}")
+                        val_text.append("[● ON]", style=f"bold {bolt_color}")
                     else:
-                        val_text.append("○ off", style="dim #707a8c")
+                        val_text.append("[○ OFF]", style="dim #505a6c")
                 else:
                     display_str = str(current_val or "default")
                     if key_name == "anime_provider":
@@ -1853,14 +1854,14 @@ class UIManager:
                         elif current_val == "anime_slayer":
                             display_str = "Anime Slayer"
                         elif current_val in ["animeify", "animefy"]:
-                            display_str = "Animeify (Arabic)"
+                            display_str = "Animeify"
                         elif current_val in ["anidb", "ani-cli"]:
                             display_str = "AniDB (English)"
                         else:
                             display_str = str(current_val).title()
                     
-                    val_style = f"bold {COLOR_TITLE}" if is_selected else "white"
-                    val_text.append(display_str, style=val_style)
+                    val_style = f"bold {COLOR_TITLE}" if is_selected else "bold white"
+                    val_text.append(f"⟨ {display_str} ⟩", style=val_style)
 
                 list_table.add_row(label_text, val_text)
 
@@ -1869,11 +1870,18 @@ class UIManager:
             panel_content.add_row(Align.center(tabs_bar))
             panel_content.add_row(Text(""))
             panel_content.add_row(list_table)
+            
+            if active_desc:
+                panel_content.add_row(Text(""))
+                desc_text = Text()
+                desc_text.append("ℹ ", style=f"bold {COLOR_TITLE}")
+                desc_text.append(active_desc, style="italic dim white")
+                panel_content.add_row(Align.left(desc_text))
 
             panel = Panel(
                 panel_content,
-                title=f"[bold {COLOR_TITLE}]Settings • {tab_name}[/bold {COLOR_TITLE}]",
-                box=HEAVY,
+                title=f"[bold {COLOR_TITLE}] ⚙ Settings Hub • {tab_name} [/bold {COLOR_TITLE}]",
+                box=ROUNDED,
                 border_style=COLOR_BORDER,
                 padding=(1, 2),
                 width=box_width
@@ -1887,20 +1895,20 @@ class UIManager:
 
             title_badge = Text()
             title_badge.append("[ ", style=f"bold {COLOR_BORDER}")
-            title_badge.append("Settings Hub", style="bold white")
+            title_badge.append("Settings & Preferences", style="bold white")
             title_badge.append(" ]", style=f"bold {COLOR_BORDER}")
             header_table.add_row(Align.center(title_badge))
 
             # Organized Keycaps Dock
             dock = Text()
-            dock.append("←/→ ", style=f"bold {COLOR_TITLE}")
-            dock.append("tabs  ", style="white")
-            dock.append("↑/↓ ", style=f"bold {COLOR_TITLE}")
-            dock.append("navigate  ", style="white")
-            dock.append("space/↵ ", style=f"bold {COLOR_TITLE}")
-            dock.append("toggle  ", style="white")
-            dock.append("esc ", style="bold #ff79c6")
-            dock.append("save & close", style="white")
+            dock.append("[←/→] ", style=f"bold {COLOR_TITLE}")
+            dock.append("Tabs   ", style="dim white")
+            dock.append("[↑/↓] ", style=f"bold {COLOR_TITLE}")
+            dock.append("Navigate   ", style="dim white")
+            dock.append("[Space/↵] ", style=f"bold {COLOR_TITLE}")
+            dock.append("Toggle   ", style="dim white")
+            dock.append("[Esc/B] ", style="bold #ff79c6")
+            dock.append("Save & Exit", style="dim white")
 
             root = Table.grid(expand=False)
             root.add_column(justify="center")
@@ -2031,7 +2039,7 @@ class UIManager:
                                 elif cur_p == "anime_slayer":
                                     pname = "Anime Slayer"
                                 elif cur_p in ["animeify", "animefy"]:
-                                    pname = "Animeify (Arabic)"
+                                    pname = "Animeify"
                                 elif cur_p in ["anidb", "ani-cli"]:
                                     pname = "AniDB (English)"
                                 else:
