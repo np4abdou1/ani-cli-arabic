@@ -1106,7 +1106,8 @@ class UIManager:
         default_download_quality="1080p",
         download_mode="internal",
         download_path="downloads",
-        initial_selected=0
+        initial_selected=0,
+        episodes_progress=None
     ):
         selected = max(0, min(int(initial_selected or 0), len(episodes) - 1)) if episodes else 0
         scroll_offset = 0
@@ -1155,7 +1156,20 @@ class UIManager:
                 prefix_w = cell_len(prefix)
 
                 is_last_watched = (last_watched_ep is not None and str(ep.display_num) == str(last_watched_ep))
-                suffix = " 👁" if is_last_watched else ""
+                
+                # Progress info
+                prog_info = (episodes_progress or {}).get(str(ep.display_num), {})
+                prog_pct = prog_info.get('percent', 0)
+                prog_done = prog_info.get('completed', False) or (prog_pct >= 90)
+                
+                if prog_done:
+                    prog_str = " [100% ✔]"
+                elif prog_pct > 0:
+                    prog_str = f" [{int(prog_pct)}%]"
+                else:
+                    prog_str = ""
+
+                suffix = f" 👁{prog_str}" if is_last_watched else prog_str
                 suffix_w = cell_len(suffix)
 
                 type_str = f" [{ep.type}]" if (ep.type and str(ep.type).lower() != "episode") else ""
@@ -1203,7 +1217,8 @@ class UIManager:
                     if type_str:
                         content.append(type_str, style=f"bold {COLOR_SUBTITLE}")
                     if suffix:
-                        content.append(suffix, style=f"bold {bolt_color}")
+                        s_color = bolt_color if (prog_done or is_last_watched) else "#5af78e"
+                        content.append(suffix, style=f"bold {s_color}")
                     content.append(pad_spaces)
                     content.append("\n")
 
@@ -1561,10 +1576,16 @@ class UIManager:
         max_display = max(4, min(10, self.console.height - 14))
         
         def generate_renderable():
+            c_title = getattr(config_module, 'COLOR_TITLE', COLOR_TITLE)
+            c_border = getattr(config_module, 'COLOR_BORDER', COLOR_BORDER)
+            c_sub = getattr(config_module, 'COLOR_SUBTITLE', COLOR_SUBTITLE)
+            c_hl_fg = getattr(config_module, 'COLOR_HIGHLIGHT_FG', COLOR_HIGHLIGHT_FG)
+            c_bolt = getattr(config_module, 'COLOR_BOLT', COLOR_BOLT)
+            
             content = Text()
             visible_items = history_items[scroll_offset:scroll_offset + max_display]
-            box_width = min(74, self.console.width - 4)
-            inner_w = box_width - 8
+            box_width = min(78, self.console.width - 4)
+            inner_w = box_width - 6
             
             for idx, item in enumerate(visible_items):
                 real_idx = idx + scroll_offset
@@ -1572,36 +1593,62 @@ class UIManager:
                 
                 raw_title = item.get('title', 'Unknown')
                 date_str = item.get('last_updated', '').split('T')[0]
-                ep_str = f"[ Ep {item.get('episode', '?')} ]"
-                date_b = f"[ {date_str} ]"
+                ep_num = str(item.get('episode', '?'))
+                percent = int(item.get('percent', 0))
+                time_str = item.get('time_str', '00:00')
+                completed = item.get('completed', False) or (percent >= 90)
                 
-                avail_for_title = max(10, inner_w - len(ep_str) - len(date_b) - 8)
-                disp_title = raw_title[:avail_for_title-3] + "..." if len(raw_title) > avail_for_title else raw_title
-                pad = " " * max(1, inner_w - len(disp_title) - len(ep_str) - len(date_b) - 5)
+                ep_badge = f"[ Ep {ep_num} ]"
+                date_badge = f"[ {date_str} ]"
+                
+                if completed:
+                    prog_badge = "[ 100% ✔ ]"
+                elif percent > 0:
+                    prog_badge = f"[ {percent}% • {time_str} ]"
+                else:
+                    prog_badge = "[ Unwatched ]"
+
+                right_part = f"{ep_badge}  {prog_badge}  {date_badge}"
+                right_len = cell_len(right_part)
+                
+                avail_for_title = max(10, inner_w - right_len - 6)
+                disp_title = raw_title
+                if cell_len(disp_title) > avail_for_title:
+                    while cell_len(disp_title) > avail_for_title - 3 and len(disp_title) > 0:
+                        disp_title = disp_title[:-1]
+                    disp_title += "..."
+                    
+                pad_len = max(1, inner_w - cell_len(disp_title) - right_len - 4)
+                pad = " " * pad_len
 
                 if is_selected:
                     row_text = Text()
-                    row_text.append(" ▶ ")
-                    row_text.append(disp_title)
+                    row_text.append(" ▶ ", style=f"bold {c_hl_fg}")
+                    row_text.append(disp_title, style=f"bold {c_hl_fg}")
                     row_text.append(pad)
-                    row_text.append(f"{ep_str}  {date_b}")
-                    row_text.stylize(f"bold {COLOR_HIGHLIGHT_FG} on {COLOR_BORDER}")
+                    row_text.append(f"{ep_badge}  ", style=f"bold {c_hl_fg}")
+                    row_text.append(f"{prog_badge}  ", style=f"bold {c_hl_fg}")
+                    row_text.append(date_badge, style=f"bold {c_hl_fg}")
+                    row_text.stylize(f"bold {c_hl_fg} on {c_border}")
                     content.append_text(row_text)
                     content.append("\n")
                 else:
                     content.append("   ", style="white")
                     content.append(disp_title, style="white")
                     content.append(pad)
-                    content.append(ep_str, style=f"bold {COLOR_SUBTITLE}")
+                    content.append(ep_badge, style=f"bold {c_sub}")
                     content.append("  ")
-                    content.append(date_b, style=f"bold {COLOR_TITLE}")
+                    prog_style = f"bold {c_bolt}" if (completed or percent > 0) else "dim white"
+                    content.append(prog_badge, style=prog_style)
+                    content.append("  ")
+                    content.append(date_badge, style=f"dim {c_title}")
                     content.append("\n")
             
             panel = Panel(
                 content,
-                title=f"[bold {COLOR_TITLE}]Watch History[/bold {COLOR_TITLE}]",
-                box=HEAVY,
-                border_style=COLOR_BORDER,
+                title=f"[bold {c_title}] 🕒 Watch History & Continue Watching [/bold {c_title}]",
+                box=ROUNDED,
+                border_style=c_border,
                 padding=(1, 2),
                 width=box_width
             )
@@ -1613,9 +1660,9 @@ class UIManager:
             header_table.add_row(Text(""))
 
             title_badge = Text()
-            title_badge.append("[ ", style=f"bold {COLOR_BORDER}")
-            title_badge.append(f"Continue Watching • {len(history_items)} items", style="bold white")
-            title_badge.append(" ]", style=f"bold {COLOR_BORDER}")
+            title_badge.append("[ ", style=f"bold {c_border}")
+            title_badge.append(f"Continue Watching • {len(history_items)} in history", style="bold white")
+            title_badge.append(" ]", style=f"bold {c_border}")
             header_table.add_row(Align.center(title_badge))
 
             # Organized Keycaps Dock
@@ -1629,15 +1676,15 @@ class UIManager:
                     t.append("↵", style=f"bold {fg}")
                     t.append(f" {flabel}", style="white")
                 else:
-                    t.append("[", style=f"bold {COLOR_BORDER}")
+                    t.append("[", style=f"bold {c_border}")
                     t.append(k, style=f"bold {fg}")
-                    t.append("]", style=f"bold {COLOR_BORDER}")
+                    t.append("]", style=f"bold {c_border}")
                     t.append(f" {flabel}", style="white")
                 return t
 
             row1 = [
-                format_h_key("↵", "resume", COLOR_TITLE),
-                format_h_key("↑↓/jk", "navigate", COLOR_TITLE),
+                format_h_key("↵", "resume at timestamp", c_title),
+                format_h_key("e", "episode list", c_title),
             ]
             row2 = [
                 format_h_key("r", "remove", "#d97979"),
@@ -1675,6 +1722,8 @@ class UIManager:
                         live.update(generate_renderable(), refresh=True)
                     elif key == 'ENTER':
                         return (selected, 'resume')
+                    elif key == 'e' or key == 'E':
+                        return (selected, 'episodes')
                     elif key == 'r' or key == 'R':
                         return (selected, 'remove')
                     elif key == 'b' or key == 'ESC' or key == 'q':

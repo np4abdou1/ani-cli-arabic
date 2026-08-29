@@ -8,6 +8,90 @@ from typing import Optional
 from .utils import is_bundled
 from .logger import logger
 
+class MpvTracker:
+    def __init__(self, sock_path: str):
+        self.sock_path = sock_path
+        self.state = {
+            'time_pos': 0.0,
+            'duration': 0.0,
+            'percent': 0.0,
+            'completed': False
+        }
+        self._stop_event = threading.Event()
+        self._thread = None
+
+    def start(self):
+        self._thread = threading.Thread(target=self._run, daemon=True)
+        self._thread.start()
+
+    def stop(self):
+        self._stop_event.set()
+        if self._thread:
+            self._thread.join(timeout=1.0)
+
+    def _run(self):
+        s = None
+        is_windows = (os.name == 'nt')
+        
+        for _ in range(25):
+            if self._stop_event.is_set():
+                return
+            try:
+                if is_windows:
+                    s = open(self.sock_path, 'r+b', buffering=0)
+                    break
+                else:
+                    if os.path.exists(self.sock_path):
+                        import socket
+                        s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+                        s.settimeout(0.6)
+                        s.connect(self.sock_path)
+                        break
+            except Exception:
+                pass
+            time.sleep(0.1)
+
+        if not s:
+            return
+
+        try:
+            import json
+            while not self._stop_event.is_set():
+                for prop in ["time-pos", "duration", "percent-pos"]:
+                    try:
+                        req = json.dumps({"command": ["get_property", prop]}) + "\n"
+                        if is_windows:
+                            s.write(req.encode('utf-8'))
+                            s.flush()
+                            resp_line = s.readline().decode('utf-8')
+                        else:
+                            s.sendall(req.encode('utf-8'))
+                            resp_line = s.recv(2048).decode('utf-8')
+                            
+                        for line in resp_line.strip().split('\n'):
+                            if line.strip():
+                                res = json.loads(line)
+                                if "data" in res and res["data"] is not None:
+                                    val = float(res["data"])
+                                    if prop == "time-pos":
+                                        self.state["time_pos"] = round(val, 1)
+                                    elif prop == "duration":
+                                        self.state["duration"] = round(val, 1)
+                                    elif prop == "percent-pos":
+                                        self.state["percent"] = round(val, 1)
+                    except Exception:
+                        pass
+                
+                if self.state["percent"] >= 90 or (self.state["duration"] > 0 and self.state["duration"] - self.state["time_pos"] < 30):
+                    self.state["completed"] = True
+                    
+                time.sleep(0.5)
+        finally:
+            try:
+                s.close()
+            except Exception:
+                pass
+
 class PlayerManager:
     def __init__(self, rpc_manager=None, console=None):
         self.temp_mpv_path = None
@@ -109,8 +193,9 @@ class PlayerManager:
 
         return players
 
-    def play(self, url: str, title: str, player_type: str = 'ask'):
+    def play(self, url: str, title: str, player_type: str = 'ask', start_time: float = 0.0) -> dict:
         available_players = self.get_available_players()
+        default_result = {'time_pos': 0.0, 'duration': 0.0, 'percent': 0.0, 'completed': False}
         
         if not available_players:
             msg = "No video players found on your computer. Please download and install MPV or VLC Media Player."
@@ -121,7 +206,7 @@ class PlayerManager:
             else:
                 print(msg, file=sys.stderr)
                 input("Press Enter to continue...")
-            return
+            return default_result
 
         player_names = list(available_players.keys())
         selected_player = None
@@ -156,11 +241,11 @@ class PlayerManager:
 
         try:
             if selected_player == 'VLC':
-                self._play_vlc(url, title, available_players['VLC'])
+                return self._play_vlc(url, title, available_players['VLC'], start_time=start_time)
             elif selected_player == 'MPV':
-                self._play_mpv(url, title, available_players['MPV'])
+                return self._play_mpv(url, title, available_players['MPV'], start_time=start_time)
             elif selected_player == 'MPC-HC':
-                self._play_mpc(url, title, available_players['MPC-HC'])
+                return self._play_mpc(url, title, available_players['MPC-HC'])
         except Exception as e:
             if self.console:
                 from rich.text import Text
@@ -169,8 +254,9 @@ class PlayerManager:
             else:
                 print(f"Error launching player: {str(e)}", file=sys.stderr)
                 input("Press Enter to continue...")
+        return default_result
 
-    def _play_vlc(self, url: str, title: str, vlc_path: str = None):
+    def _play_vlc(self, url: str, title: str, vlc_path: str = None, start_time: float = 0.0) -> dict:
         if not vlc_path:
             vlc_path = self.get_available_players().get('VLC')
         
@@ -181,19 +267,24 @@ class PlayerManager:
             vlc_path,
             '--fullscreen',
             '--play-and-exit',
-            '--start-time=5',
             '--meta-title', title,
-            url
         ]
+        if start_time and start_time > 0:
+            vlc_args.append(f'--start-time={int(start_time)}')
+            
+        vlc_args.append(url)
         
+        t_start = time.time()
         subprocess.run(
             vlc_args,
             check=False,
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL
         )
+        elapsed = time.time() - t_start
+        return {'time_pos': start_time + elapsed, 'duration': 0.0, 'percent': 0.0, 'completed': False}
 
-    def _play_mpv(self, url: str, title: str, mpv_path: str = None):
+    def _play_mpv(self, url: str, title: str, mpv_path: str = None, start_time: float = 0.0) -> dict:
         if not mpv_path:
             mpv_path = self.get_available_players().get('MPV')
         
@@ -211,6 +302,19 @@ class PlayerManager:
         elif "ab-hunter.com" in url or "anslayer.com" in url:
             referer = "https://anslayer.com/"
 
+        # Setup IPC Socket
+        is_win = (os.name == 'nt')
+        ipc_id = f"ani_mpv_{os.getpid()}_{int(time.time()*1000)}"
+        if is_win:
+            sock_path = f"\\\\.\\pipe\\{ipc_id}"
+        else:
+            sock_path = os.path.join(tempfile.gettempdir(), f"{ipc_id}.sock")
+            if os.path.exists(sock_path):
+                try:
+                    os.remove(sock_path)
+                except Exception:
+                    pass
+
         # High-performance stream caching & hardware decoding for MPV
         mpv_args = [
             mpv_path,
@@ -226,7 +330,7 @@ class PlayerManager:
             '--cache-pause=yes',
             '--cache-pause-wait=3',
             '--cache-pause-initial=no',
-            '--start=00:05',
+            f'--input-ipc-server={sock_path}',
             '--hr-seek=yes',
             '--hr-seek-framedrop=yes',
             '--stream-buffer-size=16MiB',
@@ -242,11 +346,19 @@ class PlayerManager:
             f'--force-media-title={title}',
         ]
         
+        if start_time and start_time > 0:
+            mpv_args.append(f'--start={start_time}')
+        else:
+            mpv_args.append('--start=0')
+
         if referer:
             mpv_args.append(f'--referrer={referer}')
 
         mpv_args.append(url)
         mpv_args.append('--force-window=yes')
+
+        tracker = MpvTracker(sock_path)
+        tracker.start()
 
         logger.log_player("MPV", mpv_args)
         t_start = time.time()
@@ -261,11 +373,20 @@ class PlayerManager:
         duration = time.time() - t_start
         logger.log_player("MPV", mpv_args, exit_code=result.returncode, stderr_output=result.stderr, duration=duration)
         
+        tracker.stop()
+        if not is_win and os.path.exists(sock_path):
+            try:
+                os.remove(sock_path)
+            except Exception:
+                pass
+
         if result.returncode != 0:
             if self.console:
                 from rich.text import Text
                 self.console.print(Text("⚠ Stream closed or unreachable. Select another server if playback failed.", style="bold yellow"))
                 time.sleep(0.6)
+
+        return tracker.state
 
     def _play_mpc(self, url: str, title: str, mpc_path: str = None):
         if not mpc_path:
