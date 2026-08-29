@@ -2004,12 +2004,12 @@ class UIManager:
 
             # Organized Keycaps Dock
             dock = Text()
-            dock.append("[←/→] ", style=f"bold {c_title}")
+            dock.append("[Tab/1-4] ", style=f"bold {c_title}")
             dock.append("Tabs   ", style="dim white")
             dock.append("[↑/↓] ", style=f"bold {c_title}")
             dock.append("Navigate   ", style="dim white")
-            dock.append("[Space/↵] ", style=f"bold {c_title}")
-            dock.append("Toggle   ", style="dim white")
+            dock.append("[←/→/↵/Space] ", style=f"bold {c_title}")
+            dock.append("Change Value   ", style="dim white")
             dock.append("[Esc/B] ", style="bold #ff79c6")
             dock.append("Save & Exit", style="dim white")
 
@@ -2038,11 +2038,11 @@ class UIManager:
                             cur_tab = new_tab
                             selected_row = 0
                             live.update(generate_renderable(), refresh=True)
-                    elif key == 'TAB' or key == 'RIGHT' or key == 'l':
+                    elif key in ['TAB', 'tab', ']']:
                         cur_tab = (cur_tab + 1) % len(tabs)
                         selected_row = 0
                         live.update(generate_renderable(), refresh=True)
-                    elif key == 'LEFT' or key == 'h':
+                    elif key == '[':
                         cur_tab = (cur_tab - 1) % len(tabs)
                         selected_row = 0
                         live.update(generate_renderable(), refresh=True)
@@ -2052,7 +2052,7 @@ class UIManager:
                     elif (key == 'DOWN' or key == 'j') and selected_row < len(options) - 1:
                         selected_row += 1
                         live.update(generate_renderable(), refresh=True)
-                    elif key == 'ENTER' or key == ' ' or key == 'SPACE':
+                    elif key in ['ENTER', ' ', 'SPACE', 'RIGHT', 'l', 'LEFT', 'h']:
                         label, choices, key_name = options[selected_row]
                         current_val = settings_mgr.get(key_name)
 
@@ -2093,11 +2093,15 @@ class UIManager:
                             continue
                         
                         if choices:
+                            is_backward = (key in ['LEFT', 'h'])
                             try:
                                 curr_idx = choices.index(current_val)
-                                new_val = choices[(curr_idx + 1) % len(choices)]
+                                if is_backward:
+                                    new_val = choices[(curr_idx - 1) % len(choices)]
+                                else:
+                                    new_val = choices[(curr_idx + 1) % len(choices)]
                             except ValueError:
-                                new_val = choices[0]
+                                new_val = choices[-1] if is_backward else choices[0]
                                 
                             settings_mgr.set(key_name, new_val)
                             
@@ -2107,6 +2111,8 @@ class UIManager:
                             
                             if key_name == "anime_provider":
                                 provider_changed = True
+                                from .providers import ProviderManager
+                                ProviderManager.set_active_provider(new_val)
                             
                             if key_name == "debug_logging":
                                 if new_val:
