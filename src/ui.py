@@ -110,6 +110,16 @@ class UIManager:
     def render_message(self, title: str, message: str, style_name: str = "info"):
         self.clear()
         
+        c_title = getattr(config_module, 'COLOR_TITLE', COLOR_TITLE)
+        c_border = getattr(config_module, 'COLOR_BORDER', COLOR_BORDER)
+        c_error = getattr(config_module, 'COLOR_ERROR', COLOR_ERROR)
+        
+        border_col = c_error if style_name == "error" else c_border
+        icon = "✗" if style_name == "error" else "ℹ"
+        
+        # Clean title to prevent double icons
+        clean_title = title.replace("✗", "").replace("ℹ", "").replace("✔", "").strip()
+        
         # Create styled message text
         message_text = Text()
         for line in message.split('\n'):
@@ -117,37 +127,29 @@ class UIManager:
                 if line.startswith('•'):
                     message_text.append(f"  {line}\n", style="white")
                 else:
-                    message_text.append(f"{line}\n", style=f"bold {COLOR_SUBTITLE}" if style_name != "error" else "bold white")
+                    message_text.append(f"{line}\n", style="bold white" if style_name == "error" else f"bold {c_border}")
             else:
                 message_text.append("\n")
         
-        border_col = "#FF6B6B" if style_name == "error" else COLOR_BORDER
         box_width = min(64, self.console.width - 4)
         
         panel = Panel(
             Align.center(message_text, vertical="middle"),
-            title=f"[bold {COLOR_TITLE}]{title}[/bold {COLOR_TITLE}]",
-            box=HEAVY,
+            title=f"[bold {border_col}] {icon} {clean_title} [/bold {border_col}]",
+            box=ROUNDED,
             border_style=border_col,
             padding=(1, 4),
             width=box_width
         )
         
-        # Header with Logo & Title Badge
+        # Header with Logo
         header_table = Table.grid(expand=False)
         header_table.add_column(justify="center")
         header_table.add_row(Align.center(self._get_torlink_ascii_logo()))
-        header_table.add_row(Text(""))
-
-        title_badge = Text()
-        title_badge.append("[ ", style=f"bold {border_col}")
-        title_badge.append(f"{title}", style="bold white")
-        title_badge.append(" ]", style=f"bold {border_col}")
-        header_table.add_row(Align.center(title_badge))
 
         hint_text = Text()
-        hint_text.append("↵", style=f"bold {COLOR_TITLE}")
-        hint_text.append(" continue", style="white")
+        hint_text.append("[↵/Space] ", style=f"bold {c_title}")
+        hint_text.append("Continue", style="dim white")
 
         root = Table.grid(expand=False)
         root.add_column(justify="center")
@@ -158,19 +160,42 @@ class UIManager:
         root.add_row(Align.center(hint_text))
 
         self.console.print(Align.center(root, vertical="middle", height=self.console.height))
-        Prompt.ask("", console=self.console, default="")
+        
+        # We need a proper key wait here rather than Prompt.ask, which requires terminal enter
+        with RawTerminal():
+            while True:
+                key = get_key()
+                if key in ['ENTER', ' ', 'ESC', 'q', 'b']:
+                    break
 
     def render_timed_message(self, title: str, message: str, style_name: str = "info", duration: float = 1.4):
         self.clear()
 
-        message_text = Text(message, style="white", justify="center")
-        border_col = "#FF6B6B" if style_name == "error" else COLOR_BORDER
+        c_title = getattr(config_module, 'COLOR_TITLE', COLOR_TITLE)
+        c_border = getattr(config_module, 'COLOR_BORDER', COLOR_BORDER)
+        c_error = getattr(config_module, 'COLOR_ERROR', COLOR_ERROR)
+        
+        border_col = c_error if style_name == "error" else c_border
+        icon = "✗" if style_name == "error" else "ℹ"
+        
+        clean_title = title.replace("✗", "").replace("ℹ", "").replace("✔", "").strip()
+        
+        message_text = Text()
+        for line in message.split('\n'):
+            if line.strip():
+                if line.startswith('•'):
+                    message_text.append(f"  {line}\n", style="white")
+                else:
+                    message_text.append(f"{line}\n", style="bold white" if style_name == "error" else f"bold {c_border}")
+            else:
+                message_text.append("\n")
+
         box_width = min(64, self.console.width - 4)
 
         panel = Panel(
             Align.center(message_text, vertical="middle"),
-            title=f"[bold {COLOR_TITLE}]{title}[/bold {COLOR_TITLE}]",
-            box=HEAVY,
+            title=f"[bold {border_col}] {icon} {clean_title} [/bold {border_col}]",
+            box=ROUNDED,
             border_style=border_col,
             padding=(1, 4),
             width=box_width
@@ -179,13 +204,6 @@ class UIManager:
         header_table = Table.grid(expand=False)
         header_table.add_column(justify="center")
         header_table.add_row(Align.center(self._get_torlink_ascii_logo()))
-        header_table.add_row(Text(""))
-
-        title_badge = Text()
-        title_badge.append("[ ", style=f"bold {border_col}")
-        title_badge.append(f"{title}", style="bold white")
-        title_badge.append(" ]", style=f"bold {border_col}")
-        header_table.add_row(Align.center(title_badge))
 
         root = Table.grid(expand=False)
         root.add_column(justify="center")
@@ -1825,16 +1843,22 @@ class UIManager:
         def generate_renderable():
             tab_name, options = tabs[cur_tab]
             box_width = min(72, self.console.width - 4)
-            bolt_color = getattr(config_module, 'COLOR_BOLT', COLOR_BOLT)
+            
+            c_title = getattr(config_module, 'COLOR_TITLE', COLOR_TITLE)
+            c_border = getattr(config_module, 'COLOR_BORDER', COLOR_BORDER)
+            c_sub = getattr(config_module, 'COLOR_SUBTITLE', COLOR_SUBTITLE)
+            c_hl_fg = getattr(config_module, 'COLOR_HIGHLIGHT_FG', COLOR_HIGHLIGHT_FG)
+            c_hl_bg = getattr(config_module, 'COLOR_HIGHLIGHT_BG', COLOR_HIGHLIGHT_BG)
+            c_bolt = getattr(config_module, 'COLOR_BOLT', COLOR_BOLT)
             
             # Modern Horizontal Segmented Tabs Bar
             tabs_bar = Text()
             for idx, (tname, _) in enumerate(tabs):
                 num_badge = f"{idx+1}"
                 if idx == cur_tab:
-                    tabs_bar.append(f" [{num_badge}] {tname} ", style=f"bold {COLOR_HIGHLIGHT_FG} on {COLOR_HIGHLIGHT_BG}")
+                    tabs_bar.append(f" [{num_badge}] {tname} ", style=f"bold {c_hl_fg} on {c_hl_bg}")
                 else:
-                    tabs_bar.append(f" [{num_badge}] {tname} ", style=f"dim {COLOR_SUBTITLE}")
+                    tabs_bar.append(f" [{num_badge}] {tname} ", style=f"dim {c_sub}")
                 if idx < len(tabs) - 1:
                     tabs_bar.append(" ")
 
@@ -1852,8 +1876,8 @@ class UIManager:
                 # Label part
                 label_text = Text()
                 if is_selected:
-                    label_text.append("▌ ", style=f"bold {COLOR_TITLE}")
-                    label_text.append(label, style=f"bold {COLOR_TITLE}")
+                    label_text.append("▌ ", style=f"bold {c_title}")
+                    label_text.append(label, style=f"bold {c_title}")
                 else:
                     label_text.append("  ", style="dim")
                     label_text.append(label, style="white")
@@ -1862,7 +1886,7 @@ class UIManager:
                 val_text = Text()
                 if isinstance(current_val, bool):
                     if current_val:
-                        v_style = "bold #ff79c6" if is_modified else f"bold {bolt_color}"
+                        v_style = "bold #ff79c6" if is_modified else f"bold {c_bolt}"
                         tag = "[● ON] *" if is_modified else "[● ON]"
                         val_text.append(tag, style=v_style)
                     else:
@@ -1878,7 +1902,7 @@ class UIManager:
                     if is_modified:
                         val_text.append(f"⟨ {display_str} ⟩ *", style="bold #ff79c6")
                     else:
-                        val_style = f"bold {COLOR_TITLE}" if is_selected else "bold white"
+                        val_style = f"bold {c_title}" if is_selected else "bold white"
                         val_text.append(f"⟨ {display_str} ⟩", style=val_style)
 
                 list_table.add_row(label_text, val_text)
@@ -1891,9 +1915,9 @@ class UIManager:
 
             panel = Panel(
                 panel_content,
-                title=f"[bold {COLOR_TITLE}] ⚙ Settings & Preferences • {tab_name} [/bold {COLOR_TITLE}]",
+                title=f"[bold {c_title}] ⚙ Settings & Preferences • {tab_name} [/bold {c_title}]",
                 box=ROUNDED,
-                border_style=COLOR_BORDER,
+                border_style=c_border,
                 padding=(1, 2),
                 width=box_width
             )
@@ -1908,18 +1932,20 @@ class UIManager:
             toast_table.add_column(justify="center")
             if last_notification and (time.time() - last_notification_time < 2.5):
                 toast_text = Text()
-                toast_text.append(f" {last_notification} ", style=f"bold #1a1b26 on {bolt_color}")
+                toast_text.append(f" {last_notification} ", style=f"bold #1a1b26 on {c_bolt}")
                 toast_table.add_row(Align.center(toast_text))
+                toast_table.add_row(Text("")) # padding under toast!
             else:
+                toast_table.add_row(Text(""))
                 toast_table.add_row(Text(""))
 
             # Organized Keycaps Dock
             dock = Text()
-            dock.append("[←/→] ", style=f"bold {COLOR_TITLE}")
+            dock.append("[←/→] ", style=f"bold {c_title}")
             dock.append("Tabs   ", style="dim white")
-            dock.append("[↑/↓] ", style=f"bold {COLOR_TITLE}")
+            dock.append("[↑/↓] ", style=f"bold {c_title}")
             dock.append("Navigate   ", style="dim white")
-            dock.append("[Space/↵] ", style=f"bold {COLOR_TITLE}")
+            dock.append("[Space/↵] ", style=f"bold {c_title}")
             dock.append("Toggle   ", style="dim white")
             dock.append("[Esc/B] ", style="bold #ff79c6")
             dock.append("Save & Exit", style="dim white")
@@ -2059,8 +2085,12 @@ class UIManager:
                         )
                         
                         if has_any_change:
+                            # Dynamic colors for apply animation
+                            c_title = getattr(config_module, 'COLOR_TITLE', COLOR_TITLE)
+                            c_bolt = getattr(config_module, 'COLOR_BOLT', COLOR_BOLT)
+                            bolt_palette = getattr(config_module, "COLOR_BOLT_GLOW", [c_bolt])
+                            
                             # 1. Smooth Bouncing Bar Apply Animation
-                            bolt_palette = getattr(config_module, "COLOR_BOLT_GLOW", [COLOR_BOLT])
                             for i in range(8):
                                 c = bolt_palette[i % len(bolt_palette)]
                                 frame = BOUNCING_BAR_FRAMES[i % len(BOUNCING_BAR_FRAMES)]
@@ -2071,7 +2101,7 @@ class UIManager:
                                 
                                 panel = Panel(
                                     Align.center(anim_text, vertical="middle"),
-                                    title=f"[bold {COLOR_TITLE}] ⚙ Settings [/bold {COLOR_TITLE}]",
+                                    title=f"[bold {c_title}] ⚙ Settings [/bold {c_title}]",
                                     box=ROUNDED,
                                     border_style=c,
                                     padding=(1, 3),
@@ -2099,16 +2129,15 @@ class UIManager:
                                     msg_lines.append(f"{k.replace('_', ' ').title()}: {disp_val}")
 
                             msg_text = Text()
-                            bolt_color = getattr(config_module, "COLOR_BOLT", COLOR_BOLT)
-                            msg_text.append("✔ Preferences Saved Successfully\n\n", style=f"bold {bolt_color}")
+                            msg_text.append("✔ Preferences Saved Successfully\n\n", style=f"bold {c_bolt}")
                             for line in msg_lines[:5]:
                                 msg_text.append(f" • {line}\n", style="white")
 
                             panel = Panel(
                                 Align.center(msg_text, vertical="middle"),
-                                title=f"[bold {COLOR_TITLE}] ⚙ Saved [/bold {COLOR_TITLE}]",
+                                title=f"[bold {c_title}] ⚙ Saved [/bold {c_title}]",
                                 box=ROUNDED,
-                                border_style=bolt_color,
+                                border_style=c_bolt,
                                 padding=(1, 3),
                                 width=min(56, self.console.width - 4)
                             )
