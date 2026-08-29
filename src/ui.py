@@ -2057,6 +2057,18 @@ class UIManager:
                             if key_name == "theme":
                                 theme_changed = True
                                 importlib.reload(config_module)
+                                
+                                # Universal In-Memory Theme Propagation
+                                # This ensures any module (like app.py) that did `from .config import COLOR_X` 
+                                # gets their local namespace updated instantly.
+                                import sys
+                                for mod_name, mod in list(sys.modules.items()):
+                                    if mod and (mod_name.startswith('src.') or mod_name == '__main__'):
+                                        for attr_name in dir(config_module):
+                                            if attr_name.startswith('COLOR_') or attr_name in ['HEADER_ART', 'GOODBYE_ART']:
+                                                if hasattr(mod, attr_name):
+                                                    setattr(mod, attr_name, getattr(config_module, attr_name))
+                                                    
                                 self.theme = Theme({
                                     "panel.border": config_module.COLOR_BORDER,
                                     "prompt.prompt": config_module.COLOR_PROMPT,
