@@ -6,6 +6,7 @@ import subprocess
 import tempfile
 from typing import Optional
 from .utils import is_bundled
+from .logger import logger
 
 class PlayerManager:
     def __init__(self, rpc_manager=None, console=None):
@@ -23,7 +24,6 @@ class PlayerManager:
                     self.temp_mpv_path = os.path.join(temp_dir, exe_name)
                     shutil.copy2(bundled_mpv, self.temp_mpv_path)
                     
-                    # Ensure executable permissions on Linux/macOS
                     if os.name != 'nt':
                         st = os.stat(self.temp_mpv_path)
                         os.chmod(self.temp_mpv_path, st.st_mode | 0o111)
@@ -41,7 +41,6 @@ class PlayerManager:
             if os.path.exists(local_mpv):
                 return local_mpv
 
-            # Check system PATH
             if shutil.which('mpv'):
                 return 'mpv'
             
@@ -114,7 +113,7 @@ class PlayerManager:
         available_players = self.get_available_players()
         
         if not available_players:
-            msg = "No video players found on your computer. Please download and install VLC Media Player from https://www.videolan.org/vlc/"
+            msg = "No video players found on your computer. Please download and install MPV or VLC Media Player."
             if self.console:
                 from rich.text import Text
                 self.console.print(Text(msg, style="bold red"))
@@ -130,7 +129,11 @@ class PlayerManager:
         if len(player_names) == 1:
             selected_player = player_names[0]
         else:
-            if self.console:
+            if 'MPV' in available_players and player_type == 'mpv':
+                selected_player = 'MPV'
+            elif 'VLC' in available_players and player_type == 'vlc':
+                selected_player = 'VLC'
+            elif self.console:
                 from rich.prompt import Prompt
                 from rich.panel import Panel
                 from rich.text import Text
@@ -149,22 +152,7 @@ class PlayerManager:
                 )
                 selected_player = player_names[int(choice)-1]
             else:
-                print("\nAvailable Video Players:")
-                for i, name in enumerate(player_names):
-                    print(f"{i+1}. {name}")
-                
-                while True:
-                    try:
-                        choice = input(f"Choose a video player (1-{len(player_names)}) [1]: ")
-                        if not choice.strip():
-                            choice = "1"
-                        choice_idx = int(choice) - 1
-                        if 0 <= choice_idx < len(player_names):
-                            selected_player = player_names[choice_idx]
-                            break
-                        print("Invalid choice.")
-                    except ValueError:
-                        print("Invalid input.")
+                selected_player = player_names[0]
 
         try:
             if selected_player == 'VLC':
@@ -193,6 +181,7 @@ class PlayerManager:
             vlc_path,
             '--fullscreen',
             '--play-and-exit',
+            '--start-time=5',
             '--meta-title', title,
             url
         ]
@@ -211,6 +200,18 @@ class PlayerManager:
         if not mpv_path or (mpv_path != 'mpv' and not os.path.exists(mpv_path)):
             raise FileNotFoundError(f"MPV not found at: {mpv_path}")
 
+        # Determine dynamic referer per provider
+        referer = None
+        if "vid3rb.com" in url:
+            referer = "https://video.vid3rb.com/"
+        elif "mediafire.com" in url:
+            referer = "https://www.mediafire.com/"
+        elif "ok.ru" in url:
+            referer = "https://ok.ru/"
+        elif "ab-hunter.com" in url or "anslayer.com" in url:
+            referer = "https://anslayer.com/"
+
+        # High-performance stream caching & hardware decoding for MPV
         mpv_args = [
             mpv_path,
             '--fullscreen',
@@ -218,41 +219,53 @@ class PlayerManager:
             '--keep-open=yes',
             '--ontop',
             '--cache=yes',
+            '--demuxer-max-bytes=300MiB',
+            '--demuxer-max-back-bytes=100MiB',
+            '--demuxer-readahead-secs=600',
+            '--cache-secs=600',
             '--cache-pause=yes',
-            '--cache-pause-initial=yes',
             '--cache-pause-wait=3',
-            '--demuxer-max-bytes=256M',
-            '--demuxer-max-back-bytes=128M',
-            '--cache-secs=30',
+            '--cache-pause-initial=no',
+            '--start=00:05',
+            '--hr-seek=yes',
+            '--hr-seek-framedrop=yes',
+            '--stream-buffer-size=16MiB',
+            '--network-timeout=30',
+            '--tls-verify=no',
+            '--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36',
             '--hwdec=auto-safe',
             '--vo=gpu',
-            '--profile=gpu-hq',
-            '--ytdl',
-            '--ytdl-format=bestvideo[height<=?1080]+bestaudio/best',
-            '--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+            '--profile=fast',
             '--sub-auto=fuzzy',
-            '--sub-file-paths=subs',
             '--slang=ara,ar,eng,en',
             '--alang=jpn,ja,eng,en',
-            '--title=' + title,
-            url
+            f'--force-media-title={title}',
         ]
         
+        if referer:
+            mpv_args.append(f'--referrer={referer}')
+
+        mpv_args.append(url)
         mpv_args.append('--force-window=yes')
 
+        logger.log_player("MPV", mpv_args)
+        t_start = time.time()
         result = subprocess.run(
             mpv_args,
             check=False,
             stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-            stdin=subprocess.DEVNULL
+            stderr=subprocess.PIPE,
+            stdin=subprocess.DEVNULL,
+            text=True
         )
+        duration = time.time() - t_start
+        logger.log_player("MPV", mpv_args, exit_code=result.returncode, stderr_output=result.stderr, duration=duration)
         
         if result.returncode != 0:
             if self.console:
                 from rich.text import Text
-                self.console.print(Text(f"MPV exited with error code {result.returncode}", style="bold red"))
-                input("Press Enter to continue...")
+                self.console.print(Text("⚠ Stream closed or unreachable. Select another server if playback failed.", style="bold yellow"))
+                time.sleep(0.6)
 
     def _play_mpc(self, url: str, title: str, mpc_path: str = None):
         if not mpc_path:
@@ -274,4 +287,4 @@ class PlayerManager:
             check=False,
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL
-        )
+        )
