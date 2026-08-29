@@ -276,30 +276,6 @@ class AnimeifyProvider(BaseAnimeProvider):
                 self._anime_cache[aid] = results[0]
             return results[0]
 
-        # Cross-provider resolution fallback
-        try:
-            from .manager import ProviderManager
-            if aid.isdigit():
-                slayer_details = ProviderManager.get_provider("anime_slayer").get_anime_details(aid)
-                if slayer_details and slayer_details.title_en and slayer_details.title_en != aid:
-                    hits = self.search_anime(slayer_details.title_en)
-                    if hits:
-                        with self._cache_lock:
-                            self._anime_cache[aid] = hits[0]
-                        return hits[0]
-                    return slayer_details
-            else:
-                a3rb_details = ProviderManager.get_provider("anime3rb").get_anime_details(aid)
-                if a3rb_details and a3rb_details.title_en and a3rb_details.title_en != aid:
-                    hits = self.search_anime(a3rb_details.title_en)
-                    if hits:
-                        with self._cache_lock:
-                            self._anime_cache[aid] = hits[0]
-                        return hits[0]
-                    return a3rb_details
-        except Exception:
-            pass
-
         return AnimeResult(id=aid, title_en=aid, thumbnail="")
 
     def get_episodes(self, anime_id: str) -> List[Episode]:
@@ -328,14 +304,7 @@ class AnimeifyProvider(BaseAnimeProvider):
                         data = []
 
         if not isinstance(data, list) or not data:
-            try:
-                from .manager import ProviderManager
-                if aid.isdigit():
-                    return ProviderManager.get_provider("anime_slayer").get_episodes(aid)
-                else:
-                    return ProviderManager.get_provider("anime3rb").get_episodes(aid)
-            except Exception:
-                return []
+            return []
 
         try:
             episodes = []
@@ -468,17 +437,6 @@ class AnimeifyProvider(BaseAnimeProvider):
                 if direct:
                     current_ep['FRLowQ'] = direct
                     qualities.append(QualityOption("Mediafire > 480p (SD)", "FRLowQ", "info", direct_url=direct, res="480p"))
-
-        # Fallback to alternate providers if Animeify has no direct working streams for this episode
-        if not qualities:
-            try:
-                from .manager import ProviderManager
-                if str(anime_id).isdigit():
-                    return ProviderManager.get_provider("anime_slayer").get_streaming_servers(str(anime_id), episode_num, anime_type)
-                else:
-                    return ProviderManager.get_provider("anime3rb").get_streaming_servers(str(anime_id), episode_num, anime_type)
-            except Exception:
-                pass
 
         if not current_ep and qualities:
             current_ep["FRLink"] = qualities[0].url

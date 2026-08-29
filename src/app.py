@@ -162,6 +162,12 @@ class AniCliArApp:
             if '-i' not in sys.argv and shutil.get_terminal_size().columns < 80:
                 return "SWITCH_TO_CLI"
 
+            # Always synchronize active provider directly from settings before home screen/actions
+            active_provider_id = self.settings.get("anime_provider") or "anime3rb"
+            self.provider = ProviderManager.get_provider(active_provider_id)
+            self.api = self.provider
+            ProviderManager.set_active_provider(active_provider_id)
+
             if query_override:
                 action, payload = "search", query_override
                 query_override = None
@@ -661,22 +667,7 @@ class AniCliArApp:
             if detailed.thumbnail:
                 selected_anime.thumbnail = detailed.thumbnail
 
-        eps = self.api.get_episodes(selected_anime.id)
-        
-        # Fallback to alternate provider if no episodes returned
-        if not eps:
-            try:
-                from src.providers.manager import ProviderManager
-                other_pid = "anime_slayer" if getattr(self.api, "id", "") == "anime3rb" else "anime3rb"
-                other_prov = ProviderManager.get_provider(other_pid)
-                search_title = selected_anime.title_en or selected_anime.title_ar or selected_anime.id.replace("-", " ")
-                alt_results = other_prov.search_anime(search_title)
-                if alt_results:
-                    eps = other_prov.get_episodes(alt_results[0].id)
-                    if eps and not selected_anime.thumbnail and alt_results[0].thumbnail:
-                        selected_anime.thumbnail = alt_results[0].thumbnail
-            except Exception:
-                pass
+        eps = self.api.get_episodes(selected_anime.id) or []
 
         if selected_anime.thumbnail:
             screen_height = self.ui.console.height
