@@ -15,7 +15,7 @@ from rich.panel import Panel
 from rich.text import Text
 from rich.spinner import Spinner
 from rich.box import HEAVY
-from .config import COLOR_BORDER, COLOR_TITLE, COLOR_SUBTITLE
+from .config import COLOR_BORDER, COLOR_TITLE, COLOR_SUBTITLE, COLOR_BOLT
 
 if os.name == 'nt':
     import msvcrt
@@ -607,7 +607,7 @@ def _download_with_builtin(url, filename, filepath, console):
 
                 progress = Progress(
                     TextColumn(f"[bold {COLOR_TITLE}]{{task.fields[filename]}}", justify="center"),
-                    BarColumn(bar_width=32, complete_style=f"bold {COLOR_BORDER}", finished_style="bold #5af78e"),
+                    BarColumn(bar_width=32, complete_style=f"bold {COLOR_BORDER}", finished_style=f"bold {COLOR_BOLT}"),
                     "[bold white]{task.percentage:>3.1f}%",
                     "•",
                     DownloadColumn(binary_units=True),
