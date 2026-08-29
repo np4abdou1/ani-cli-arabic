@@ -9,7 +9,7 @@ from src.player import PlayerManager
 from src.models import QualityOption
 from src.history import HistoryManager
 from src.version import APP_VERSION
-from src.config import MINIMAL_ASCII_ART, GOODBYE_ART, THEMES
+from src.config import MINIMAL_ASCII_ART, GOODBYE_ART, THEMES, POPULAR_GENRES
 from rich.console import Console
 from rich.text import Text
 from rich.panel import Panel
@@ -27,8 +27,8 @@ class AniCliWrapper:
         
     def get_theme_color(self, key="ascii"):
         t_name = self.settings_manager.get("theme")
-        theme = THEMES.get(t_name, THEMES["blue"])
-        return theme.get(key, "blue")
+        theme = THEMES.get(t_name, THEMES.get("auto", THEMES["blue"]))
+        return theme.get(key, "#7eb3d4")
 
     def _get_rpc_status_text(self):
         if not self.settings_manager.get('discord_rpc'):
@@ -147,17 +147,9 @@ class AniCliWrapper:
         current_ep_data = server_data.get('CurrentEpisode', {})
         server_id = current_ep_data.get(selected_q.server_key)
         
-        if not server_id:
-            print(f"\033[1;31mNo server ID found for quality {selected_q.name}\033[0m")
-            return False
-
-        direct_url = None
-        with self.console.status(f"[bold cyan]Extracting {selected_q.name} link...[/bold cyan]", spinner="bouncingBar"):
-             mf_url = self.api.build_mediafire_url(server_id)
-             if mf_url:
-                 direct_url = self.api.extract_mediafire_direct(mf_url)
+        direct_url = selected_q.direct_url or server_id
         
-        if not direct_url:
+        if not direct_url or not direct_url.startswith("http"):
             print(f"\033[1;31mFailed to extract direct link for {selected_q.name}\033[0m")
             return False
 
@@ -390,14 +382,14 @@ class AniCliWrapper:
                 
                 # Show Menu / Prompt
                 margin = "   "
-                self.console.print(margin + "[cyan]T[/cyan]: Trending   [cyan]P[/cyan]: Popular", style="dim")
-                self.console.print(margin + "[cyan]G[/cyan]: Genres     [cyan]S[/cyan]: Studios", style="dim")
-                self.console.print(margin + "[cyan]D[/cyan]: 💖 Donate", style="dim")
+                self.console.print(margin + "[cyan]E[/cyan]: Latest Eps  [cyan]M[/cyan]: Movies   [cyan]T[/cyan]: Trending", style="dim")
+                self.console.print(margin + "[cyan]P[/cyan]: Popular     [cyan]R[/cyan]: Top Rated [cyan]G[/cyan]: Genres", style="dim")
+                self.console.print(margin + "[cyan]S[/cyan]: Studios     [cyan]D[/cyan]: 💖 Donate", style="dim")
                 self.console.print()
 
                 # Input
                 try:
-                    self.console.print(f"  [{border_color}]╭─   Search (or T,P,S,G,D)[/{border_color}]")
+                    self.console.print(f"  [{border_color}]╭─   Search (or E,M,T,P,R,G,S)[/{border_color}]")
                     self.console.print(f"  [{border_color}]╰─>[/{border_color}] ", end="")
                     query = input().strip()
                 except (KeyboardInterrupt, EOFError):
@@ -414,8 +406,44 @@ class AniCliWrapper:
             cmd = query.lower()
             query = None # Consume query
 
-            # Clear screen before showing results/submenus
-            # os.system('cls' if os.name == 'nt' else 'clear')
+            if cmd == 'e':
+                with self.console.status("[bold blue]Fetching latest episodes...[/bold blue]", spinner="dots"):
+                    eps = self.api.get_latest_episodes(limit=50)
+                if not eps:
+                    self.console.print("[red]No recent episodes found.[/red]")
+                    continue
+                ep_items = [f"EP {str(e['ep_num']).zfill(2)} • {e['title']}" for e in eps]
+                sel = self._launcher(ep_items, "Select Latest Episode to Play")
+                if sel and sel[0]:
+                    sel_idx = ep_items.index(sel[0]) if sel[0] in ep_items else 0
+                    chosen_ep = eps[sel_idx]
+                    # Fetch details and play
+                    with self.console.status(f"[bold blue]Loading {chosen_ep['title']}...[/bold blue]", spinner="dots"):
+                        anime_obj = self.api.get_anime_details(chosen_ep['slug'])
+                        all_eps = self.api.get_episodes(chosen_ep['slug'])
+                    if anime_obj and all_eps:
+                        self._process_episodes(anime_obj, all_eps)
+                os.system('cls' if os.name == 'nt' else 'clear')
+                self._print_header()
+                continue
+
+            if cmd == 'm':
+                with self.console.status("[bold blue]Fetching anime movies...[/bold blue]", spinner="dots"):
+                    results = self.api.get_movies(limit=100)
+                self.console.print(f"[green]Got {len(results)} movies[/green]")
+                self._process_anime_list(results, "Anime Movies")
+                os.system('cls' if os.name == 'nt' else 'clear')
+                self._print_header()
+                continue
+
+            if cmd == 'r':
+                with self.console.status("[bold blue]Fetching top-rated masterpieces (9-10)...[/bold blue]", spinner="dots"):
+                    results = self.api.get_top_rated_anime(limit=100, rate_tier="9-10")
+                self.console.print(f"[green]Got {len(results)} top-rated results[/green]")
+                self._process_anime_list(results, "Top Rated Anime (9-10)")
+                os.system('cls' if os.name == 'nt' else 'clear')
+                self._print_header()
+                continue
             
             if cmd == 't':
                 with self.console.status("[bold blue]Fetching trending...[/bold blue]", spinner="dots"):
@@ -429,8 +457,10 @@ class AniCliWrapper:
                 continue
                 
             if cmd == 'p':
-                 with self.console.status("[bold blue]Fetching popular...[/bold blue]", spinner="dots"):
-                    results = self.api.get_top_rated_anime(limit=100)
+                 with self.console.status("[bold blue]Fetching popular & spotlight...[/bold blue]", spinner="dots"):
+                    results = self.api.get_pinned_anime()
+                    if not results:
+                        results = self.api.get_trending_anime(limit=100)
                  self.console.print(f"[green]Got {len(results)} popular results[/green]")
                  self._process_anime_list(results, "Popular Anime")
                  os.system('cls' if os.name == 'nt' else 'clear')
@@ -438,16 +468,15 @@ class AniCliWrapper:
                  continue
                  
             if cmd == 'g':
-                genres = ["Action", "Adventure", "Comedy", "Drama", "Fantasy", 
-                          "Horror", "Mystery", "Romance", "Sci-Fi", "Slice of Life", 
-                          "Sports", "Supernatural", "Thriller", "Isekai", "School"]
-                sel = self._launcher(genres, "Select Genre")
+                genre_labels = [f"{g['name_en']} • {g['name_ar']}" for g in POPULAR_GENRES]
+                sel = self._launcher(genre_labels, "Select Genre")
                 if sel and sel[0]:
-                    genre = sel[0]
-                    with self.console.status(f"[bold blue]Fetching {genre} anime...[/bold blue]", spinner="dots"):
-                         results = self.api.get_anime_list("GENRE", genre, "SERIES", limit=100)
-                    self.console.print(f"[green]Got {len(results)} results for {genre}[/green]")
-                    self._process_anime_list(results, f"Genre: {genre}")
+                    sel_idx = genre_labels.index(sel[0]) if sel[0] in genre_labels else 0
+                    genre_obj = POPULAR_GENRES[sel_idx]
+                    with self.console.status(f"[bold blue]Fetching {genre_obj['name_en']} anime...[/bold blue]", spinner="dots"):
+                         results = self.api.get_genre_anime(genre_obj['slug'], limit=100)
+                    self.console.print(f"[green]Got {len(results)} results for {genre_obj['name_en']}[/green]")
+                    self._process_anime_list(results, f"Genre: {genre_obj['name_en']}")
                 
                 os.system('cls' if os.name == 'nt' else 'clear')
                 self._print_header()

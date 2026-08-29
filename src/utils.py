@@ -1,6 +1,7 @@
 import os
 import sys
 import time
+from typing import Optional, List, Dict, Any
 import shutil
 import subprocess
 import threading
@@ -14,6 +15,7 @@ from rich.panel import Panel
 from rich.text import Text
 from rich.spinner import Spinner
 from rich.box import HEAVY
+from .config import COLOR_BORDER, COLOR_TITLE, COLOR_SUBTITLE
 
 if os.name == 'nt':
     import msvcrt
@@ -37,9 +39,26 @@ _WINDOWS_RESERVED_FILENAMES = {
 def is_bundled():
     return getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS')
 
+def hide_cursor():
+    """Hide terminal cursor across Linux, macOS, and Windows ANSI."""
+    try:
+        sys.stdout.write("\033[?25l")
+        sys.stdout.flush()
+    except Exception:
+        pass
+
+def show_cursor():
+    """Show terminal cursor across Linux, macOS, and Windows ANSI."""
+    try:
+        sys.stdout.write("\033[?25h")
+        sys.stdout.flush()
+    except Exception:
+        pass
+
 def _enter_raw_mode():
     """Enter raw mode for the terminal (Linux/macOS only). Called once at start of menu."""
     global _linux_terminal_fd, _linux_old_settings, _linux_raw_mode
+    hide_cursor()
     if os.name == 'nt' or _linux_raw_mode:
         return
     try:
@@ -53,6 +72,7 @@ def _enter_raw_mode():
 def _exit_raw_mode():
     """Exit raw mode and restore terminal settings."""
     global _linux_terminal_fd, _linux_old_settings, _linux_raw_mode
+    show_cursor()
     if os.name == 'nt' or not _linux_raw_mode:
         return
     try:
@@ -243,6 +263,7 @@ class RawTerminal:
         self.old_settings = None
 
     def __enter__(self):
+        hide_cursor()
         if platform.system() != 'Windows':
             try:
                 self.fd = sys.stdin.fileno()
@@ -258,6 +279,7 @@ class RawTerminal:
         return self
 
     def __exit__(self, exc_type, exc_value, traceback):
+        show_cursor()
         if RawTerminal._lock:
             with RawTerminal._lock:
                 RawTerminal._active_instance = None
@@ -271,12 +293,120 @@ class RawTerminal:
                 pass
 
 
+class MouseTerminal(RawTerminal):
+    """Context manager for Raw Terminal with SGR Mouse tracking enabled."""
+    def __enter__(self):
+        res = super().__enter__()
+        try:
+            sys.stdout.write("\033[?1000h\033[?1002h\033[?1006h")
+            sys.stdout.flush()
+        except Exception:
+            pass
+        return res
+        
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        try:
+            sys.stdout.write("\033[?1000l\033[?1002l\033[?1006l")
+            sys.stdout.flush()
+        except Exception:
+            pass
+        super().__exit__(exc_type, exc_val, exc_tb)
+
+
+def get_home_input_event():
+    """
+    Read keyboard and mouse events for interactive home search.
+    Returns:
+      ('CHAR', ch)
+      ('BACKSPACE', None)
+      ('ENTER', None)
+      ('ESC', None)
+      ('MOUSE_CLICK', x, y)
+      ('MOUSE_MOVE', x, y)
+      None
+    """
+    if platform.system() == 'Windows':
+        if msvcrt.kbhit():
+            ch = msvcrt.getch()
+            if ch in [b'\r', b'\n']:
+                return ('ENTER', None)
+            elif ch in [b'\x08', b'\x7f']:
+                return ('BACKSPACE', None)
+            elif ch == b'\x1b':
+                return ('ESC', None)
+            elif ch in [b'\xe0', b'\x00']:
+                ch2 = msvcrt.getch()
+                if ch2 == b'S':
+                    return ('BACKSPACE', None)
+                return None
+            else:
+                try:
+                    return ('CHAR', ch.decode('utf-8'))
+                except Exception:
+                    return None
+        return None
+    else:
+        fd = sys.stdin.fileno()
+        if not select.select([fd], [], [], 0.05)[0]:
+            return None
+        try:
+            ch_bytes = os.read(fd, 1)
+        except (OSError, IOError):
+            return None
+        if not ch_bytes:
+            return None
+            
+        if ch_bytes == b'\x03':  # Ctrl+C
+            raise KeyboardInterrupt
+        if ch_bytes in [b'\r', b'\n']:
+            return ('ENTER', None)
+        if ch_bytes in [b'\x7f', b'\x08']:
+            return ('BACKSPACE', None)
+            
+        if ch_bytes == b'\x1b':
+            seq = ch_bytes.decode('utf-8', errors='ignore')
+            end_time = time.time() + 0.03
+            while time.time() < end_time:
+                if select.select([fd], [], [], 0.005)[0]:
+                    try:
+                        nb = os.read(fd, 1)
+                        if nb:
+                            seq += nb.decode('utf-8', errors='ignore')
+                            if seq.startswith('\x1b[<') and (seq.endswith('M') or seq.endswith('m')):
+                                m = re.match(r'\x1b\[<(\d+);(\d+);(\d+);([Mm])', seq)
+                                if m:
+                                    btn, x, y, act = int(m.group(1)), int(m.group(2)), int(m.group(3)), m.group(4)
+                                    if act == 'M' and btn == 0:
+                                        return ('MOUSE_CLICK', x, y)
+                                    elif btn == 35:
+                                        return ('MOUSE_MOVE', x, y)
+                                break
+                            if seq == '\x1b[3~':
+                                return ('BACKSPACE', None)
+                    except (OSError, IOError):
+                        break
+                else:
+                    break
+            if seq == '\x1b':
+                return ('ESC', None)
+            return None
+            
+        try:
+            char_str = ch_bytes.decode('utf-8')
+            if char_str.isprintable() or char_str == ' ':
+                return ('CHAR', char_str)
+        except Exception:
+            pass
+        return None
+
+
 def restore_terminal_for_input():
     """Temporarily restore normal terminal mode for user input (like Prompt.ask).
     
     Call this before using Rich's Prompt.ask() or similar input functions
     while inside a RawTerminal context. Call enter_raw_mode_after_input() after.
     """
+    show_cursor()
     if platform.system() == 'Windows':
         return  # Not needed on Windows
     
@@ -293,6 +423,7 @@ def enter_raw_mode_after_input():
     
     Call this after using Rich's Prompt.ask() or similar input functions.
     """
+    hide_cursor()
     if platform.system() == 'Windows':
         return  # Not needed on Windows
     
@@ -373,15 +504,15 @@ def sanitize_download_filename(filename):
 
 
 def _show_centered_download_message(console, title, message, is_error=False, duration=1.3):
-    border_style = "red" if is_error else "panel.border"
-    body = Text(message, justify="center", style="info")
+    border_style = "#ff6b6b" if is_error else COLOR_BORDER
+    body = Text(message, justify="center", style=f"bold {COLOR_SUBTITLE}" if not is_error else "bold white")
     panel = Panel(
         Align.center(body, vertical="middle"),
-        title=Text(title, style="title"),
+        title=f"[bold {COLOR_TITLE}]{title}[/bold {COLOR_TITLE}]",
         box=HEAVY,
         border_style=border_style,
-        padding=(2, 4),
-        width=72,
+        padding=(1, 4),
+        width=min(72, console.width - 4),
     )
 
     with Live(
@@ -418,14 +549,14 @@ def _download_with_aria2(url, filename, download_dir, filepath, console):
     if not aria2_path:
         return False
 
-    spinner = Spinner("dots", text=Text("Downloading with aria2c...", style="loading"))
+    spinner = Spinner("dots", text=Text(" Downloading with aria2c...", style="bold white"))
     panel = Panel(
         Align.center(spinner, vertical="middle"),
-        title=Text("DOWNLOAD", style="title"),
+        title=f"[bold {COLOR_TITLE}]Accelerated Download[/bold {COLOR_TITLE}]",
         box=HEAVY,
-        border_style="panel.border",
-        padding=(2, 4),
-        width=72,
+        border_style=COLOR_BORDER,
+        padding=(1, 4),
+        width=min(72, console.width - 4),
     )
 
     cmd = [
@@ -475,9 +606,9 @@ def _download_with_builtin(url, filename, filepath, console):
                 total_size = int(response.headers.get('content-length', 0))
 
                 progress = Progress(
-                    TextColumn("[bold blue]{task.fields[filename]}", justify="center"),
-                    BarColumn(bar_width=36),
-                    "[progress.percentage]{task.percentage:>3.1f}%",
+                    TextColumn(f"[bold {COLOR_TITLE}]{{task.fields[filename]}}", justify="center"),
+                    BarColumn(bar_width=32, complete_style=f"bold {COLOR_BORDER}", finished_style="bold #5af78e"),
+                    "[bold white]{task.percentage:>3.1f}%",
                     "•",
                     DownloadColumn(binary_units=True),
                     "•",
@@ -490,12 +621,12 @@ def _download_with_builtin(url, filename, filepath, console):
 
                 panel = Panel(
                     Align.center(progress, vertical="middle"),
-                    title=Text("DOWNLOADING", style="title"),
-                    subtitle=Text("Please wait...", style="secondary"),
+                    title=f"[bold {COLOR_TITLE}]Downloading Episode[/bold {COLOR_TITLE}]",
+                    subtitle=Text("saving to downloads directory", style=f"bold {COLOR_SUBTITLE}"),
                     box=HEAVY,
-                    border_style="panel.border",
-                    padding=(2, 2),
-                    width=92,
+                    border_style=COLOR_BORDER,
+                    padding=(1, 3),
+                    width=min(88, console.width - 4),
                 )
 
                 with Live(
@@ -527,6 +658,7 @@ def _download_with_builtin(url, filename, filepath, console):
     raise RuntimeError("Download failed")
 
 def download_file(url, filename, console, mode="internal", download_dir=None):
+    from .logger import logger
     filename = sanitize_download_filename(filename)
 
     # Use absolute path for compatibility with external tools (IDM/aria2)
@@ -548,6 +680,8 @@ def download_file(url, filename, console, mode="internal", download_dir=None):
         else:
             selected_mode = "internal"
 
+    logger.debug("DOWNLOAD", f"Starting download of '{filename}' via mode '{selected_mode}' from {url[:60]}...")
+    success = False
     try:
         if selected_mode == "idm":
             if _download_with_idm(url, filename, download_dir):
@@ -558,6 +692,7 @@ def download_file(url, filename, console, mode="internal", download_dir=None):
                     is_error=False,
                     duration=1.2,
                 )
+                success = True
                 return True
 
             _show_centered_download_message(
@@ -571,6 +706,7 @@ def download_file(url, filename, console, mode="internal", download_dir=None):
 
         if selected_mode == "aria2c":
             if _download_with_aria2(url, filename, download_dir, filepath, console):
+                success = True
                 return True
 
             _show_centered_download_message(
@@ -583,10 +719,10 @@ def download_file(url, filename, console, mode="internal", download_dir=None):
             selected_mode = "internal"
 
         if selected_mode == "internal":
-            return _download_with_builtin(url, filename, filepath, console)
+            success = _download_with_builtin(url, filename, filepath, console)
+            return success
 
         return False
-
     except KeyboardInterrupt:
         try:
             if os.path.exists(filepath):
@@ -617,3 +753,120 @@ def download_file(url, filename, console, mode="internal", download_dir=None):
             duration=1.8,
         )
         return False
+    finally:
+        logger.log_downloader(selected_mode, url, filename, success)
+
+try:
+    import arabic_reshaper
+    from bidi.algorithm import get_display
+    HAS_ARABIC_SUPPORT = True
+except ImportError:
+    HAS_ARABIC_SUPPORT = False
+
+def ar(text: Optional[str]) -> str:
+    """Proper Arabic shaping and BiDi reordering for terminal display."""
+    if not text or not HAS_ARABIC_SUPPORT:
+        return str(text or "").strip()
+    try:
+        raw_str = str(text).strip()
+        if any("\u0600" <= c <= "\u06FF" or "\u0750" <= c <= "\u077F" or "\u08A0" <= c <= "\u08FF" or "\uFB50" <= c <= "\uFDFF" or "\uFE70" <= c <= "\uFEFF" for c in raw_str):
+            reshaper = arabic_reshaper.ArabicReshaper(
+                configuration={
+                    'delete_harakat': True,
+                    'support_ligatures': True,
+                    'shift_harakat_position': False,
+                    'language': 'Arabic'
+                }
+            )
+            reshaped = reshaper.reshape(raw_str)
+            return get_display(reshaped)
+    except Exception:
+        pass
+    return str(text or "").strip()
+
+
+def ar_wrap(text: Optional[str], width: int = 34) -> str:
+    """Wrap Arabic text on word boundaries and shape each line with BiDi without double-wrap overflow."""
+    if not text:
+        return ""
+    import textwrap
+    clean_text = " ".join(str(text).split())
+    safe_width = max(16, width)
+    lines = textwrap.wrap(clean_text, width=safe_width)
+    return "\n".join(ar(line) for line in lines)
+
+
+AR_TO_EN_GENRES = {
+    "أكشن": "Action",
+    "مغامرات": "Adventure",
+    "كوميديا": "Comedy",
+    "دراما": "Drama",
+    "خيال": "Fantasy",
+    "خارق للطبيعة": "Supernatural",
+    "سحر": "Magic",
+    "غموض": "Mystery",
+    "رعب": "Horror",
+    "نفسي": "Psychological",
+    "رومانسي": "Romance",
+    "خيال علمي": "Sci-Fi",
+    "شريحة من الحياة": "Slice of Life",
+    "رياضي": "Sports",
+    "إثارة": "Suspense",
+    "تشويق": "Thriller",
+    "شونين": "Shounen",
+    "شوجو": "Shoujo",
+    "سينين": "Seinen",
+    "جوسي": "Josei",
+    "ميكا": "Mecha",
+    "موسيقى": "Music",
+    "عسكري": "Military",
+    "مدرسي": "School",
+    "تاريخي": "Historical",
+    "فضاء": "Space",
+    "حريم": "Harem",
+    "إيسيكاي": "Isekai",
+    "ألعاب": "Game",
+    "فنون قتالية": "Martial Arts",
+    "مصاصو دماء": "Vampires",
+    "شياطين": "Demons",
+    "ساموراي": "Samurai",
+    "قوى خارقة": "Super Power",
+    "محاكاة ساخرة": "Parody",
+    "بوليسي": "Police",
+    "أنثروبولوجي": "Anthropology",
+    "إياشيكي": "Iyashikei",
+    "الحياة اليومية": "Daily Life",
+}
+
+AR_TO_EN_TYPES = {
+    "مسلسل": "TV",
+    "فيلم": "Movie",
+    "أوفا": "OVA",
+    "أونا": "ONA",
+    "خاصة": "Special",
+    "حلقة خاصة": "Special",
+    "حلقة خاصة تلفزيونية": "TV Special",
+    "مستمر": "Airing",
+    "مكتمل": "Completed",
+}
+
+def clean_genre(g: Optional[str]) -> str:
+    """Return clean standard English/Latin genre label to avoid terminal font spacing bugs."""
+    if not g:
+        return ""
+    g_str = str(g).strip()
+    return AR_TO_EN_GENRES.get(g_str, g_str)
+
+def clean_type(t: Optional[str]) -> str:
+    """Return clean standard type label (TV, Movie, OVA, Special, etc.)."""
+    if not t:
+        return "TV"
+    t_str = str(t).strip()
+    return AR_TO_EN_TYPES.get(t_str, t_str)
+
+def clean_status(s: Optional[str]) -> str:
+    """Return clean standard status label (Completed, Airing, etc.)."""
+    if not s:
+        return "Completed"
+    s_str = str(s).strip()
+    return AR_TO_EN_TYPES.get(s_str, s_str)

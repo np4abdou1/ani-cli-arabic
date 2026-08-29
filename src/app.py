@@ -8,30 +8,39 @@ from rich.text import Text
 from rich.prompt import Prompt
 from rich.box import HEAVY
 
-from .config import COLOR_PROMPT, COLOR_BORDER
+from .config import COLOR_PROMPT, COLOR_BORDER, COLOR_TITLE, GOODBYE_ART, POPULAR_GENRES
 from .ui import UIManager
 from .api import AnimeAPI, get_trailers_base
+from .providers import ProviderManager
 from .monitoring import monitor
 from .player import PlayerManager
 from .discord_rpc import DiscordRPCManager
 from .models import QualityOption
-from .utils import download_file, flush_stdin
+from .utils import download_file, flush_stdin, show_cursor, hide_cursor
 from .history import HistoryManager
 from .settings import SettingsManager
 from .favorites import FavoritesManager
 from .updater import check_for_updates, get_version_status
 from .deps import ensure_dependencies
 from .cli import run_simple_cli
-from .config import GOODBYE_ART
+from .logger import logger, install_global_exception_handler
 import shutil
 import argparse
 
 class AniCliArApp:
     def __init__(self):
+        install_global_exception_handler()
+        atexit.register(show_cursor)
+        hide_cursor()
         self.ui = UIManager()
-        self.api = AnimeAPI()
-        self.rpc = DiscordRPCManager()
         self.settings = SettingsManager()
+        if self.settings.get("debug_logging"):
+            logger.enable()
+        active_provider_id = self.settings.get("anime_provider") or "anime3rb"
+        self.provider = ProviderManager.get_provider(active_provider_id)
+        self.api = self.provider
+        ProviderManager.set_active_provider(active_provider_id)
+        self.rpc = DiscordRPCManager()
         self.player = PlayerManager(rpc_manager=self.rpc, console=self.ui.console)
         self.history = HistoryManager()
         self.favorites = FavoritesManager()
@@ -46,11 +55,16 @@ class AniCliArApp:
             formatter_class=argparse.RawTextHelpFormatter
         )
         parser.add_argument('-i', '--interactive', action='store_true', help="Force minimal interactive CLI mode")
+        parser.add_argument('-d', '--debug', action='store_true', help="Enable verbose debug logging to file and console")
         parser.add_argument('-v', '--version', action='store_true', help="Show version information")
         parser.add_argument('query', nargs='*', help="Anime name to search for")
         
         args = parser.parse_args()
         
+        if args.debug:
+            logger.enable(console_mirror=True)
+            logger.debug("APP", "CLI flag --debug specified, verbose console mirror enabled")
+            
         if args.version:
             from .version import __version__
             print(f"ani-cli-arabic v{__version__}")
@@ -58,6 +72,8 @@ class AniCliArApp:
             
         self.force_cli = args.interactive
         initial_query = " ".join(args.query) if args.query else None
+        
+        logger.debug("APP", f"App starting | interactive={args.interactive} | debug={args.debug} | provider={self.settings.get('anime_provider')} | query={initial_query}")
 
         if not ensure_dependencies():
             print("\n[!] Cannot start without required dependencies.")
@@ -132,145 +148,99 @@ class AniCliArApp:
         }
         return run_simple_cli(query, deps=deps)
 
-    def run_tui_mode(self, query=None):
+    def run_tui_mode(self, initial_query=None):
+        query_override = initial_query
+        
         while True:
             if '-i' not in sys.argv and shutil.get_terminal_size().columns < 80:
                 return "SWITCH_TO_CLI"
 
-            self.ui.clear()
-
-            if hasattr(self, 'rpc_status') and self.settings.get('discord_rpc'):
-                if self.rpc.connected:
-                    self.rpc_status['status'] = True
-                elif self.rpc_status.get('status') is not None:
-                    self.rpc_status['status'] = False
-            
-            vertical_space = self.ui.console.height - 14
-            top_padding = (vertical_space // 2) - 2
-            
-            if top_padding > 0:
-                self.ui.print(Text("\n" * top_padding))
-
-            self.ui.print(Align.center(self.ui.get_header_renderable()))
-            self.ui.print()
-            
-            if self.settings.get('discord_rpc'):
-                if hasattr(self, 'rpc_status'):
-                    if self.rpc_status['status'] is True:
-                        self.ui.print(Align.center(Text.from_markup("Discord Rich Presence ✅", style="secondary")))
-                    elif self.rpc_status['status'] is None:
-                        self.ui.print(Align.center(Text.from_markup("Discord Rich Presence [dim](connecting...)[/dim]", style="dim")))
-                    else:
-                        self.ui.print(Align.center(Text.from_markup("Discord Rich Presence [dim](enabled, not connected)[/dim]", style="dim")))
+            if query_override:
+                action, payload = "search", query_override
+                query_override = None
             else:
-                self.ui.print(Align.center(Text.from_markup("Discord Rich Presence [dim](disabled)[/dim]", style="dim")))
-            
-            if self.settings.get('show_donation'):
-                self.ui.print()
-                donation_markup = "💖 [bold magenta dim]Support the project:[/bold magenta dim] [link=https://paypal.me/np4abdou][cyan underline dim]Click here to donate via PayPal[/cyan underline dim][/link] ☕"
-                self.ui.print(Align.center(Text.from_markup(donation_markup)))
-                
-            self.ui.print()
+                action, payload = self.ui.home_screen_menu(
+                    rpc_status=getattr(self, 'rpc_status', None),
+                    version_info=self.version_info
+                )
 
-            keybinds_panel = Panel(
-                Text("T: Trending | P: Popular | G: Genres | S: Studios | D: 💖 Donate | L: History | F: Favorites | C: Settings | Q: Quit", style="info", justify="center"),
-                box=HEAVY,
-                border_style=COLOR_BORDER
-            )
-            self.ui.print(Align.center(keybinds_panel))
-            self.ui.print()
-            
-            prompt_string = f" {Text('›', style=COLOR_PROMPT)} "
-            pad_width = (self.ui.console.width - 30) // 2
-            padding = " " * max(0, pad_width)
-            
-            if self.version_info and self.version_info.get('is_outdated'):
-                status_text = f"Dev: v{self.version_info['current']} → Latest: v{self.version_info['latest_pip']} (update available)"
-                self.ui.print(Align.center(Text(status_text, style="dim")))
-                self.ui.print()
-
-            flush_stdin()
-            
-            query = Prompt.ask(f"{padding}{prompt_string}", console=self.ui.console).strip().lower()
-            
-            if query in ['q', 'quit', 'exit']:
+            if action in ["quit", "exit"] or action is None:
                 break
-            
+
             results = []
-            
-            if query == 't':
-                self.rpc.update_trending()
-                results = self.ui.run_with_loading(
-                    "Fetching trending anime...",
-                    self.api.get_trending_anime,
-                    0,
-                    15
-                )
-                if results:
-                    def load_more_trending(current_count):
-                        return self.api.get_trending_anime(current_count, 15)
-                    self.handle_anime_selection_with_lazy_load(results, load_more_trending)
-                    continue
-            elif query == 'p':
-                self.rpc.update_popular()
-                results = self.ui.run_with_loading(
-                    "Fetching popular anime...",
-                    self.api.get_top_rated_anime,
-                    0,
-                    15
-                )
-                if results:
-                    def load_more_popular(current_count):
-                        return self.api.get_top_rated_anime(current_count, 15)
-                    self.handle_anime_selection_with_lazy_load(results, load_more_popular)
-                    continue
-            elif query == 'g':
-                self.rpc.update_genres()
+
+            if action == "latest":
+                self.handle_latest_episodes()
+                continue
+
+            elif action == "movies":
+                self.handle_movies()
+                continue
+
+            elif action == "top_rated":
+                self.handle_top_rated()
+                continue
+
+            elif action == "trending":
+                self.handle_trending()
+                continue
+
+            elif action == "popular":
+                self.handle_popular()
+                continue
+
+            elif action == "genres":
                 self.handle_genres()
                 continue
-            elif query == 's':
+
+            elif action == "studios":
                 self.rpc.update_studios()
                 self.handle_studios()
                 continue
-            elif query == 'd':
-                import webbrowser
-                webbrowser.open("https://paypal.me/np4abdou")
-                # Redraw
-                continue
-            elif query == 'l':
+
+            elif action == "history":
                 self.rpc.update_history()
                 self.handle_history()
                 continue
-            elif query == 'f':
+
+            elif action == "favorites":
                 self.rpc.update_favorites()
                 self.handle_favorites()
                 continue
-            elif query == 'c':
+
+            elif action == "settings":
                 self.rpc.update_settings()
                 self.ui.settings_menu(self.settings)
+                active_provider_id = self.settings.get("anime_provider") or "anime3rb"
+                self.provider = ProviderManager.get_provider(active_provider_id)
+                self.api = self.provider
+                ProviderManager.set_active_provider(active_provider_id)
                 continue
-            elif query == 'a':
-                self.ui.show_credits()
+
+            elif action == "donate":
+                import webbrowser
+                webbrowser.open("https://paypal.me/np4abdou")
                 continue
-            elif query:
+
+            elif action == "search":
+                search_query = payload
+                if not search_query:
+                    continue
                 self.rpc.update_searching()
-                results = self.ui.run_with_loading("Searching...", self.api.search_anime, query)
-            else:
+                results = self.ui.run_with_loading("Searching...", self.api.search_anime, search_query)
+                if not results:
+                    self.ui.render_message(
+                        "✗ No Anime Found", 
+                        f"No anime matching '{search_query}' was found.\n\nTry:\n• Checking spelling\n• Using English or Romaji name\n• Using Arabic title", 
+                        "error"
+                    )
+                    continue
+                self.handle_anime_selection(results)
                 continue
-            
-            if not results:
-                self.ui.render_message(
-                    "✗ No Anime Found", 
-                    f"No anime matching '{query}' was found.\n\nTry:\n• Checking spelling\n• Using English name\n• Using alternative titles", 
-                    "error"
-                )
-                continue
-            
-            self.handle_anime_selection(results)
 
     def handle_anime_selection_with_lazy_load(self, results, load_more_callback):
         while True:
-            anime_idx = self.ui.anime_selection_menu(results, load_more_callback=load_more_callback)
+            anime_idx = self.ui.anime_selection_menu(results, load_more_callback=load_more_callback, api=self.api)
             
             if anime_idx == -1:
                 sys.exit(0)
@@ -281,7 +251,6 @@ class AniCliArApp:
 
             self.rpc.update_viewing_anime(selected_anime.title_en, selected_anime.thumbnail)
             
-            
             episodes = self.ui.run_with_loading(
                 "Loading episodes & poster...",
                 lambda: self._fetch_episodes_and_poster(selected_anime)
@@ -289,38 +258,137 @@ class AniCliArApp:
             
             if not episodes:
                 self.ui.render_message(
-                    "✗ No Episodes",
-                    f"No episodes found for '{selected_anime.title_en}'.",
+                    "✗ No Episodes", 
+                    f"No episodes found for '{selected_anime.title_en}'.", 
                     "error"
                 )
                 continue
             
             self.handle_episode_selection(selected_anime, episodes)
 
-    def handle_genres(self):
-        genres = [
-            "Action", "Adventure", "Comedy", "Drama", "Fantasy", 
-            "Horror", "Mystery", "Romance", "Sci-Fi", "Slice of Life", 
-            "Sports", "Supernatural", "Thriller", "Isekai", "School"
-        ]
-        
-        selected_genre = self.ui.selection_menu(genres, title="Select Genre")
-        if selected_genre:
+    def handle_latest_episodes(self):
+        episodes = self.ui.run_with_loading(
+            "Fetching latest episodes...",
+            self.api.get_latest_episodes,
+            40
+        )
+        if not episodes:
+            self.ui.render_message("Info", "No recent episodes found.", "info")
+            return
+
+        while True:
+            res = self.ui.latest_episodes_menu(episodes)
+            if res is None:
+                break
+            idx, act = res
+            ep_info = episodes[idx]
+
+            selected_anime = self.ui.run_with_loading(
+                f"Loading {ep_info['title']}...",
+                self.api.get_anime_details,
+                ep_info["slug"]
+            )
+            if not selected_anime:
+                continue
+
+            all_episodes = self.ui.run_with_loading(
+                "Loading episode list...",
+                self.api.get_episodes,
+                selected_anime.id
+            )
+            if not all_episodes:
+                continue
+
+            if act == 'play':
+                initial_idx = self._find_episode_index(all_episodes, ep_info["ep_num"])
+                self.handle_episode_selection(selected_anime, all_episodes, initial_selected=initial_idx)
+            else:
+                self.handle_episode_selection(selected_anime, all_episodes)
+
+    def handle_movies(self):
+        results = self.ui.run_with_loading(
+            "Fetching anime movies...",
+            self.api.get_movies,
+            0,
+            20
+        )
+        if results:
+            def load_more_movies(current_count):
+                return self.api.get_movies(current_count, 20)
+            self.handle_anime_selection_with_lazy_load(results, load_more_movies)
+        else:
+            self.ui.render_message("Info", "No anime movies found.", "info")
+
+    def handle_top_rated(self):
+        results = self.ui.run_with_loading(
+            "Fetching top-rated anime (9-10)...",
+            self.api.get_top_rated_anime,
+            0,
+            20,
+            "9-10"
+        )
+        if results:
+            def load_more_top(current_count):
+                return self.api.get_top_rated_anime(current_count, 20, "9-10")
+            self.handle_anime_selection_with_lazy_load(results, load_more_top)
+        else:
+            self.ui.render_message("Info", "No top-rated anime found.", "info")
+
+    def handle_trending(self):
+        self.rpc.update_trending()
+        results = self.ui.run_with_loading(
+            "Fetching trending anime...",
+            self.api.get_trending_anime,
+            0,
+            20
+        )
+        if results:
+            def load_more_trending(current_count):
+                return self.api.get_trending_anime(current_count, 20)
+            self.handle_anime_selection_with_lazy_load(results, load_more_trending)
+        else:
+            self.ui.render_message("Info", "No trending anime found.", "info")
+
+    def handle_popular(self):
+        self.rpc.update_popular()
+        results = self.ui.run_with_loading(
+            "Fetching spotlight & popular anime...",
+            self.api.get_pinned_anime
+        )
+        if not results:
             results = self.ui.run_with_loading(
-                f"Fetching {selected_genre} anime...",
-                self.api.get_anime_list,
-                "GENRE",
-                selected_genre,
-                "SERIES",
+                "Fetching popular anime...",
+                self.api.get_trending_anime,
                 0,
-                15
+                20
+            )
+        if results:
+            def load_more_popular(current_count):
+                return self.api.get_trending_anime(current_count, 20)
+            self.handle_anime_selection_with_lazy_load(results, load_more_popular)
+        else:
+            self.ui.render_message("Info", "No popular anime found.", "info")
+
+    def handle_genres(self):
+        self.rpc.update_genres()
+        selected_genre = self.ui.genre_selection_menu(POPULAR_GENRES)
+        if selected_genre:
+            genre_name = selected_genre["name_en"] if isinstance(selected_genre, dict) else str(selected_genre)
+            genre_slug = selected_genre.get("slug", genre_name.lower()) if isinstance(selected_genre, dict) else genre_name.lower()
+
+            results = self.ui.run_with_loading(
+                f"Fetching {genre_name} anime...",
+                self.api.get_genre_anime,
+                genre_slug,
+                0,
+                20
             )
             if results:
                 def load_more_genre(current_count):
-                    return self.api.get_anime_list("GENRE", selected_genre, "SERIES", current_count, 15)
+                    return self.api.get_genre_anime(genre_slug, current_count, 20)
                 self.handle_anime_selection_with_lazy_load(results, load_more_genre)
             else:
-                self.ui.render_message("Info", f"No anime found for genre: {selected_genre}", "info")
+                self.ui.render_message("Info", f"No anime found for genre: {genre_name}", "info")
 
     def handle_studios(self):
         studios = [
@@ -328,7 +396,7 @@ class AniCliArApp:
             "TMS Entertainment", "Studio Pierrot", "Studio Deen", "A-1 Pictures", 
             "Bones", "Kyoto Animation", "MAPPA", "Wit Studio", "ufotable", 
             "White Fox", "David Production", "Shaft", "Trigger", "CloverWorks", 
-            "Lerche", "P.A. Works", "CoMix Wave Films", "Gainax", "Tatsunoko Production"
+            "Lerche", "P.A. Works", "CoMix Wave Films", "Gainax", "Studio Ghibli"
         ]
         studios.sort()
         
@@ -336,36 +404,37 @@ class AniCliArApp:
         if selected_studio:
             results = self.ui.run_with_loading(
                 f"Fetching {selected_studio} anime...",
-                self.api.get_anime_list,
-                "STUDIOS",
+                self.api.get_studio_anime,
                 selected_studio,
-                "SERIES",
                 0,
-                15
+                20
             )
             if results:
                 def load_more_studio(current_count):
-                    return self.api.get_anime_list("STUDIOS", selected_studio, "SERIES", current_count, 15)
+                    return self.api.get_studio_anime(selected_studio, current_count, 20)
                 self.handle_anime_selection_with_lazy_load(results, load_more_studio)
             else:
                 self.ui.render_message("Info", f"No anime found for studio: {selected_studio}", "info")
 
     def handle_history(self):
-        history_items = self.history.get_history()
-        if not history_items:
-            self.ui.render_message("Info", "No history found.", "info")
-            return
-
         while True:
-            selected_idx = self.ui.history_menu(history_items)
-            if selected_idx is None:
+            history_items = self.history.get_history()
+            if not history_items:
+                self.ui.render_message("Info", "No history found.", "info")
+                return
+
+            result = self.ui.history_menu(history_items)
+            if result is None:
                 break
             
+            selected_idx, action = result
             item = history_items[selected_idx]
-            # Resume directly without nested loading screen
-            self.resume_anime(item)
-            # Refresh history after watching
-            history_items = self.history.get_history()
+            
+            if action == 'remove':
+                self.history.remove(item['anime_id'])
+                continue
+            elif action == 'resume':
+                self.resume_anime(item)
 
     def _find_episode_index(self, episodes, episode_value):
         if episode_value is None:
@@ -409,7 +478,11 @@ class AniCliArApp:
             selected_anime = results[0] # Fallback
 
         self.rpc.update_viewing_anime(selected_anime.title_en, selected_anime.thumbnail)
-        episodes = self.api.get_episodes(selected_anime.id)
+        episodes = self.ui.run_with_loading(
+            "Loading episodes...", 
+            self.api.get_episodes, 
+            selected_anime.id
+        )
         
         if episodes:
             initial_idx = self._find_episode_index(episodes, history_item.get('episode'))
@@ -440,7 +513,7 @@ class AniCliArApp:
 
     def handle_anime_selection(self, results):
         while True:
-            anime_idx = self.ui.anime_selection_menu(results)
+            anime_idx = self.ui.anime_selection_menu(results, api=self.api)
             
             if anime_idx == -1:
                 sys.exit(0)
@@ -471,6 +544,21 @@ class AniCliArApp:
     
 
     def _fetch_episodes_and_poster(self, selected_anime):
+        # Fetch rich anime details and update model
+        detailed = self.api.get_anime_details(selected_anime.id)
+        if detailed:
+            selected_anime.score = detailed.score
+            selected_anime.genres = detailed.genres
+            selected_anime.status = detailed.status
+            selected_anime.premiered = detailed.premiered
+            selected_anime.creators = detailed.creators
+            selected_anime.synopsis = detailed.synopsis
+            selected_anime.trailer = detailed.trailer
+            selected_anime.yt_trailer = detailed.yt_trailer
+            selected_anime.trailers = detailed.trailers
+            if detailed.thumbnail:
+                selected_anime.thumbnail = detailed.thumbnail
+
         eps = self.api.get_episodes(selected_anime.id)
         if selected_anime.thumbnail:
             screen_height = self.ui.console.height
@@ -528,24 +616,7 @@ class AniCliArApp:
             self.ui.render_message("Error", "No trailer available for this anime.", "error")
             return
         
-        self.ui.clear()
-        
-        message_text = Text()
-        message_text.append("Trailer Launched!\n\n", style="bold green")
-        message_text.append("Playing trailer in MPV window...\n", style="info")
-        message_text.append("Close MPV to return to episodes list.", style="secondary")
-        
-        panel = Panel(
-            Align.center(message_text, vertical="middle"),
-            title=Text("Trailer", style="title"),
-            box=HEAVY,
-            border_style=COLOR_BORDER,
-            padding=(2, 6),
-            width=60
-        )
-        
-        self.ui.console.print(Align.center(panel, vertical="middle", height=self.ui.console.height))
-        
+        self.ui.render_now_playing(anime.title_en, "Official Trailer", "YouTube / Direct Stream")
         self.player.play(trailer_url, f"Trailer - {anime.title_en}")
 
     def handle_episode_selection(self, selected_anime, episodes, initial_idx=0):
@@ -641,7 +712,7 @@ class AniCliArApp:
                             self.ui.render_message("Info", "No more episodes!", "info")
                             break
 
-                    next_action = self.ui.post_watch_menu()
+                    next_action = self.ui.post_watch_menu(selected_anime.title_en, str(selected_ep.display_num))
                     
                     if next_action == "Next Episode":
                         if current_idx + 1 < len(episodes):
@@ -680,7 +751,19 @@ class AniCliArApp:
         quality_match = re.search(r"\b(\d{3,4}p)\b", quality_name or "")
         return quality_match.group(1) if quality_match else (quality_name or "auto")
 
-    def _pick_default_download_quality_option(self, current_ep_data):
+    def _pick_default_download_quality_option(self, server_data):
+        if isinstance(server_data, dict):
+            qualities = server_data.get('Qualities')
+            if qualities:
+                preferred = self._get_default_download_quality()
+                for q in qualities:
+                    if preferred in (q.res or q.name or ""):
+                        return q
+                return qualities[0]
+            current_ep_data = server_data.get('CurrentEpisode', {})
+        else:
+            current_ep_data = server_data
+
         qualities = [
             QualityOption("1080p", 'FRFhdQ', "info"),
             QualityOption("720p", 'FRLink', "info"),
@@ -714,27 +797,14 @@ class AniCliArApp:
         if not server_data:
             return None, None, "No servers found for this episode."
 
-        current_ep_data = server_data.get('CurrentEpisode', {})
-        selected_quality = self._pick_default_download_quality_option(current_ep_data)
+        selected_quality = self._pick_default_download_quality_option(server_data)
         if not selected_quality:
             return None, None, "No suitable quality found for this episode."
 
-        server_id = current_ep_data.get(selected_quality.server_key)
-        if not server_id:
-            return None, None, "Missing server id for selected quality."
-
-        mediafire_url = self.api.build_mediafire_url(server_id)
-        if show_loading:
-            direct_url = self.ui.run_with_loading(
-                "Extracting direct link...",
-                self.api.extract_mediafire_direct,
-                mediafire_url
-            )
-        else:
-            direct_url = self.api.extract_mediafire_direct(mediafire_url)
-
-        if not direct_url:
-            return None, None, "Failed to extract direct link from MediaFire."
+        current_ep_data = server_data.get('CurrentEpisode', {}) if isinstance(server_data, dict) else {}
+        direct_url = selected_quality.direct_url or current_ep_data.get(selected_quality.server_key)
+        if not direct_url or not direct_url.startswith("http"):
+            return None, None, "Failed to resolve direct video stream."
 
         quality_tag = self._extract_quality_tag(selected_quality.name)
         filename = f"{selected_anime.title_en} - Ep {selected_ep.display_num} [{quality_tag}].mp4"
@@ -778,7 +848,7 @@ class AniCliArApp:
         
         for idx in selected_indices:
             ep = episodes[idx]
-            direct_url, filename, error = self.resolve_default_download_target(selected_anime, ep, show_loading=False)
+            direct_url, filename, error = self.resolve_default_download_target(selected_anime, ep, show_loading=True)
 
             if error:
                 failed_count += 1
@@ -811,18 +881,19 @@ class AniCliArApp:
 
     def handle_quality_selection(self, selected_anime, selected_ep, server_data):
         current_ep_data = server_data.get('CurrentEpisode', {})
-        qualities = [
-            QualityOption("SD • 480p (Low Quality)", 'FRLowQ', "info"),
-            QualityOption("HD • 720p (Standard Quality)", 'FRLink', "info"),
-            QualityOption("FHD • 1080p (Full HD)", 'FRFhdQ', "info"),
-        ]
-        
-        available = [q for q in qualities if current_ep_data.get(q.server_key)]
+        available = server_data.get('Qualities')
+        if not available:
+            qualities = [
+                QualityOption("480p", 'FRLowQ', "info"),
+                QualityOption("720p", 'FRLink', "info"),
+                QualityOption("1080p", 'FRFhdQ', "info"),
+            ]
+            available = [q for q in qualities if current_ep_data.get(q.server_key)]
         
         if not available:
             self.ui.render_message(
                 "✗ No Links", 
-                "No MediaFire servers found for this episode.", 
+                "No video streams found for this episode.", 
                 "error"
             )
             return None
@@ -842,15 +913,9 @@ class AniCliArApp:
             
         idx, action = result
         quality = available[idx]
-        server_id = current_ep_data.get(quality.server_key)
+        direct_url = getattr(quality, 'direct_url', '') or getattr(quality, 'url', '') or current_ep_data.get(getattr(quality, 'server_key', ''))
         
-        direct_url = self.ui.run_with_loading(
-            "Extracting direct link...",
-            self.api.extract_mediafire_direct,
-            self.api.build_mediafire_url(server_id)
-        )
-        
-        if direct_url:
+        if direct_url and direct_url.startswith("http"):
             quality_match = re.search(r"\b(\d{3,4}p)\b", quality.name)
             quality_tag = quality_match.group(1) if quality_match else quality.name
             filename = f"{selected_anime.title_en} - Ep {selected_ep.display_num} [{quality_tag}].mp4"
@@ -869,35 +934,9 @@ class AniCliArApp:
                 return None
             else:
                 player_type = self.settings.get('player')
-                
-                from rich.text import Text
-                from rich.panel import Panel
-                from rich.align import Align
-                from rich.box import HEAVY
-                from .config import COLOR_BORDER, COLOR_TITLE
-                
-                watching_text = Text()
-                watching_text.append("▶ ", style=COLOR_TITLE + " blink")
-                watching_text.append(selected_anime.title_en, style="bold")
-                watching_text.append("\nEpisode ", style="secondary")
-                watching_text.append(str(selected_ep.display_num), style=COLOR_TITLE + " bold")
-                watching_text.append(" ◀", style=COLOR_TITLE + " blink")
-                watching_text.append(f"\n\n{quality.name}", style="dim")
-                
-                watching_panel = Panel(
-                    Align.center(watching_text, vertical="middle"),
-                    title=Text("NOW PLAYING", style=COLOR_TITLE + " bold"),
-                    box=HEAVY,
-                    border_style=COLOR_BORDER,
-                    padding=(2, 4),
-                    width=60
-                )
-                
-                self.ui.clear()
-                self.ui.console.print(Align.center(watching_panel, vertical="middle", height=self.ui.console.height))
+                self.ui.render_now_playing(selected_anime.title_en, f"Episode {selected_ep.display_num}", quality.name)
                 
                 self.rpc.update_watching(selected_anime.title_en, str(selected_ep.display_num), selected_anime.thumbnail)
-                
                 monitor.track_video_play(selected_anime.title_en, str(selected_ep.display_num))
                 
                 self.player.play(direct_url, f"{selected_anime.title_en} - Ep {selected_ep.display_num} ({quality.name})", player_type=player_type)
@@ -908,7 +947,7 @@ class AniCliArApp:
         else:
             self.ui.render_message(
                 "✗ Error", 
-                "Failed to extract direct link from MediaFire.", 
+                "Failed to resolve direct video stream for this quality.", 
                 "error"
             )
             return None
@@ -917,11 +956,12 @@ class AniCliArApp:
         self.ui.clear()
         
         panel = Panel(
-            Text("👋 Interrupted - Goodbye!", justify="center", style="info"),
-            title=Text("EXIT", style="title"),
+            Text("👋 Goodbye! See you next time.", justify="center", style="bold white"),
+            title=f"[bold {COLOR_TITLE}]Session Ended[/bold {COLOR_TITLE}]",
             box=HEAVY,
-            padding=1,
-            border_style=COLOR_BORDER
+            padding=(1, 4),
+            border_style=COLOR_BORDER,
+            width=min(50, self.ui.console.width - 4)
         )
         
         self.ui.print(Align.center(panel, vertical="middle", height=self.ui.console.height))
@@ -931,11 +971,12 @@ class AniCliArApp:
         self.ui.console.print_exception()
         
         panel = Panel(
-            Text(f"✗ Unexpected error: {e}", justify="center", style="error"),
-            title=Text("CRITICAL ERROR", style="title"),
+            Text(f"✗ Unexpected error: {e}", justify="center", style="bold #ff6b6b"),
+            title=f"[bold #ff6b6b]Critical Error[/bold #ff6b6b]",
             box=HEAVY,
-            padding=1,
-            border_style=COLOR_BORDER
+            padding=(1, 4),
+            border_style="#ff6b6b",
+            width=min(60, self.ui.console.width - 4)
         )
         
         self.ui.print(Align.center(panel, vertical="middle", height=self.ui.console.height))
@@ -964,6 +1005,7 @@ class AniCliArApp:
             self.ui.print("\n" * 2)
             self.ui.print(Align.center(Text(GOODBYE_ART, style=COLOR_ASCII)))
             self.ui.print("\n")
+        show_cursor()
 
 
 def main():

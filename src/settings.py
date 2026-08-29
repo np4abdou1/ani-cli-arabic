@@ -23,8 +23,10 @@ class SettingsManager:
             "auto_next": False,
             "discord_rpc": True,
             "show_donation": True,
-            "theme": "blue",
-            "analytics": True  # Allow users to opt-out of analytics
+            "theme": "auto",
+            "anime_provider": "anime3rb",
+            "analytics": True,  # Allow users to opt-out of analytics
+            "debug_logging": False  # Turned OFF by default
         }
         
         if not self.config_file.exists():

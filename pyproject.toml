@@ -36,6 +36,11 @@ dependencies = [
     "yt-dlp",                # Extract anime trailers from YouTube
     "Pillow>=10.0.0",        # Image processing for anime posters
     "numpy>=1.24.0",         # Array operations for image display
+    "curl-cffi>=0.7.0",      # Browserless TLS impersonation client
+    "beautifulsoup4>=4.12.0",# HTML parsing
+    "arabic-reshaper>=3.0.0",# Arabic character shaping
+    "python-bidi>=0.6.0",    # BiDi right-to-left layout
+    "pycryptodome>=3.18.0",  # Crypto operations for stream decryption
 ]
 # External tools (auto-installed by deps.py):
 # - mpv: Media player for streaming episodes

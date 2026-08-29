@@ -57,7 +57,12 @@ class HistoryManager:
         if data:
             return data.get('episode')
         return None
-    
+
+    def remove(self, anime_id):
+        if str(anime_id) in self.history:
+            del self.history[str(anime_id)]
+            self.save_history()
+
     def get_history(self):
         items = []
         for anime_id, data in self.history.items():
