@@ -12,12 +12,17 @@ from .utils import is_bundled
 from .logger import logger
 
 class MpvTracker:
+    """
+    High-performance real-time MPV IPC state tracker using observe_property events.
+    Captures playback position, duration, percentage, paused state, and EOF events.
+    """
     def __init__(self, sock_path: str):
         self.sock_path = sock_path
         self.state = {
             'time_pos': 0.0,
             'duration': 0.0,
             'percent': 0.0,
+            'paused': False,
             'completed': False
         }
         self._stop_event = threading.Event()
@@ -34,64 +39,115 @@ class MpvTracker:
 
     def _run(self):
         s = None
+        f = None
         is_windows = (os.name == 'nt')
         
-        for _ in range(25):
+        # Connect to MPV IPC socket (retry up to 3 seconds)
+        for _ in range(30):
             if self._stop_event.is_set():
                 return
             try:
                 if is_windows:
                     s = open(self.sock_path, 'r+b', buffering=0)
+                    f = s
                     break
                 else:
                     if os.path.exists(self.sock_path):
                         import socket
                         s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-                        s.settimeout(0.6)
+                        s.settimeout(1.0)
                         s.connect(self.sock_path)
+                        f = s.makefile('rwb', buffering=0)
                         break
             except Exception:
                 pass
             time.sleep(0.1)
 
-        if not s:
+        if not s or not f:
             return
 
         try:
             import json
+            # 1. Register observe_property subscriptions
+            subscriptions = [
+                {"command": ["observe_property", 1, "time-pos"]},
+                {"command": ["observe_property", 2, "duration"]},
+                {"command": ["observe_property", 3, "percent-pos"]},
+                {"command": ["observe_property", 4, "pause"]},
+                {"command": ["observe_property", 5, "eof-reached"]},
+            ]
+            for sub in subscriptions:
+                try:
+                    f.write((json.dumps(sub) + "\n").encode('utf-8'))
+                    f.flush()
+                except Exception:
+                    pass
+
+            # 2. Continuous event stream reader
             while not self._stop_event.is_set():
-                for prop in ["time-pos", "duration", "percent-pos"]:
+                try:
+                    line = f.readline()
+                    if not line:
+                        break
+                    
+                    line_str = line.decode('utf-8', errors='ignore').strip()
+                    if not line_str:
+                        continue
+
+                    for entry in line_str.split('\n'):
+                        entry = entry.strip()
+                        if not entry:
+                            continue
+                        try:
+                            msg = json.loads(entry)
+                        except Exception:
+                            continue
+
+                        # Handle real-time property change events
+                        if msg.get('event') == 'property-change':
+                            name = msg.get('name')
+                            val = msg.get('data')
+                            if val is not None:
+                                if name == 'time-pos':
+                                    self.state['time_pos'] = round(float(val), 1)
+                                elif name == 'duration':
+                                    self.state['duration'] = round(float(val), 1)
+                                elif name == 'percent-pos':
+                                    self.state['percent'] = round(float(val), 1)
+                                elif name == 'pause':
+                                    self.state['paused'] = bool(val)
+                                elif name == 'eof-reached':
+                                    if bool(val):
+                                        self.state['completed'] = True
+
+                        # Handle explicit end-file event
+                        elif msg.get('event') == 'end-file':
+                            if msg.get('reason') == 'eof':
+                                self.state['completed'] = True
+
+                    # Update completion threshold
+                    pct = self.state['percent']
+                    dur = self.state['duration']
+                    pos = self.state['time_pos']
+                    if pct >= 85 or (dur > 0 and dur - pos < 35):
+                        self.state['completed'] = True
+
+                except Exception:
+                    # Periodically query properties as heartbeat
                     try:
-                        req = json.dumps({"command": ["get_property", prop]}) + "\n"
-                        if is_windows:
-                            s.write(req.encode('utf-8'))
-                            s.flush()
-                            resp_line = s.readline().decode('utf-8')
-                        else:
-                            s.sendall(req.encode('utf-8'))
-                            resp_line = s.recv(2048).decode('utf-8')
-                            
-                        for line in resp_line.strip().split('\n'):
-                            if line.strip():
-                                res = json.loads(line)
-                                if "data" in res and res["data"] is not None:
-                                    val = float(res["data"])
-                                    if prop == "time-pos":
-                                        self.state["time_pos"] = round(val, 1)
-                                    elif prop == "duration":
-                                        self.state["duration"] = round(val, 1)
-                                    elif prop == "percent-pos":
-                                        self.state["percent"] = round(val, 1)
+                        for prop in ["time-pos", "duration", "percent-pos"]:
+                            f.write((json.dumps({"command": ["get_property", prop]}) + "\n").encode('utf-8'))
+                        f.flush()
                     except Exception:
                         pass
-                
-                if self.state["percent"] >= 90 or (self.state["duration"] > 0 and self.state["duration"] - self.state["time_pos"] < 30):
-                    self.state["completed"] = True
-                    
-                time.sleep(0.5)
+                    time.sleep(0.5)
+
         finally:
             try:
-                s.close()
+                if f:
+                    f.close()
+                if s and s != f:
+                    s.close()
             except Exception:
                 pass
 
