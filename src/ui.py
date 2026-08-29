@@ -1773,25 +1773,25 @@ class UIManager:
     def settings_menu(self, settings_mgr):
         tabs = [
             ("General", [
-                ("Provider", ["anime3rb", "anime_slayer", "animeify", "anidb"], "anime_provider", "Active source provider (Anime3rb / Anime Slayer / Animeify / AniDB English)"),
-                ("Default Player", ["mpv", "vlc"], "player", "Preferred media player executable (mpv / vlc)"),
-                ("Color Theme", ["auto", "blue", "purple", "cyan", "rose", "sunset", "gold", "mint", "lavender", "pink", "coral", "teal", "magenta", "red", "green"], "theme", "Color palette (auto-detects Omarchy / OS accent)"),
-                ("Show Donation Link", [True, False], "show_donation", "Display developer donation link in footer"),
-                ("Debug Logging", [False, True], "debug_logging", "Write verbose diagnostics and API/player logs to ~/.ani-cli-arabic/debug.log"),
-                ("Anonymous Telemetry", [False, True], "analytics", "Send anonymous crash logs to improve app"),
+                ("Provider", ["anime3rb", "anime_slayer", "animeify", "anidb"], "anime_provider"),
+                ("Default Player", ["mpv", "vlc"], "player"),
+                ("Color Theme", ["auto", "blue", "purple", "cyan", "rose", "sunset", "gold", "mint", "lavender", "pink", "coral", "teal", "magenta", "red", "green"], "theme"),
+                ("Show Donation Link", [True, False], "show_donation"),
             ]),
             ("Playback", [
-                ("Auto Next Episode", [True, False], "auto_next", "Auto-play next episode when current ends"),
-                ("Skip Intro Offset", ["00:05", "00:00", "00:10", "00:15"], "skip_intro", "Duration to jump on episode start (skip intro)"),
+                ("Auto Next Episode", [True, False], "auto_next"),
+                ("Skip Intro Offset", ["00:05", "00:00", "00:10", "00:15"], "skip_intro"),
+                ("Streaming Quality", ["1080p", "720p", "480p"], "default_quality"),
             ]),
             ("Downloads", [
-                ("Default Quality", ["1080p", "720p", "480p"], "default_quality", "Preferred video streaming resolution"),
-                ("Download Quality", ["1080p", "720p", "480p"], "default_download_quality", "Preferred video download resolution"),
-                ("Download Engine", ["internal", "aria2c", "idm", "auto"], "download_mode", "Download manager (internal, aria2c, or IDM)"),
-                ("Download Directory", [], "download_directory", "Directory where downloaded anime is saved"),
+                ("Download Quality", ["1080p", "720p", "480p"], "default_download_quality"),
+                ("Download Engine", ["internal", "aria2c", "idm", "auto"], "download_mode"),
+                ("Download Directory", [], "download_directory"),
             ]),
-            ("Discord", [
-                ("Discord Rich Presence", [True, False], "discord_rpc", "Display watching anime on Discord status"),
+            ("System", [
+                ("Discord Rich Presence", [True, False], "discord_rpc"),
+                ("Debug Logging", [False, True], "debug_logging"),
+                ("Anonymous Telemetry", [False, True], "analytics"),
             ])
         ]
         
@@ -1800,10 +1800,31 @@ class UIManager:
         theme_changed = False
         rpc_changed = False
         provider_changed = False
+        
+        # Track initial values to highlight changes in a distinct color
+        initial_values = {}
+        for _, tab_options in tabs:
+            for item in tab_options:
+                key_name = item[2]
+                initial_values[key_name] = settings_mgr.get(key_name)
+
+        last_notification = ""
+        last_notification_time = 0
+
+        def format_provider_name(pid):
+            if pid == "anime3rb":
+                return "Anime3rb"
+            elif pid == "anime_slayer":
+                return "Anime Slayer"
+            elif pid in ["animeify", "animefy"]:
+                return "Animeify"
+            elif pid in ["anidb", "ani-cli"]:
+                return "AniDB (English)"
+            return str(pid).title()
 
         def generate_renderable():
             tab_name, options = tabs[cur_tab]
-            box_width = min(70, self.console.width - 4)
+            box_width = min(72, self.console.width - 4)
             bolt_color = getattr(config_module, 'COLOR_BOLT', COLOR_BOLT)
             
             # Modern Horizontal Segmented Tabs Bar
@@ -1822,13 +1843,11 @@ class UIManager:
             list_table.add_column("label", justify="left")
             list_table.add_column("value", justify="right")
 
-            active_desc = ""
             for idx, item in enumerate(options):
-                label, choices, key_name, desc = item
+                label, choices, key_name = item
                 current_val = settings_mgr.get(key_name)
                 is_selected = (idx == selected_row)
-                if is_selected:
-                    active_desc = desc
+                is_modified = (current_val != initial_values.get(key_name))
 
                 # Label part
                 label_text = Text()
@@ -1843,25 +1862,24 @@ class UIManager:
                 val_text = Text()
                 if isinstance(current_val, bool):
                     if current_val:
-                        val_text.append("[● ON]", style=f"bold {bolt_color}")
+                        v_style = "bold #ff79c6" if is_modified else f"bold {bolt_color}"
+                        tag = "[● ON] *" if is_modified else "[● ON]"
+                        val_text.append(tag, style=v_style)
                     else:
-                        val_text.append("[○ OFF]", style="dim #505a6c")
+                        v_style = "bold #ff79c6" if is_modified else "dim #505a6c"
+                        tag = "[○ OFF] *" if is_modified else "[○ OFF]"
+                        val_text.append(tag, style=v_style)
                 else:
-                    display_str = str(current_val or "default")
                     if key_name == "anime_provider":
-                        if current_val == "anime3rb":
-                            display_str = "Anime3rb"
-                        elif current_val == "anime_slayer":
-                            display_str = "Anime Slayer"
-                        elif current_val in ["animeify", "animefy"]:
-                            display_str = "Animeify"
-                        elif current_val in ["anidb", "ani-cli"]:
-                            display_str = "AniDB (English)"
-                        else:
-                            display_str = str(current_val).title()
+                        display_str = format_provider_name(current_val)
+                    else:
+                        display_str = str(current_val or "default")
                     
-                    val_style = f"bold {COLOR_TITLE}" if is_selected else "bold white"
-                    val_text.append(f"⟨ {display_str} ⟩", style=val_style)
+                    if is_modified:
+                        val_text.append(f"⟨ {display_str} ⟩ *", style="bold #ff79c6")
+                    else:
+                        val_style = f"bold {COLOR_TITLE}" if is_selected else "bold white"
+                        val_text.append(f"⟨ {display_str} ⟩", style=val_style)
 
                 list_table.add_row(label_text, val_text)
 
@@ -1870,34 +1888,30 @@ class UIManager:
             panel_content.add_row(Align.center(tabs_bar))
             panel_content.add_row(Text(""))
             panel_content.add_row(list_table)
-            
-            if active_desc:
-                panel_content.add_row(Text(""))
-                desc_text = Text()
-                desc_text.append("ℹ ", style=f"bold {COLOR_TITLE}")
-                desc_text.append(active_desc, style="italic dim white")
-                panel_content.add_row(Align.left(desc_text))
 
             panel = Panel(
                 panel_content,
-                title=f"[bold {COLOR_TITLE}] ⚙ Settings Hub • {tab_name} [/bold {COLOR_TITLE}]",
+                title=f"[bold {COLOR_TITLE}] ⚙ Settings & Preferences • {tab_name} [/bold {COLOR_TITLE}]",
                 box=ROUNDED,
                 border_style=COLOR_BORDER,
                 padding=(1, 2),
                 width=box_width
             )
 
-            # Header with Logo & Title Badge
+            # Header with Logo
             header_table = Table.grid(expand=False)
             header_table.add_column(justify="center")
             header_table.add_row(Align.center(self._get_torlink_ascii_logo()))
-            header_table.add_row(Text(""))
 
-            title_badge = Text()
-            title_badge.append("[ ", style=f"bold {COLOR_BORDER}")
-            title_badge.append("Settings & Preferences", style="bold white")
-            title_badge.append(" ]", style=f"bold {COLOR_BORDER}")
-            header_table.add_row(Align.center(title_badge))
+            # Toast Notification Popup (if recently changed)
+            toast_table = Table.grid(expand=False)
+            toast_table.add_column(justify="center")
+            if last_notification and (time.time() - last_notification_time < 2.5):
+                toast_text = Text()
+                toast_text.append(f" {last_notification} ", style=f"bold #1a1b26 on {bolt_color}")
+                toast_table.add_row(Align.center(toast_text))
+            else:
+                toast_table.add_row(Text(""))
 
             # Organized Keycaps Dock
             dock = Text()
@@ -1915,11 +1929,12 @@ class UIManager:
             root.add_row(Align.center(header_table))
             root.add_row(Text(""))
             root.add_row(Align.center(panel))
-            root.add_row(Text(""))
+            root.add_row(Align.center(toast_table))
             root.add_row(Align.center(dock))
 
             return Align.center(root, vertical="middle", height=self.console.height)
 
+        hide_cursor()
         self.clear()
         
         with RawTerminal():
@@ -1949,7 +1964,7 @@ class UIManager:
                         selected_row += 1
                         live.update(generate_renderable(), refresh=True)
                     elif key == 'ENTER' or key == ' ' or key == 'SPACE':
-                        label, choices, key_name, _ = options[selected_row]
+                        label, choices, key_name = options[selected_row]
                         current_val = settings_mgr.get(key_name)
 
                         if key_name == "download_directory":
@@ -1975,10 +1990,13 @@ class UIManager:
                                 ).strip()
 
                                 settings_mgr.set("download_directory", new_path or "downloads")
+                                last_notification = f"✔ Set Download Directory → {new_path or 'downloads'}"
+                                last_notification_time = time.time()
                             except Exception:
                                 pass
                             finally:
                                 enter_raw_mode_after_input()
+                                hide_cursor()
 
                             self.clear()
                             live.start()
@@ -1993,6 +2011,10 @@ class UIManager:
                                 new_val = choices[0]
                                 
                             settings_mgr.set(key_name, new_val)
+                            
+                            disp_new = format_provider_name(new_val) if key_name == "anime_provider" else ("ON" if new_val is True else ("OFF" if new_val is False else str(new_val)))
+                            last_notification = f"✔ Set {label} → {disp_new}"
+                            last_notification_time = time.time()
                             
                             if key_name == "anime_provider":
                                 provider_changed = True
@@ -2029,45 +2051,71 @@ class UIManager:
                             live.update(generate_renderable(), refresh=True)
                     elif key == 'b' or key == 'B' or key == 'ESC' or key == 'q':
                         live.stop()
-                        if theme_changed or provider_changed or rpc_changed:
-                            self.console.clear()
+                        hide_cursor()
+                        
+                        has_any_change = (
+                            theme_changed or provider_changed or rpc_changed or
+                            any(settings_mgr.get(k) != initial_values.get(k) for k in initial_values)
+                        )
+                        
+                        if has_any_change:
+                            # 1. Smooth Bouncing Bar Apply Animation
+                            bolt_palette = getattr(config_module, "COLOR_BOLT_GLOW", [COLOR_BOLT])
+                            for i in range(8):
+                                c = bolt_palette[i % len(bolt_palette)]
+                                frame = BOUNCING_BAR_FRAMES[i % len(BOUNCING_BAR_FRAMES)]
+                                
+                                anim_text = Text()
+                                anim_text.append(f"{frame} ", style=f"bold {c}")
+                                anim_text.append("Applying & Saving Preferences...", style="bold white")
+                                
+                                panel = Panel(
+                                    Align.center(anim_text, vertical="middle"),
+                                    title=f"[bold {COLOR_TITLE}] ⚙ Settings [/bold {COLOR_TITLE}]",
+                                    box=ROUNDED,
+                                    border_style=c,
+                                    padding=(1, 3),
+                                    width=min(56, self.console.width - 4)
+                                )
+                                self.clear()
+                                self.console.print(Align.center(panel, vertical="middle", height=self.console.height))
+                                time.sleep(0.06)
+
+                            # 2. Render Saved Changes Summary Panel
+                            self.clear()
                             msg_lines = []
                             if provider_changed:
-                                cur_p = settings_mgr.get("anime_provider")
-                                if cur_p == "anime3rb":
-                                    pname = "Anime3rb"
-                                elif cur_p == "anime_slayer":
-                                    pname = "Anime Slayer"
-                                elif cur_p in ["animeify", "animefy"]:
-                                    pname = "Animeify"
-                                elif cur_p in ["anidb", "ani-cli"]:
-                                    pname = "AniDB (English)"
-                                else:
-                                    pname = str(cur_p).title()
-                                msg_lines.append(f"Provider: {pname}")
+                                msg_lines.append(f"Provider: {format_provider_name(settings_mgr.get('anime_provider'))}")
                             if theme_changed:
                                 msg_lines.append(f"Theme: {str(settings_mgr.get('theme') or 'Auto').capitalize()}")
                             if rpc_changed:
                                 rpc_status = "Enabled" if settings_mgr.get("discord_rpc") else "Disabled"
                                 msg_lines.append(f"Discord RPC: {rpc_status}")
 
+                            for k, v0 in initial_values.items():
+                                v1 = settings_mgr.get(k)
+                                if v1 != v0 and k not in ["anime_provider", "theme", "discord_rpc"]:
+                                    disp_val = "ON" if v1 is True else ("OFF" if v1 is False else str(v1))
+                                    msg_lines.append(f"{k.replace('_', ' ').title()}: {disp_val}")
+
                             msg_text = Text()
                             bolt_color = getattr(config_module, "COLOR_BOLT", COLOR_BOLT)
-                            msg_text.append("✔ Settings Applied\n\n", style=f"bold {bolt_color}")
-                            for line in msg_lines:
-                                msg_text.append(f"• {line}\n", style="white")
+                            msg_text.append("✔ Preferences Saved Successfully\n\n", style=f"bold {bolt_color}")
+                            for line in msg_lines[:5]:
+                                msg_text.append(f" • {line}\n", style="white")
 
                             panel = Panel(
                                 Align.center(msg_text, vertical="middle"),
-                                title=f"[bold {COLOR_TITLE}]Saved[/bold {COLOR_TITLE}]",
-                                box=HEAVY,
-                                border_style=COLOR_BORDER,
-                                padding=(1, 4),
-                                width=min(48, self.console.width - 4)
+                                title=f"[bold {COLOR_TITLE}] ⚙ Saved [/bold {COLOR_TITLE}]",
+                                box=ROUNDED,
+                                border_style=bolt_color,
+                                padding=(1, 3),
+                                width=min(56, self.console.width - 4)
                             )
                             self.console.print(Align.center(panel, vertical="middle", height=self.console.height))
-                            time.sleep(0.8)
+                            time.sleep(0.7)
 
+                        hide_cursor()
                         self.clear()
                         return {"theme_changed": theme_changed, "rpc_changed": rpc_changed, "provider_changed": provider_changed}
 
