@@ -26,7 +26,8 @@ from .version import APP_VERSION
 from .config import (
     COLOR_BORDER, COLOR_PROMPT, COLOR_PRIMARY_TEXT, COLOR_TITLE, COLOR_SUBTITLE,
     COLOR_SECONDARY_TEXT, COLOR_HIGHLIGHT_FG, COLOR_HIGHLIGHT_BG,
-    COLOR_ERROR, COLOR_LOADING_SPINNER, COLOR_ASCII, HEADER_ART, POPULAR_GENRES
+    COLOR_ERROR, COLOR_LOADING_SPINNER, COLOR_ASCII, HEADER_ART, POPULAR_GENRES,
+    BOUNCING_BAR_FRAMES
 )
 from .utils import (
     get_key, RawTerminal, restore_terminal_for_input, enter_raw_mode_after_input,
@@ -216,7 +217,7 @@ class UIManager:
         loading_thread = threading.Thread(target=worker, daemon=True)
         loading_thread.start()
 
-        braille_frames = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]
+        bouncing_frames = BOUNCING_BAR_FRAMES
         accent_colors = ["#5af78e", COLOR_TITLE, COLOR_SUBTITLE, COLOR_BORDER, COLOR_TITLE, "#5af78e"]
         
         clean_msg = "Searching..."
@@ -229,7 +230,7 @@ class UIManager:
         frame_idx = 0
 
         def generate_loading_renderable():
-            frame = braille_frames[frame_idx % len(braille_frames)]
+            frame = bouncing_frames[frame_idx % len(bouncing_frames)]
             color = accent_colors[frame_idx % len(accent_colors)]
 
             msg_text = Text()
@@ -249,7 +250,7 @@ class UIManager:
                 while not thread_done.is_set():
                     frame_idx += 1
                     live.update(generate_loading_renderable())
-                    time.sleep(0.06)
+                    time.sleep(0.08)
         except KeyboardInterrupt:
             thread_done.set()
             raise
@@ -780,7 +781,7 @@ class UIManager:
             )
             
             if is_loading_more:
-                dock = Align.center(Text("⏳ Loading more anime... ", style=f"bold {COLOR_TITLE}"))
+                dock = Align.center(Text("[====] Loading more anime... ", style=f"bold {COLOR_TITLE}"))
             else:
                 dock_text = Text()
                 items = [

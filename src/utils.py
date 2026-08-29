@@ -549,7 +549,7 @@ def _download_with_aria2(url, filename, download_dir, filepath, console):
     if not aria2_path:
         return False
 
-    spinner = Spinner("dots", text=Text(" Downloading with aria2c...", style="bold white"))
+    spinner = Spinner("bouncingBar", text=Text(" Downloading with aria2c...", style="bold white"))
     panel = Panel(
         Align.center(spinner, vertical="middle"),
         title=f"[bold {COLOR_TITLE}]Accelerated Download[/bold {COLOR_TITLE}]",

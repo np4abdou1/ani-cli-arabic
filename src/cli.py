@@ -122,7 +122,7 @@ class AniCliWrapper:
     def play_video(self, anime, ep, quality_override=None):
         server_data = None
         
-        with self.console.status(f"[bold blue]Fetching links for Episode {ep.number}...[/bold blue]", spinner="dots"):
+        with self.console.status(f"[bold blue]Fetching links for Episode {ep.number}...[/bold blue]", spinner="bouncingBar"):
             server_data = self.api.get_streaming_servers(anime.id, ep.number, anime.type)
             
         if not server_data:
@@ -237,7 +237,7 @@ class AniCliWrapper:
                 self.rpc.update_viewing_anime(selected_anime.title_en, selected_anime.thumbnail)
 
             episodes = []
-            with self.console.status("[bold blue]Fetching episodes...[/bold blue]", spinner="dots"):
+            with self.console.status("[bold blue]Fetching episodes...[/bold blue]", spinner="bouncingBar"):
                 episodes = self.api.get_episodes(selected_anime.id)
                 
             if not episodes:
@@ -407,7 +407,7 @@ class AniCliWrapper:
             query = None # Consume query
 
             if cmd == 'e':
-                with self.console.status("[bold blue]Fetching latest episodes...[/bold blue]", spinner="dots"):
+                with self.console.status("[bold blue]Fetching latest episodes...[/bold blue]", spinner="bouncingBar"):
                     eps = self.api.get_latest_episodes(limit=50)
                 if not eps:
                     self.console.print("[red]No recent episodes found.[/red]")
@@ -418,7 +418,7 @@ class AniCliWrapper:
                     sel_idx = ep_items.index(sel[0]) if sel[0] in ep_items else 0
                     chosen_ep = eps[sel_idx]
                     # Fetch details and play
-                    with self.console.status(f"[bold blue]Loading {chosen_ep['title']}...[/bold blue]", spinner="dots"):
+                    with self.console.status(f"[bold blue]Loading {chosen_ep['title']}...[/bold blue]", spinner="bouncingBar"):
                         anime_obj = self.api.get_anime_details(chosen_ep['slug'])
                         all_eps = self.api.get_episodes(chosen_ep['slug'])
                     if anime_obj and all_eps:
@@ -428,7 +428,7 @@ class AniCliWrapper:
                 continue
 
             if cmd == 'm':
-                with self.console.status("[bold blue]Fetching anime movies...[/bold blue]", spinner="dots"):
+                with self.console.status("[bold blue]Fetching anime movies...[/bold blue]", spinner="bouncingBar"):
                     results = self.api.get_movies(limit=100)
                 self.console.print(f"[green]Got {len(results)} movies[/green]")
                 self._process_anime_list(results, "Anime Movies")
@@ -437,7 +437,7 @@ class AniCliWrapper:
                 continue
 
             if cmd == 'r':
-                with self.console.status("[bold blue]Fetching top-rated masterpieces (9-10)...[/bold blue]", spinner="dots"):
+                with self.console.status("[bold blue]Fetching top-rated masterpieces (9-10)...[/bold blue]", spinner="bouncingBar"):
                     results = self.api.get_top_rated_anime(limit=100, rate_tier="9-10")
                 self.console.print(f"[green]Got {len(results)} top-rated results[/green]")
                 self._process_anime_list(results, "Top Rated Anime (9-10)")
@@ -446,7 +446,7 @@ class AniCliWrapper:
                 continue
             
             if cmd == 't':
-                with self.console.status("[bold blue]Fetching trending...[/bold blue]", spinner="dots"):
+                with self.console.status("[bold blue]Fetching trending...[/bold blue]", spinner="bouncingBar"):
                     if self.rpc: self.rpc.update_trending()
                     results = self.api.get_trending_anime(limit=100)
                 self.console.print(f"[green]Got {len(results)} trending results[/green]")
@@ -457,7 +457,7 @@ class AniCliWrapper:
                 continue
                 
             if cmd == 'p':
-                 with self.console.status("[bold blue]Fetching popular & spotlight...[/bold blue]", spinner="dots"):
+                 with self.console.status("[bold blue]Fetching popular & spotlight...[/bold blue]", spinner="bouncingBar"):
                     results = self.api.get_pinned_anime()
                     if not results:
                         results = self.api.get_trending_anime(limit=100)
@@ -473,7 +473,7 @@ class AniCliWrapper:
                 if sel and sel[0]:
                     sel_idx = genre_labels.index(sel[0]) if sel[0] in genre_labels else 0
                     genre_obj = POPULAR_GENRES[sel_idx]
-                    with self.console.status(f"[bold blue]Fetching {genre_obj['name_en']} anime...[/bold blue]", spinner="dots"):
+                    with self.console.status(f"[bold blue]Fetching {genre_obj['name_en']} anime...[/bold blue]", spinner="bouncingBar"):
                          results = self.api.get_genre_anime(genre_obj['slug'], limit=100)
                     self.console.print(f"[green]Got {len(results)} results for {genre_obj['name_en']}[/green]")
                     self._process_anime_list(results, f"Genre: {genre_obj['name_en']}")
@@ -494,7 +494,7 @@ class AniCliWrapper:
                 sel = self._launcher(studios, "Select Studio")
                 if sel and sel[0]:
                     studio = sel[0]
-                    with self.console.status(f"[bold blue]Fetching {studio} anime...[/bold blue]", spinner="dots"):
+                    with self.console.status(f"[bold blue]Fetching {studio} anime...[/bold blue]", spinner="bouncingBar"):
                          results = self.api.get_anime_list("STUDIOS", studio, "SERIES", limit=100)
                     self.console.print(f"[green]Got {len(results)} results for {studio}[/green]")
                     self._process_anime_list(results, f"Studio: {studio}")
@@ -514,7 +514,7 @@ class AniCliWrapper:
             search_q = cmd
 
             results = []
-            with self.console.status(f"[bold green]Searching for: {search_q}...[/bold green]", spinner="earth"):
+            with self.console.status(f"[bold green]Searching for: {search_q}...[/bold green]", spinner="bouncingBar"):
                 if self.rpc: self.rpc.update_searching()
                 results = self.api.search_anime(search_q)
             
