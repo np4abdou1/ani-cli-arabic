@@ -18,7 +18,7 @@ from rich.prompt import Prompt
 from rich.layout import Layout
 from rich.table import Table
 from rich.theme import Theme
-from rich.box import HEAVY
+from rich.box import HEAVY, ROUNDED
 from rich.spinner import Spinner
 from rich.cells import cell_len
 
