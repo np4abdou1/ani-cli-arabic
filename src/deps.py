@@ -126,7 +126,7 @@ def download_file_with_progress(urls, dest_path, description="Downloading"):
             total_size = int(response.headers.get('content-length', 0))
             
             with Progress(
-                SpinnerColumn(),
+                SpinnerColumn(spinner_name="bouncingBar"),
                 TextColumn("[cyan]{task.description}"),
                 BarColumn(bar_width=30),
                 "[progress.percentage]{task.percentage:>3.0f}%",

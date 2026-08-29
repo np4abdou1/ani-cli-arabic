@@ -248,6 +248,38 @@ COLOR_PRIMARY_TEXT = theme_colors.get("primary_text", "#FFFFFF")
 COLOR_SECONDARY_TEXT = theme_colors.get("secondary_text", "#888888")
 COLOR_ERROR = theme_colors.get("error", "#FF0000")
 
+# Bouncing Bar Loading Spinner Configuration
+BOUNCING_BAR_SPINNER = {
+    "interval": 80,
+    "frames": [
+        "[    ]",
+        "[=   ]",
+        "[==  ]",
+        "[=== ]",
+        "[====]",
+        "[ ===]",
+        "[  ==]",
+        "[   =]",
+        "[    ]",
+        "[   =]",
+        "[  ==]",
+        "[ ===]",
+        "[====]",
+        "[=== ]",
+        "[==  ]",
+        "[=   ]"
+    ]
+}
+BOUNCING_BAR_FRAMES = BOUNCING_BAR_SPINNER["frames"]
+BOUNCING_BAR_INTERVAL = BOUNCING_BAR_SPINNER["interval"]
+
+try:
+    from rich._spinners import SPINNERS
+    SPINNERS["bouncingBar"] = BOUNCING_BAR_SPINNER
+    SPINNERS["dots"] = BOUNCING_BAR_SPINNER
+except Exception:
+    pass
+
 POPULAR_GENRES = [
     {"name_ar": "أكشن", "name_en": "Action", "slug": "action"},
     {"name_ar": "مغامرة", "name_en": "Adventure", "slug": "adventure"},
