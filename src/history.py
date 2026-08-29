@@ -56,7 +56,7 @@ class HistoryManager:
             import sys
             print(f"Warning: Failed to save history: {e}", file=sys.stderr)
 
-    def mark_watched(self, anime_id, episode_num, anime_title, time_pos: float = 0.0, duration: float = 0.0, percent: float = 0.0):
+    def mark_watched(self, anime_id, episode_num, anime_title, time_pos: float = 0.0, duration: float = 0.0, percent: float = 0.0, poster_url: str = "", provider: str = ""):
         """
         Record watch progress for an episode and series.
         """
@@ -93,6 +93,8 @@ class HistoryManager:
             'duration': round(float(duration or 0.0), 1),
             'percent': percent_val,
             'completed': completed,
+            'poster_url': poster_url or entry.get('poster_url', ''),
+            'provider': provider or entry.get('provider', ''),
             'last_updated': datetime.now().isoformat(),
             'episodes_progress': episodes_prog
         }
@@ -110,18 +112,22 @@ class HistoryManager:
         data = self.history.get(str(anime_id), {})
         episodes_prog = data.get('episodes_progress', {})
         if isinstance(episodes_prog, dict) and str(episode_num) in episodes_prog:
-            return episodes_prog[str(episode_num)]
+            rec = dict(episodes_prog[str(episode_num)])
+            rec['time_str'] = format_seconds(rec.get('time_pos', 0.0))
+            return rec
             
         # Fallback to series-level record if it matches episode
         if str(data.get('episode')) == str(episode_num):
+            t_pos = data.get('time_pos', 0.0)
             return {
-                'time_pos': data.get('time_pos', 0.0),
+                'time_pos': t_pos,
                 'duration': data.get('duration', 0.0),
                 'percent': data.get('percent', 0),
                 'completed': data.get('completed', False),
-                'last_updated': data.get('last_updated', '')
+                'last_updated': data.get('last_updated', ''),
+                'time_str': format_seconds(t_pos)
             }
-        return {'time_pos': 0.0, 'duration': 0.0, 'percent': 0, 'completed': False}
+        return {'time_pos': 0.0, 'duration': 0.0, 'percent': 0, 'completed': False, 'time_str': '00:00'}
 
     def get_all_episodes_progress(self, anime_id) -> dict:
         """Get dictionary mapping episode numbers to progress dicts for an anime."""
@@ -129,18 +135,23 @@ class HistoryManager:
         episodes_prog = data.get('episodes_progress', {})
         result = {}
         if isinstance(episodes_prog, dict):
-            result.update(episodes_prog)
+            for ep_k, ep_v in episodes_prog.items():
+                r = dict(ep_v)
+                r['time_str'] = format_seconds(r.get('time_pos', 0.0))
+                result[ep_k] = r
             
         # Ensure the active episode is also represented
         if 'episode' in data:
             active_ep = str(data['episode'])
             if active_ep not in result:
+                t_pos = data.get('time_pos', 0.0)
                 result[active_ep] = {
-                    'time_pos': data.get('time_pos', 0.0),
+                    'time_pos': t_pos,
                     'duration': data.get('duration', 0.0),
                     'percent': data.get('percent', 0),
                     'completed': data.get('completed', False),
-                    'last_updated': data.get('last_updated', '')
+                    'last_updated': data.get('last_updated', ''),
+                    'time_str': format_seconds(t_pos)
                 }
         return result
 
