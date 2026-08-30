@@ -4,6 +4,7 @@ import importlib
 import os
 import sys
 import re
+from pathlib import Path
 import requests
 from io import BytesIO
 from functools import lru_cache
@@ -37,12 +38,25 @@ from .utils import (
 from .logger import logger
 from . import config as config_module
 
-_stars_cache = {"count": 58, "last_fetch": 0}
+_STARS_CACHE_FILE = Path.home() / ".ani-cli-arabic" / "database" / "stars_cache.json"
+
+def _load_cached_stars():
+    try:
+        if _STARS_CACHE_FILE.exists():
+            with open(_STARS_CACHE_FILE, "r", encoding="utf-8") as f:
+                data = json.load(f)
+                return int(data.get("count", 59)), float(data.get("last_fetch", 0))
+    except Exception:
+        pass
+    return 59, 0
+
+_initial_stars, _initial_fetch_time = _load_cached_stars()
+_stars_cache = {"count": _initial_stars, "last_fetch": _initial_fetch_time}
 
 def get_github_stars():
     global _stars_cache
     now = time.time()
-    if now - _stars_cache["last_fetch"] > 1800:
+    if now - _stars_cache["last_fetch"] > 900:  # Refresh every 15 minutes
         _stars_cache["last_fetch"] = now
         def _fetch():
             try:
@@ -52,10 +66,17 @@ def get_github_stars():
                     "https://api.github.com/repos/np4abdou1/ani-cli-arabic",
                     headers={"User-Agent": "ani-cli-arabic"}
                 )
-                with urllib.request.urlopen(req, timeout=3) as resp:
+                with urllib.request.urlopen(req, timeout=4) as resp:
                     data = json.loads(resp.read().decode())
                     if "stargazers_count" in data:
-                        _stars_cache["count"] = data["stargazers_count"]
+                        cnt = int(data["stargazers_count"])
+                        _stars_cache["count"] = cnt
+                        try:
+                            _STARS_CACHE_FILE.parent.mkdir(parents=True, exist_ok=True)
+                            with open(_STARS_CACHE_FILE, "w", encoding="utf-8") as f:
+                                json.dump({"count": cnt, "last_fetch": time.time()}, f)
+                        except Exception:
+                            pass
             except Exception:
                 pass
         threading.Thread(target=_fetch, daemon=True).start()
