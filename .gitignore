@@ -4,7 +4,10 @@ __pycache__/
 *$py.class
 *.so
 .Python
-/dashboard
+.wrangler/
+dashboard/node_modules/
+dashboard/.next/
+dashboard/out/
 build/
 /api docs
 develop-eggs/
