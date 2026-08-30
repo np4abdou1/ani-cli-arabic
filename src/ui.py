@@ -468,6 +468,9 @@ class UIManager:
 
         self.clear()
 
+        last_broadcast_check = time.time()
+        last_banner_state = None
+
         with MouseTerminal():
             with Live(
                 generate_renderable(query, hovered_btn),
@@ -479,6 +482,15 @@ class UIManager:
                 while True:
                     ev = get_home_input_event()
                     if not ev:
+                        now_t = time.time()
+                        if now_t - last_broadcast_check > 1.0:
+                            last_broadcast_check = now_t
+                            from .broadcast import BroadcastManager
+                            cur_banner = BroadcastManager.get_active_banner()
+                            cur_b_id = cur_banner.get("id", "") + cur_banner.get("message", "") if cur_banner else ""
+                            if cur_b_id != last_banner_state:
+                                last_banner_state = cur_b_id
+                                live.update(generate_renderable(query, hovered_btn), refresh=True)
                         time.sleep(0.02)
                         continue
 

@@ -48,7 +48,7 @@ class BroadcastManager:
     def fetch_remote(cls, force: bool = False) -> Optional[Dict[str, Any]]:
         """Fetches remote broadcast message in the background."""
         now = time.time()
-        if not force and cls._cached_broadcast and (now - cls._last_fetch_time < 600):  # 10 min cache
+        if not force and cls._cached_broadcast and (now - cls._last_fetch_time < 30):  # 30s cache
             return cls._cached_broadcast
 
         def _fetch_worker():
@@ -87,13 +87,21 @@ class BroadcastManager:
         and is enabled.
         """
         b = cls._cached_broadcast or cls.load_cached()
-        if not b or not b.get("active", False):
+        if not b:
+            return None
+
+        is_active = b.get("active")
+        if isinstance(is_active, str):
+            is_active = is_active.lower() in ("true", "1", "yes")
+
+        msg = str(b.get("message") or "").strip()
+        if not is_active or not msg:
             return None
 
         # Check version constraints
         min_ver = b.get("min_version")
         max_ver = b.get("max_version")
-        from .updater import parse_version
+        from .version import parse_version
         cur = parse_version(__version__)
 
         if min_ver and cur < parse_version(min_ver):
