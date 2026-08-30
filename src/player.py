@@ -226,6 +226,38 @@ class PlayerManager:
     def get_available_players(self) -> dict:
         players = {}
         
+        # Check MPV
+        mpv_path = self.get_mpv_path()
+        if mpv_path == 'mpv':
+            if shutil.which('mpv'):
+                 players['MPV'] = 'mpv'
+        elif os.path.exists(mpv_path):
+            players['MPV'] = mpv_path
+
+        # Check Celluloid (Linux GTK MPV frontend)
+        celluloid_path = shutil.which('celluloid') or shutil.which('io.github.celluloid_player.Celluloid')
+        if celluloid_path:
+            players['Celluloid'] = celluloid_path
+
+        # Check IINA (macOS MPV frontend)
+        iina_path = shutil.which('iina-cli') or shutil.which('iina')
+        if not iina_path and sys.platform == 'darwin':
+            mac_paths = [
+                "/Applications/IINA.app/Contents/MacOS/iina-cli",
+                os.path.expanduser("~/Applications/IINA.app/Contents/MacOS/iina-cli")
+            ]
+            for p in mac_paths:
+                if os.path.exists(p):
+                    iina_path = p
+                    break
+        if iina_path:
+            players['IINA'] = iina_path
+
+        # Check Syncplay (Multi-user sync)
+        syncplay_path = shutil.which('syncplay')
+        if syncplay_path:
+            players['Syncplay'] = syncplay_path
+
         # Check VLC
         vlc_path = shutil.which('vlc')
         if not vlc_path:
@@ -249,14 +281,6 @@ class PlayerManager:
                         break
         if vlc_path:
             players['VLC'] = vlc_path
-
-        # Check MPV
-        mpv_path = self.get_mpv_path()
-        if mpv_path == 'mpv':
-            if shutil.which('mpv'):
-                 players['MPV'] = 'mpv'
-        elif os.path.exists(mpv_path):
-            players['MPV'] = mpv_path
 
         # Check MPC-HC
         mpc_path = shutil.which('mpc-hc64') or shutil.which('mpc-hc')
@@ -294,13 +318,18 @@ class PlayerManager:
         player_names = list(available_players.keys())
         selected_player = None
 
-        if len(player_names) == 1:
-            selected_player = player_names[0]
-        else:
-            if 'MPV' in available_players and player_type == 'mpv':
+        req_p = (player_type or "").lower()
+        if req_p in ('mpv', 'celluloid', 'iina', 'syncplay', 'vlc', 'mpc-hc', 'mpc'):
+            for p_name in player_names:
+                if req_p in p_name.lower():
+                    selected_player = p_name
+                    break
+
+        if not selected_player:
+            if len(player_names) == 1:
+                selected_player = player_names[0]
+            elif 'MPV' in available_players:
                 selected_player = 'MPV'
-            elif 'VLC' in available_players and player_type == 'vlc':
-                selected_player = 'VLC'
             elif self.console:
                 from rich.prompt import Prompt
                 from rich.panel import Panel
@@ -323,10 +352,16 @@ class PlayerManager:
                 selected_player = player_names[0]
 
         try:
-            if selected_player == 'VLC':
-                return self._play_vlc(url, title, available_players['VLC'], start_time=start_time)
-            elif selected_player == 'MPV':
+            if selected_player == 'MPV':
                 return self._play_mpv(url, title, available_players['MPV'], start_time=start_time)
+            elif selected_player == 'Celluloid':
+                return self._play_celluloid(url, title, available_players['Celluloid'], start_time=start_time)
+            elif selected_player == 'IINA':
+                return self._play_iina(url, title, available_players['IINA'], start_time=start_time)
+            elif selected_player == 'Syncplay':
+                return self._play_syncplay(url, title, available_players['Syncplay'], start_time=start_time)
+            elif selected_player == 'VLC':
+                return self._play_vlc(url, title, available_players['VLC'], start_time=start_time)
             elif selected_player == 'MPC-HC':
                 return self._play_mpc(url, title, available_players['MPC-HC'])
         except Exception as e:
@@ -364,6 +399,53 @@ class PlayerManager:
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL
         )
+        elapsed = time.time() - t_start
+        return {'time_pos': start_time + elapsed, 'duration': 0.0, 'percent': 0.0, 'completed': False}
+
+    def _play_celluloid(self, url: str, title: str, celluloid_path: str = None, start_time: float = 0.0) -> dict:
+        if not celluloid_path:
+            celluloid_path = self.get_available_players().get('Celluloid')
+        if not celluloid_path:
+            raise FileNotFoundError("Celluloid not found")
+
+        args = [celluloid_path]
+        if start_time and start_time > 0:
+            args.append(f'--mpv-start={start_time}')
+        args.append(url)
+        
+        t_start = time.time()
+        subprocess.run(args, check=False, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        elapsed = time.time() - t_start
+        return {'time_pos': start_time + elapsed, 'duration': 0.0, 'percent': 0.0, 'completed': False}
+
+    def _play_iina(self, url: str, title: str, iina_path: str = None, start_time: float = 0.0) -> dict:
+        if not iina_path:
+            iina_path = self.get_available_players().get('IINA')
+        if not iina_path:
+            raise FileNotFoundError("IINA not found")
+
+        args = [iina_path, '--keep-running']
+        if start_time and start_time > 0:
+            args.append(f'--mpv-start={start_time}')
+        args.append(url)
+        
+        t_start = time.time()
+        subprocess.run(args, check=False, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        elapsed = time.time() - t_start
+        return {'time_pos': start_time + elapsed, 'duration': 0.0, 'percent': 0.0, 'completed': False}
+
+    def _play_syncplay(self, url: str, title: str, syncplay_path: str = None, start_time: float = 0.0) -> dict:
+        if not syncplay_path:
+            syncplay_path = self.get_available_players().get('Syncplay')
+        if not syncplay_path:
+            raise FileNotFoundError("Syncplay not found")
+
+        args = [syncplay_path, url]
+        if start_time and start_time > 0:
+            args.extend(['--', f'--start={start_time}'])
+
+        t_start = time.time()
+        subprocess.run(args, check=False, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         elapsed = time.time() - t_start
         return {'time_pos': start_time + elapsed, 'duration': 0.0, 'percent': 0.0, 'completed': False}
 
