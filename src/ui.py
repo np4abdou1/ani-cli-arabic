@@ -440,6 +440,12 @@ class UIManager:
             grid.add_row(*row3)
 
             table.add_row(Align.center(grid))
+            table.add_row(Text(""))
+
+            donate_line = Text()
+            donate_line.append("♥ Support the project: ", style="bold #ff79c6")
+            donate_line.append("paypal.me/np4abdou", style=f"bold {COLOR_TITLE} underline")
+            table.add_row(Align.center(donate_line))
 
             return Align.center(table, vertical="middle", height=self.console.height)
 
