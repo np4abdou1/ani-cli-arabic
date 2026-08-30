@@ -5,13 +5,14 @@
 const DEFAULT_BROADCAST = {
   id: "",
   active: false,
-  type: "banner",
+  type: "popup", // "banner" or "popup"
   title: "",
   message: "",
   link: "",
   min_version: "",
   max_version: "",
-  dismissable: true,
+  dismissable: false,
+  closable: true,
   style: "cyan"
 };
 
@@ -21,7 +22,7 @@ export default {
 
     const corsHeaders = {
       "Access-Control-Allow-Origin": "*",
-      "Access-Control-Allow-Methods": "GET, HEAD, OPTIONS",
+      "Access-Control-Allow-Methods": "GET, POST, HEAD, OPTIONS",
       "Access-Control-Allow-Headers": "Content-Type, User-Agent",
       "Cache-Control": "no-cache, no-store, must-revalidate, max-age=0"
     };
@@ -30,10 +31,10 @@ export default {
       return new Response(null, { headers: corsHeaders });
     }
 
-    if (url.pathname === "/broadcast.json" || url.pathname === "/" || url.pathname === "/api/broadcast") {
+    // Handle GET
+    if (request.method === "GET" && (url.pathname === "/broadcast.json" || url.pathname === "/" || url.pathname === "/api/broadcast")) {
       let broadcastData = DEFAULT_BROADCAST;
 
-      // If KV storage is bound as env.BROADCAST_KV
       if (env.BROADCAST_KV) {
         try {
           const stored = await env.BROADCAST_KV.get("active_broadcast", { type: "json" });
@@ -51,6 +52,24 @@ export default {
           ...corsHeaders
         }
       });
+    }
+
+    // Handle POST
+    if (request.method === "POST" && (url.pathname === "/api/broadcast" || url.pathname === "/broadcast.json" || url.pathname === "/")) {
+      if (!env.BROADCAST_KV) {
+        return new Response(JSON.stringify({ error: "BROADCAST_KV binding missing" }), { status: 500, headers: corsHeaders });
+      }
+
+      try {
+        const body = await request.json();
+        body.updated_at = new Date().toISOString();
+        await env.BROADCAST_KV.put("active_broadcast", JSON.stringify(body));
+        return new Response(JSON.stringify({ success: true, broadcast: body }), {
+          headers: { "Content-Type": "application/json", ...corsHeaders }
+        });
+      } catch (e) {
+        return new Response(JSON.stringify({ error: e.message }), { status: 400, headers: corsHeaders });
+      }
     }
 
     if (url.pathname === "/health") {

@@ -121,13 +121,12 @@ class AniCliArApp:
                 pass
         threading.Thread(target=run_cleanup_bg, daemon=True).start()
 
-        def check_broadcast_bg():
-            try:
-                from .broadcast import BroadcastManager
-                BroadcastManager.fetch_remote()
-            except Exception:
-                pass
-        threading.Thread(target=check_broadcast_bg, daemon=True).start()
+        # Check remote broadcast (quick sync fetch with fallback)
+        try:
+            from .broadcast import BroadcastManager
+            BroadcastManager.fetch_remote_sync(timeout=1.0)
+        except Exception:
+            pass
 
         self.rpc_status = rpc_connected
 
@@ -135,6 +134,16 @@ class AniCliArApp:
         try:
             from .changelog import render_changelog_popup
             render_changelog_popup(self.ui.console)
+        except Exception:
+            pass
+
+        # Show active remote broadcast popup modal if enabled
+        try:
+            from .broadcast import BroadcastManager
+            from .broadcast_popup import render_broadcast_popup
+            active_popup = BroadcastManager.get_active_popup()
+            if active_popup:
+                render_broadcast_popup(self.ui.console, active_popup)
         except Exception:
             pass
 
