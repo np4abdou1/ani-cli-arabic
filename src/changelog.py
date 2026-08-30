@@ -24,114 +24,60 @@ from .config import (
 )
 from .utils import get_key, RawTerminal
 
-_CHANGELOG_RELEASES: List[Dict[str, Any]] = [
+_CHANGELOG_ITEMS: List[Dict[str, Any]] = [
     {
-        "version": "2.0.0",
-        "title": "The Ultimate Multi-Provider & UI Evolution",
-        "date": "2026-08-30",
-        "tag": "Current Version",
-        "items": [
-            {
-                "badge": "Multi-Provider",
-                "badge_style": "bold cyan",
-                "title": "4 Distinct Streaming Engines",
-                "desc": "Seamless streaming across Anime3rb, Anime Slayer (VIP CDN), Animeify, and AniDB (English Sub & Dub) with instant runtime switching."
-            },
-            {
-                "badge": "Watch Progress",
-                "badge_style": "bold yellow",
-                "title": "Real-Time MPV Socket Resumption",
-                "desc": "Precise background IPC tracking records exact playback timestamps and resumes seamlessly from where you left off."
-            },
-            {
-                "badge": "Minimal TUI",
-                "badge_style": "bold magenta",
-                "title": "Streamlined Tactile Interface",
-                "desc": "Compact 4x3 shortcut dock, integrated top pill badges, dynamic star cache, and zero visual clutter."
-            },
-            {
-                "badge": "Multi-Player",
-                "badge_style": "bold green",
-                "title": "Expanded Player Ecosystem",
-                "desc": "Auto-detection and timestamp support for Celluloid, IINA, Syncplay, MPV, VLC, and MPC-HC."
-            },
-            {
-                "badge": "Broadcast",
-                "badge_style": "bold blue",
-                "title": "Cloudflare Remote Broadcast Engine",
-                "desc": "Live global announcements, maintenance notices, and domain switch alerts without client updates."
-            },
-            {
-                "badge": "Smart Search",
-                "badge_style": "bold cyan",
-                "title": "Typo Normalization & Fallbacks",
-                "desc": "Automatic Arabic orthographic normalization and chunked token search fallbacks for zero-miss lookups."
-            },
-            {
-                "badge": "Maintenance",
-                "badge_style": "bold #d97979",
-                "title": "Automated Cache Optimization",
-                "desc": "Background IPC socket cleanup and temporary database pruning on startup."
-            }
-        ]
+        "badge": "Multi-Provider",
+        "badge_style": "bold cyan",
+        "title": "4 Distinct Streaming Engines",
+        "desc": "Stream seamlessly across Anime3rb, Anime Slayer (VIP CDN), Animeify, and AniDB (English Sub & Dub) with instant runtime switching."
     },
     {
-        "version": "1.6.0",
-        "title": "Discovery & Anime Slayer Integration",
-        "date": "2026-08-25",
-        "tag": "Previous Release",
-        "items": [
-            {
-                "badge": "Discovery",
-                "badge_style": "bold cyan",
-                "title": "Complete Exploration Hub",
-                "desc": "Browse Trending, Popular, Top Rated, Movies, Genres, and Studios directly from the terminal."
-            },
-            {
-                "badge": "Provider",
-                "badge_style": "bold yellow",
-                "title": "Anime Slayer Engine",
-                "desc": "AES and RNCryptor CDN stream extraction for Arabic dubbed and subbed anime."
-            },
-            {
-                "badge": "Downloader",
-                "badge_style": "bold green",
-                "title": "Batch Multi-Episode Downloader",
-                "desc": "Aria2 and IDM integration with customizable quality queues."
-            },
-            {
-                "badge": "Discord RPC",
-                "badge_style": "bold blue",
-                "title": "Rich Presence Status",
-                "desc": "Live watching status, anime poster artwork, and episode tracking on Discord."
-            }
-        ]
+        "badge": "Watch Progress",
+        "badge_style": "bold yellow",
+        "title": "Real-Time MPV Socket Resumption",
+        "desc": "Background IPC socket tracking records exact timestamps and percentage, resuming instantly from where you left off."
     },
     {
-        "version": "1.5.0",
-        "title": "Core Architecture Refactor",
-        "date": "2026-08-10",
-        "tag": "Milestone",
-        "items": [
-            {
-                "badge": "Engine",
-                "badge_style": "bold cyan",
-                "title": "Multi-Threaded Resolvers",
-                "desc": "Fast asynchronous search and high-throughput video stream resolution."
-            },
-            {
-                "badge": "Storage",
-                "badge_style": "bold yellow",
-                "title": "Atomic JSON Database",
-                "desc": "Corruption-proof atomic writes for history, favorites, and user settings."
-            },
-            {
-                "badge": "English",
-                "badge_style": "bold magenta",
-                "title": "AniDB Provider Integration",
-                "desc": "Comprehensive English anime catalogs with sub and dub streams."
-            }
-        ]
+        "badge": "Minimal TUI",
+        "badge_style": "bold magenta",
+        "title": "Streamlined Tactile Interface",
+        "desc": "Compact 4x3 shortcut dock, integrated top pill badges, live star cache, and zero visual clutter."
+    },
+    {
+        "badge": "Multi-Player",
+        "badge_style": "bold green",
+        "title": "Expanded Player Ecosystem",
+        "desc": "Auto-detection and timestamp seeking for Celluloid, IINA, Syncplay, MPV, VLC, and MPC-HC."
+    },
+    {
+        "badge": "Broadcast",
+        "badge_style": "bold blue",
+        "title": "Cloudflare Remote Announcements",
+        "desc": "Instant global announcements and maintenance notices delivered live via Cloudflare Worker."
+    },
+    {
+        "badge": "Smart Search",
+        "badge_style": "bold cyan",
+        "title": "Typo Normalization & Fallbacks",
+        "desc": "Automatic Arabic orthographic normalization and chunked token search fallbacks for zero-miss lookups."
+    },
+    {
+        "badge": "Intro Skip",
+        "badge_style": "bold yellow",
+        "title": "Anime3rb Bumper Auto-Skip",
+        "desc": "Automatically skips the 5-second intro bumper strictly on Anime3rb streams when starting fresh episodes."
+    },
+    {
+        "badge": "Auto-Updater",
+        "badge_style": "bold green",
+        "title": "Bulletproof Upgrade Engine",
+        "desc": "Automated PyPI and pipx updates with automatic PEP 668 managed environment handling."
+    },
+    {
+        "badge": "Maintenance",
+        "badge_style": "bold #d97979",
+        "title": "Automated Cache Optimization",
+        "desc": "Background IPC socket cleanup and temporary database pruning on startup."
     }
 ]
 
@@ -177,39 +123,26 @@ def clear_version_seen() -> None:
 
 
 def _build_changelog_lines(content_w: int) -> List[Text]:
-    """Generates wrapped, beautifully styled lines for all releases."""
+    """Generates wrapped, beautifully styled lines for the changelog modal."""
     all_lines: List[Text] = []
 
-    for rel in _CHANGELOG_RELEASES:
-        is_current = (rel["version"] == __version__)
+    for item in _CHANGELOG_ITEMS:
+        # Line 1: Bullet + Badge + Title
+        t1 = Text()
+        t1.append("  ◆ ", style=f"bold {COLOR_TITLE}")
+        t1.append(f"[{item['badge']}]", style=item["badge_style"])
+        t1.append(f" {item['title']}", style="bold white")
+        all_lines.append(t1)
+
+        # Line 2+: Description wrapped nicely
+        wrapped = textwrap.wrap(item["desc"], width=max(20, content_w - 6))
+        for w in wrapped:
+            t2 = Text()
+            t2.append("    ", style="dim")
+            t2.append(w, style="white")
+            all_lines.append(t2)
         
-        # Section Header with Version Pill
-        hdr = Text()
-        hdr.append("━━━ ", style=f"bold {COLOR_BORDER}")
-        hdr.append(f"[ v{rel['version']} ]", style=f"bold {COLOR_TITLE}" if is_current else "bold white")
-        hdr.append(f" {rel['title']}", style="bold white" if is_current else "white")
-        hdr.append(f" ({rel['date']}) ", style="dim")
-        hdr.append("━━━", style=f"bold {COLOR_BORDER}")
-        all_lines.append(hdr)
         all_lines.append(Text(""))
-
-        for item in rel["items"]:
-            # Line 1: Bullet + Badge + Title
-            t1 = Text()
-            t1.append("  ◆ ", style=f"bold {COLOR_TITLE}")
-            t1.append(f"[{item['badge']}]", style=item["badge_style"])
-            t1.append(f" {item['title']}", style="bold white")
-            all_lines.append(t1)
-
-            # Line 2+: Description wrapped nicely
-            wrapped = textwrap.wrap(item["desc"], width=max(20, content_w - 6))
-            for w in wrapped:
-                t2 = Text()
-                t2.append("    ", style="dim")
-                t2.append(w, style="white")
-                all_lines.append(t2)
-            
-            all_lines.append(Text(""))
 
     return all_lines
 
@@ -279,7 +212,7 @@ def render_changelog_popup(console, force: bool = False) -> None:
         panel = Panel(
             body,
             title=f"[bold {COLOR_TITLE}] ⚡ What's New in {APP_VERSION} [/bold {COLOR_TITLE}]",
-            subtitle=f"[dim]↑/↓ or j/k to scroll • [bold {COLOR_TITLE}]{pct_str}[/bold {COLOR_TITLE}] • Enter / Esc to close[/dim]",
+            subtitle=f"[dim]↑/↓ to scroll • [bold {COLOR_TITLE}]{pct_str}[/bold {COLOR_TITLE}] • Enter / Esc to close[/dim]",
             box=HEAVY,
             border_style=COLOR_BORDER,
             padding=(0, 1),
