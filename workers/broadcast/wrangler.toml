@@ -2,7 +2,6 @@ name = "ani-cli-broadcast"
 main = "src/index.js"
 compatibility_date = "2026-08-30"
 
-# Optional custom domain or route:
-# routes = [
-#   { pattern = "broadcast.ani-cli-arabic.dev/*", zone_name = "ani-cli-arabic.dev" }
-# ]
+[[kv_namespaces]]
+binding = "BROADCAST_KV"
+id = "9964f00f31ab464e864f2b21751046aa"
