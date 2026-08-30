@@ -6,8 +6,16 @@ Detects first-run and post-update states to automatically showcase new features.
 import os
 import json
 import time
+import textwrap
 from pathlib import Path
-from typing import Optional, Dict, List
+from typing import Optional, Dict, List, Any
+
+from rich.text import Text
+from rich.panel import Panel
+from rich.table import Table
+from rich.align import Align
+from rich.live import Live
+from rich.box import HEAVY
 
 from .version import __version__, APP_VERSION
 from .config import (
@@ -16,52 +24,118 @@ from .config import (
 )
 from .utils import get_key, RawTerminal
 
-_CHANGELOG_DATA: Dict[str, Dict[str, any]] = {
-    "2.0.0": {
-        "title": "v2.0.0 — The Ultimate Multi-Provider & UI Evolution",
+_CHANGELOG_RELEASES: List[Dict[str, Any]] = [
+    {
+        "version": "2.0.0",
+        "title": "The Ultimate Multi-Provider & UI Evolution",
         "date": "2026-08-30",
-        "highlights": [
-            "⚡ 4 Distinct Providers: Anime3rb, Anime Slayer (VIP CDN), Animeify, and AniDB (English Sub & Dub).",
-            "🕒 Real-Time Watch Progress & IPC Resumption: MPV tracking saves exact position & resumes instantly.",
-            "🎨 Streamlined Minimal TUI: Clean 4x3 tactile keycaps, integrated provider pills, and zero clutter.",
-            "🎬 Extended Player Ecosystem: Native support for Celluloid, IINA, Syncplay, MPV, VLC, and MPC-HC.",
-            "📡 Remote Broadcast Engine: Live global announcements, domain updates, and server notices via Cloudflare Worker.",
-            "🔍 Smart Search Normalization: Automatic typo correction and Arabic orthographic variations.",
-            "🧹 Background Maintenance: Automated socket cleanup and disk storage optimization."
+        "tag": "Current Version",
+        "items": [
+            {
+                "badge": "Multi-Provider",
+                "badge_style": "bold cyan",
+                "title": "4 Distinct Streaming Engines",
+                "desc": "Seamless streaming across Anime3rb, Anime Slayer (VIP CDN), Animeify, and AniDB (English Sub & Dub) with instant runtime switching."
+            },
+            {
+                "badge": "Watch Progress",
+                "badge_style": "bold yellow",
+                "title": "Real-Time MPV Socket Resumption",
+                "desc": "Precise background IPC tracking records exact playback timestamps and resumes seamlessly from where you left off."
+            },
+            {
+                "badge": "Minimal TUI",
+                "badge_style": "bold magenta",
+                "title": "Streamlined Tactile Interface",
+                "desc": "Compact 4x3 shortcut dock, integrated top pill badges, dynamic star cache, and zero visual clutter."
+            },
+            {
+                "badge": "Multi-Player",
+                "badge_style": "bold green",
+                "title": "Expanded Player Ecosystem",
+                "desc": "Auto-detection and timestamp support for Celluloid, IINA, Syncplay, MPV, VLC, and MPC-HC."
+            },
+            {
+                "badge": "Broadcast",
+                "badge_style": "bold blue",
+                "title": "Cloudflare Remote Broadcast Engine",
+                "desc": "Live global announcements, maintenance notices, and domain switch alerts without client updates."
+            },
+            {
+                "badge": "Smart Search",
+                "badge_style": "bold cyan",
+                "title": "Typo Normalization & Fallbacks",
+                "desc": "Automatic Arabic orthographic normalization and chunked token search fallbacks for zero-miss lookups."
+            },
+            {
+                "badge": "Maintenance",
+                "badge_style": "bold #d97979",
+                "title": "Automated Cache Optimization",
+                "desc": "Background IPC socket cleanup and temporary database pruning on startup."
+            }
         ]
     },
-    "1.6.0": {
-        "title": "v1.6.0 — Discovery & Anime Slayer Integration",
+    {
+        "version": "1.6.0",
+        "title": "Discovery & Anime Slayer Integration",
         "date": "2026-08-25",
-        "highlights": [
-            "✨ Complete Discovery Engine: Trending, Popular, Top Rated, Movies, Genres, and Studios.",
-            "🛡️ Anime Slayer Provider: AES & RNCryptor CDN link extraction.",
-            "📥 Batch Downloader: Multi-episode download queue with Aria2 and IDM support.",
-            "🎮 Discord Rich Presence: Live watching status, episode counts, and anime poster art."
+        "tag": "Previous Release",
+        "items": [
+            {
+                "badge": "Discovery",
+                "badge_style": "bold cyan",
+                "title": "Complete Exploration Hub",
+                "desc": "Browse Trending, Popular, Top Rated, Movies, Genres, and Studios directly from the terminal."
+            },
+            {
+                "badge": "Provider",
+                "badge_style": "bold yellow",
+                "title": "Anime Slayer Engine",
+                "desc": "AES and RNCryptor CDN stream extraction for Arabic dubbed and subbed anime."
+            },
+            {
+                "badge": "Downloader",
+                "badge_style": "bold green",
+                "title": "Batch Multi-Episode Downloader",
+                "desc": "Aria2 and IDM integration with customizable quality queues."
+            },
+            {
+                "badge": "Discord RPC",
+                "badge_style": "bold blue",
+                "title": "Rich Presence Status",
+                "desc": "Live watching status, anime poster artwork, and episode tracking on Discord."
+            }
         ]
     },
-    "1.5.0": {
-        "title": "v1.5.0 — Core Architecture Refactor",
+    {
+        "version": "1.5.0",
+        "title": "Core Architecture Refactor",
         "date": "2026-08-10",
-        "highlights": [
-            "🚀 High-performance multi-threaded search and stream resolver.",
-            "💾 Atomic JSON database storage for history, favorites, and settings.",
-            "🌐 Comprehensive English anime support via AniDB engine."
+        "tag": "Milestone",
+        "items": [
+            {
+                "badge": "Engine",
+                "badge_style": "bold cyan",
+                "title": "Multi-Threaded Resolvers",
+                "desc": "Fast asynchronous search and high-throughput video stream resolution."
+            },
+            {
+                "badge": "Storage",
+                "badge_style": "bold yellow",
+                "title": "Atomic JSON Database",
+                "desc": "Corruption-proof atomic writes for history, favorites, and user settings."
+            },
+            {
+                "badge": "English",
+                "badge_style": "bold magenta",
+                "title": "AniDB Provider Integration",
+                "desc": "Comprehensive English anime catalogs with sub and dub streams."
+            }
         ]
     }
-}
+]
 
 _VERSION_SEEN_FILE = Path.home() / ".ani-cli-arabic" / "database" / "version_seen.json"
-
-
-def get_latest_changelog() -> Dict[str, any]:
-    """Returns the latest changelog entry."""
-    return _CHANGELOG_DATA.get(__version__, list(_CHANGELOG_DATA.values())[0])
-
-
-def get_all_changelogs() -> Dict[str, Dict[str, any]]:
-    """Returns all changelogs."""
-    return _CHANGELOG_DATA
 
 
 def should_show_update_popup() -> bool:
@@ -93,66 +167,127 @@ def mark_version_seen() -> None:
         pass
 
 
+def clear_version_seen() -> None:
+    """Clears the seen version file to force display on next run."""
+    try:
+        if _VERSION_SEEN_FILE.exists():
+            _VERSION_SEEN_FILE.unlink()
+    except Exception:
+        pass
+
+
+def _build_changelog_lines(content_w: int) -> List[Text]:
+    """Generates wrapped, beautifully styled lines for all releases."""
+    all_lines: List[Text] = []
+
+    for rel in _CHANGELOG_RELEASES:
+        is_current = (rel["version"] == __version__)
+        
+        # Section Header with Version Pill
+        hdr = Text()
+        hdr.append("━━━ ", style=f"bold {COLOR_BORDER}")
+        hdr.append(f"[ v{rel['version']} ]", style=f"bold {COLOR_TITLE}" if is_current else "bold white")
+        hdr.append(f" {rel['title']}", style="bold white" if is_current else "white")
+        hdr.append(f" ({rel['date']}) ", style="dim")
+        hdr.append("━━━", style=f"bold {COLOR_BORDER}")
+        all_lines.append(hdr)
+        all_lines.append(Text(""))
+
+        for item in rel["items"]:
+            # Line 1: Bullet + Badge + Title
+            t1 = Text()
+            t1.append("  ◆ ", style=f"bold {COLOR_TITLE}")
+            t1.append(f"[{item['badge']}]", style=item["badge_style"])
+            t1.append(f" {item['title']}", style="bold white")
+            all_lines.append(t1)
+
+            # Line 2+: Description wrapped nicely
+            wrapped = textwrap.wrap(item["desc"], width=max(20, content_w - 6))
+            for w in wrapped:
+                t2 = Text()
+                t2.append("    ", style="dim")
+                t2.append(w, style="white")
+                all_lines.append(t2)
+            
+            all_lines.append(Text(""))
+
+    return all_lines
+
+
 def render_changelog_popup(console, force: bool = False) -> None:
     """
-    Renders an interactive, scrollable changelog modal.
+    Renders an interactive, scrollable changelog modal with a bounded max height
+    and a visual scrollbar track and thumb.
     """
     if not force and not should_show_update_popup():
         return
 
-    from rich.text import Text
-    from rich.panel import Panel
-    from rich.table import Table
-    from rich.align import Align
-    from rich.live import Live
-    from rich.box import HEAVY
+    screen_h = max(16, console.height)
+    screen_w = max(40, console.width)
 
+    # Calculate bounded dimensions
+    panel_w = min(80, screen_w - 4)
+    content_w = panel_w - 6  # Margin for borders, padding, and scrollbar
+    viewport_h = min(14, max(6, screen_h - 10))
+
+    lines = _build_changelog_lines(content_w)
+    total_lines = len(lines)
     scroll_offset = 0
-    lines = []
-
-    # Build formatted content lines
-    for ver, data in _CHANGELOG_DATA.items():
-        is_current = (ver == __version__)
-        badge_style = f"bold {COLOR_TITLE}" if is_current else "bold white"
-        
-        lines.append(Text(""))
-        title_t = Text()
-        title_t.append("━━━ ", style=f"bold {COLOR_BORDER}")
-        title_t.append(data.get("title", f"v{ver}"), style=badge_style)
-        title_t.append(f" ({data.get('date', '')})", style="dim")
-        title_t.append(" ━━━", style=f"bold {COLOR_BORDER}")
-        lines.append(title_t)
-        lines.append(Text(""))
-
-        for h in data.get("highlights", []):
-            hl_text = Text()
-            hl_text.append("  • ", style=f"bold {COLOR_TITLE}")
-            hl_text.append(h, style="white")
-            lines.append(hl_text)
-
-    screen_h = console.height
-    max_display = max(6, min(18, screen_h - 12))
-    box_w = min(84, console.width - 4)
 
     def generate_renderable():
-        visible_lines = lines[scroll_offset:scroll_offset + max_display]
-        content = Text()
-        for idx, l in enumerate(visible_lines):
-            content.append_text(l)
-            if idx < len(visible_lines) - 1:
-                content.append("\n")
+        max_offset = max(0, total_lines - viewport_h)
+        clamped_offset = max(0, min(scroll_offset, max_offset))
+
+        # Calculate scrollbar metrics
+        if total_lines > viewport_h:
+            thumb_size = max(1, min(viewport_h, int(round((viewport_h / total_lines) * viewport_h))))
+            thumb_pos = int(round((clamped_offset / max(1, max_offset)) * (viewport_h - thumb_size)))
+        else:
+            thumb_size = viewport_h
+            thumb_pos = 0
+
+        # Scroll position label
+        if total_lines <= viewport_h:
+            pct_str = "All"
+        elif clamped_offset == 0:
+            pct_str = "Top"
+        elif clamped_offset >= max_offset:
+            pct_str = "Bot"
+        else:
+            pct = int(round((clamped_offset / max(1, max_offset)) * 100))
+            pct_str = f"{pct}%"
+
+        body = Text()
+        for r in range(viewport_h):
+            idx = clamped_offset + r
+            line_text = lines[idx] if idx < total_lines else Text("")
+            
+            # Align line and compute scrollbar column
+            plain_len = len(line_text.plain)
+            pad_len = max(0, content_w - plain_len)
+            
+            is_thumb = (r >= thumb_pos and r < thumb_pos + thumb_size)
+            sb_char = "█" if is_thumb else "│"
+            sb_style = f"bold {COLOR_TITLE}" if is_thumb else "dim #333333"
+
+            body.append_text(line_text)
+            body.append(" " * pad_len)
+            body.append(sb_char, style=sb_style)
+            if r < viewport_h - 1:
+                body.append("\n")
 
         panel = Panel(
-            content,
-            title=f"[bold {COLOR_TITLE}]What's New in {APP_VERSION}[/bold {COLOR_TITLE}]",
-            subtitle=f"[dim]Use ↑/↓ or j/k to scroll • Press Enter / Esc to close[/dim]",
+            body,
+            title=f"[bold {COLOR_TITLE}] ⚡ What's New in {APP_VERSION} [/bold {COLOR_TITLE}]",
+            subtitle=f"[dim]↑/↓ or j/k to scroll • [bold {COLOR_TITLE}]{pct_str}[/bold {COLOR_TITLE}] • Enter / Esc to close[/dim]",
             box=HEAVY,
             border_style=COLOR_BORDER,
-            padding=(1, 2),
-            width=box_w
+            padding=(0, 1),
+            width=panel_w,
+            height=viewport_h + 2
         )
 
-        # Dock
+        # Dock Keycaps
         dock = Text()
         dock.append("[ ", style="dim")
         dock.append("↵ / Esc", style=f"bold {COLOR_TITLE}")
@@ -160,6 +295,9 @@ def render_changelog_popup(console, force: bool = False) -> None:
         dock.append(" ]   [ ", style="dim")
         dock.append("↑↓ / jk", style=f"bold {COLOR_TITLE}")
         dock.append(" Scroll", style="white")
+        dock.append(" ]   [ ", style="dim")
+        dock.append("PgUp / PgDn", style=f"bold {COLOR_TITLE}")
+        dock.append(" Fast", style="white")
         dock.append(" ]", style="dim")
 
         root = Table.grid(expand=False)
@@ -171,20 +309,34 @@ def render_changelog_popup(console, force: bool = False) -> None:
         return Align.center(root, vertical="middle", height=console.height)
 
     with RawTerminal():
-        with Live(generate_renderable(), console=console, auto_refresh=False, screen=True, refresh_per_second=15) as live:
+        with Live(
+            generate_renderable(),
+            console=console,
+            auto_refresh=False,
+            screen=True,
+            refresh_per_second=20
+        ) as live:
             while True:
                 key = get_key()
+                max_offset = max(0, total_lines - viewport_h)
+
                 if key in ('UP', 'k') and scroll_offset > 0:
                     scroll_offset -= 1
                     live.update(generate_renderable(), refresh=True)
-                elif key in ('DOWN', 'j') and scroll_offset < max(0, len(lines) - max_display):
+                elif key in ('DOWN', 'j') and scroll_offset < max_offset:
                     scroll_offset += 1
                     live.update(generate_renderable(), refresh=True)
                 elif key in ('PAGE_UP',):
-                    scroll_offset = max(0, scroll_offset - 5)
+                    scroll_offset = max(0, scroll_offset - 6)
                     live.update(generate_renderable(), refresh=True)
                 elif key in ('PAGE_DOWN',):
-                    scroll_offset = min(max(0, len(lines) - max_display), scroll_offset + 5)
+                    scroll_offset = min(max_offset, scroll_offset + 6)
+                    live.update(generate_renderable(), refresh=True)
+                elif key in ('HOME',):
+                    scroll_offset = 0
+                    live.update(generate_renderable(), refresh=True)
+                elif key in ('END',):
+                    scroll_offset = max_offset
                     live.update(generate_renderable(), refresh=True)
                 elif key in ('ENTER', 'ESC', 'b', 'q', ' '):
                     break
