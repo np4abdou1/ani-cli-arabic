@@ -401,6 +401,8 @@ class UIManager:
                         t.append("↵ search", style=f"bold {COLOR_HIGHLIGHT_FG} on {COLOR_BORDER}")
                     elif key == "q":
                         t.append("^c quit", style="bold black on #d97979")
+                    elif key == "d":
+                        t.append(" [d] donate ♥ ", style="bold black on #ff79c6")
                     else:
                         t.append(f"[{key}] {label}", style=f"bold {COLOR_HIGHLIGHT_FG} on {COLOR_BORDER}")
                 else:
@@ -410,6 +412,12 @@ class UIManager:
                     elif key == "q":
                         t.append("^c", style=f"bold {fg}")
                         t.append(f" {label}", style="dim")
+                    elif key == "d":
+                        t.append("[", style="bold #ff79c6")
+                        t.append("d", style="bold white on #ff79c6")
+                        t.append("]", style="bold #ff79c6")
+                        t.append(" donate ", style="bold white")
+                        t.append("♥", style="bold #ff79c6")
                     else:
                         t.append("[", style="dim")
                         t.append(key, style=f"bold {fg}")
@@ -442,10 +450,7 @@ class UIManager:
             table.add_row(Align.center(grid))
             table.add_row(Text(""))
 
-            donate_line = Text()
-            donate_line.append("♥ Support the project: ", style="bold #ff79c6")
-            donate_line.append("paypal.me/np4abdou", style=f"bold {COLOR_TITLE} underline")
-            table.add_row(Align.center(donate_line))
+            table.add_row(Align.center(format_item("d", "donate ♥", "d", "#ff79c6")))
 
             return Align.center(table, vertical="middle", height=self.console.height)
 
@@ -503,7 +508,7 @@ class UIManager:
                         screen_w = self.console.width
                         new_hover = None
                         box_row = screen_h // 2 + 4
-                        if abs(y - box_row) <= 4:
+                        if abs(y - box_row) <= 5:
                             footer_span = 74
                             start_x = max(1, (screen_w - footer_span) // 2)
                             if start_x <= x <= start_x + footer_span:
@@ -517,6 +522,8 @@ class UIManager:
                                         ["l", "f", "c", "q"]
                                     ]
                                     new_hover = action_map[row_offset][col_idx]
+                                elif row_offset in (3, 4):
+                                    new_hover = "d"
 
                         if new_hover != hovered_btn:
                             hovered_btn = new_hover
