@@ -1,25 +1,29 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { Activity, Clock, RefreshCw, Radio, Sparkles } from "lucide-react";
-import { formatGmt1DateTime, formatGmt1TimeOnly } from "@/lib/timezone";
+import { Clock, RefreshCw, Search, Sparkles, Activity, ShieldCheck } from "lucide-react";
+import { formatGmt1DateTime } from "@/lib/timezone";
 
 interface HeaderProps {
+  activeTab: string;
   timeRange: string;
   setTimeRange: (range: string) => void;
   onRefresh: () => void;
   loading: boolean;
   autoRefreshInterval: number;
   setAutoRefreshInterval: (interval: number) => void;
+  onOpenSearch: () => void;
 }
 
 export default function Header({
+  activeTab,
   timeRange,
   setTimeRange,
   onRefresh,
   loading,
   autoRefreshInterval,
   setAutoRefreshInterval,
+  onOpenSearch,
 }: HeaderProps) {
   const [clock, setClock] = useState<string>("");
 
@@ -30,58 +34,74 @@ export default function Header({
     return () => clearInterval(interval);
   }, []);
 
+  const getBreadcrumbTitle = (tab: string) => {
+    switch (tab) {
+      case "anime": return "Anime Leaderboard & Rankings";
+      case "events": return "Live Telemetry Event Feed";
+      case "users": return "User Directory & Watch Inspector";
+      case "broadcast": return "Remote Announcements & Popups";
+      case "health": return "System Health & Cloudflare Edge Status";
+      default: return "Executive Metrics & Growth Overview";
+    }
+  };
+
   return (
-    <header className="glass-panel sticky top-0 z-40 px-6 py-4 border-b border-border mb-8">
-      <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
-        {/* Left: Brand / Title */}
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary via-indigo-600 to-accent-cyan flex items-center justify-center shadow-lg shadow-primary/20">
-            <Activity className="w-5 h-5 text-white animate-pulse" />
-          </div>
+    <header className="glass-panel sticky top-0 z-40 px-6 py-3.5 border-b border-border mb-6">
+      <div className="flex flex-col lg:flex-row items-center justify-between gap-4">
+        {/* Left: Breadcrumbs & Quick Search */}
+        <div className="flex items-center gap-4 w-full lg:w-auto justify-between lg:justify-start">
           <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-xl font-bold tracking-tight text-white flex items-center gap-2">
-                ani-cli-arabic
-                <span className="text-xs px-2 py-0.5 rounded-full font-semibold bg-primary/20 text-primary border border-primary/30">
-                  Command Center v2.0
-                </span>
-              </h1>
+            <div className="flex items-center gap-2 text-[11px] text-slate-400 font-medium">
+              <span>Platform</span>
+              <span>/</span>
+              <span className="text-primary font-semibold capitalize">{activeTab}</span>
             </div>
-            <p className="text-xs text-slate-400">
-              Live Edge Telemetry & Analytics Platform
-            </p>
+            <h2 className="text-base font-extrabold text-white tracking-tight">
+              {getBreadcrumbTitle(activeTab)}
+            </h2>
           </div>
+
+          <button
+            onClick={onOpenSearch}
+            className="flex items-center gap-2.5 px-3 py-1.5 rounded-xl bg-surface/80 hover:bg-card border border-border text-slate-400 hover:text-white transition-all text-xs group shadow-inner"
+          >
+            <Search className="w-3.5 h-3.5 group-hover:text-primary transition-colors" />
+            <span className="hidden sm:inline">Search anything...</span>
+            <kbd className="hidden sm:inline-block px-1.5 py-0.5 text-[10px] font-mono bg-background rounded border border-border/80 text-slate-500 group-hover:text-primary">
+              ⌘K
+            </kbd>
+          </button>
         </div>
 
-        {/* Center: Live GMT+1 Clock & Status */}
-        <div className="flex items-center gap-4 bg-background/60 px-4 py-2 rounded-xl border border-border/80">
-          <div className="flex items-center gap-2">
-            <span className="relative flex h-2.5 w-2.5">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-accent-green opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-accent-green"></span>
-            </span>
-            <span className="text-xs font-semibold text-accent-green tracking-wide">
-              SYSTEM ONLINE
-            </span>
+        {/* Center/Right: GMT+1 Clock + Controls */}
+        <div className="flex flex-wrap items-center gap-3 w-full lg:w-auto justify-between lg:justify-end">
+          {/* GMT+1 Clock Card */}
+          <div className="flex items-center gap-3 bg-surface/90 px-3.5 py-1.5 rounded-xl border border-white/5 shadow-inner">
+            <div className="flex items-center gap-2">
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-accent-green opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-accent-green"></span>
+              </span>
+              <span className="text-[10px] font-bold text-accent-green tracking-wider">
+                EDGE GMT+1
+              </span>
+            </div>
+            <div className="h-3 w-px bg-border"></div>
+            <div className="flex items-center gap-1.5 text-xs font-mono text-slate-200">
+              <Clock className="w-3.5 h-3.5 text-primary" />
+              <span>{clock || "Loading..."}</span>
+            </div>
           </div>
-          <div className="h-4 w-px bg-border"></div>
-          <div className="flex items-center gap-2 text-xs font-mono text-slate-300">
-            <Clock className="w-3.5 h-3.5 text-primary" />
-            <span>{clock || "Loading GMT+1..."}</span>
-          </div>
-        </div>
 
-        {/* Right: Controls & Range Selector */}
-        <div className="flex items-center gap-2">
-          {/* Time Range Pills */}
-          <div className="flex items-center bg-background/60 p-1 rounded-xl border border-border/80">
+          {/* Time Range Selector */}
+          <div className="flex items-center bg-surface/90 p-1 rounded-xl border border-white/5">
             {["24h", "7d", "30d", "90d", "all"].map((r) => (
               <button
                 key={r}
                 onClick={() => setTimeRange(r)}
-                className={`px-3 py-1 text-xs font-medium rounded-lg transition-all ${
+                className={`px-2.5 py-1 text-xs font-bold rounded-lg transition-all ${
                   timeRange === r
-                    ? "bg-primary text-slate-900 font-bold shadow-md shadow-primary/30"
+                    ? "bg-primary text-slate-900 shadow-md shadow-primary/20"
                     : "text-slate-400 hover:text-white"
                 }`}
               >
@@ -90,27 +110,28 @@ export default function Header({
             ))}
           </div>
 
-          {/* Auto-Refresh Select */}
-          <select
-            value={autoRefreshInterval}
-            onChange={(e) => setAutoRefreshInterval(Number(e.target.value))}
-            className="bg-card border border-border text-xs text-slate-300 rounded-xl px-2.5 py-1.5 focus:outline-none focus:border-primary cursor-pointer"
-          >
-            <option value={0}>Auto: Off</option>
-            <option value={10}>Auto: 10s</option>
-            <option value={30}>Auto: 30s</option>
-            <option value={60}>Auto: 60s</option>
-          </select>
+          {/* Auto Refresh & Action */}
+          <div className="flex items-center gap-2">
+            <select
+              value={autoRefreshInterval}
+              onChange={(e) => setAutoRefreshInterval(Number(e.target.value))}
+              className="bg-surface border border-border text-xs text-slate-300 rounded-xl px-2.5 py-1.5 focus:outline-none focus:border-primary cursor-pointer"
+            >
+              <option value={0}>Auto: Off</option>
+              <option value={10}>Auto: 10s</option>
+              <option value={30}>Auto: 30s</option>
+              <option value={60}>Auto: 60s</option>
+            </select>
 
-          {/* Manual Refresh Button */}
-          <button
-            onClick={onRefresh}
-            disabled={loading}
-            className="p-2 bg-card hover:bg-surface border border-border rounded-xl text-slate-300 hover:text-white transition-all disabled:opacity-50"
-            title="Refresh Data"
-          >
-            <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin text-primary" : ""}`} />
-          </button>
+            <button
+              onClick={onRefresh}
+              disabled={loading}
+              className="p-2 bg-primary hover:bg-primary-hover text-slate-900 font-bold rounded-xl shadow-md shadow-primary/20 transition-all disabled:opacity-50"
+              title="Refresh Data from Cloudflare Edge"
+            >
+              <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
+            </button>
+          </div>
         </div>
       </div>
     </header>
