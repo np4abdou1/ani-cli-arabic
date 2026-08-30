@@ -13,8 +13,9 @@ from .logger import logger
 
 class MpvTracker:
     """
-    High-performance real-time MPV IPC state tracker using observe_property events.
-    Captures playback position, duration, percentage, paused state, and EOF events.
+    High-performance real-time MPV IPC state tracker.
+    Continuously queries and observes playback position, duration, percentage,
+    paused state, and completion status.
     """
     def __init__(self, sock_path: str):
         self.sock_path = sock_path
@@ -39,115 +40,138 @@ class MpvTracker:
 
     def _run(self):
         s = None
-        f = None
         is_windows = (os.name == 'nt')
         
-        # Connect to MPV IPC socket (retry up to 3 seconds)
+        # Connect to MPV IPC socket (retry up to 30 times / 3 seconds)
         for _ in range(30):
             if self._stop_event.is_set():
                 return
             try:
                 if is_windows:
                     s = open(self.sock_path, 'r+b', buffering=0)
-                    f = s
                     break
                 else:
                     if os.path.exists(self.sock_path):
                         import socket
                         s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-                        s.settimeout(1.0)
+                        s.settimeout(0.5)
                         s.connect(self.sock_path)
-                        f = s.makefile('rwb', buffering=0)
                         break
             except Exception:
                 pass
             time.sleep(0.1)
 
-        if not s or not f:
+        if not s:
             return
 
+        import json
+
+        def send_data(payload: dict):
+            try:
+                raw = (json.dumps(payload) + "\n").encode('utf-8')
+                if is_windows:
+                    s.write(raw)
+                    s.flush()
+                else:
+                    s.sendall(raw)
+            except Exception:
+                pass
+
+        # Register observe_property subscriptions
+        for sub_id, prop_name in [
+            (1, "time-pos"),
+            (2, "duration"),
+            (3, "percent-pos"),
+            (4, "pause"),
+            (5, "eof-reached"),
+        ]:
+            send_data({"command": ["observe_property", sub_id, prop_name]})
+
+        buffer = ""
+
         try:
-            import json
-            # 1. Register observe_property subscriptions
-            subscriptions = [
-                {"command": ["observe_property", 1, "time-pos"]},
-                {"command": ["observe_property", 2, "duration"]},
-                {"command": ["observe_property", 3, "percent-pos"]},
-                {"command": ["observe_property", 4, "pause"]},
-                {"command": ["observe_property", 5, "eof-reached"]},
-            ]
-            for sub in subscriptions:
-                try:
-                    f.write((json.dumps(sub) + "\n").encode('utf-8'))
-                    f.flush()
-                except Exception:
-                    pass
-
-            # 2. Continuous event stream reader
             while not self._stop_event.is_set():
-                try:
-                    line = f.readline()
-                    if not line:
-                        break
-                    
-                    line_str = line.decode('utf-8', errors='ignore').strip()
-                    if not line_str:
-                        continue
+                # 1. Query properties via heartbeat request IDs
+                send_data({"command": ["get_property", "time-pos"], "request_id": 101})
+                send_data({"command": ["get_property", "duration"], "request_id": 102})
+                send_data({"command": ["get_property", "percent-pos"], "request_id": 103})
+                send_data({"command": ["get_property", "pause"], "request_id": 104})
+                send_data({"command": ["get_property", "eof-reached"], "request_id": 105})
 
-                    for entry in line_str.split('\n'):
-                        entry = entry.strip()
-                        if not entry:
+                # 2. Read available incoming responses
+                try:
+                    if is_windows:
+                        chunk = s.read(2048)
+                        if not chunk:
+                            break
+                        chunk_str = chunk.decode('utf-8', errors='ignore')
+                    else:
+                        chunk = s.recv(4096)
+                        if not chunk:
+                            break
+                        chunk_str = chunk.decode('utf-8', errors='ignore')
+
+                    buffer += chunk_str
+                    while "\n" in buffer:
+                        line, buffer = buffer.split("\n", 1)
+                        line = line.strip()
+                        if not line:
                             continue
                         try:
-                            msg = json.loads(entry)
+                            msg = json.loads(line)
                         except Exception:
                             continue
 
-                        # Handle real-time property change events
-                        if msg.get('event') == 'property-change':
-                            name = msg.get('name')
-                            val = msg.get('data')
-                            if val is not None:
-                                if name == 'time-pos':
-                                    self.state['time_pos'] = round(float(val), 1)
-                                elif name == 'duration':
-                                    self.state['duration'] = round(float(val), 1)
-                                elif name == 'percent-pos':
-                                    self.state['percent'] = round(float(val), 1)
-                                elif name == 'pause':
-                                    self.state['paused'] = bool(val)
-                                elif name == 'eof-reached':
-                                    if bool(val):
-                                        self.state['completed'] = True
+                        req_id = msg.get("request_id")
+                        name = msg.get("name")
+                        val = msg.get("data")
 
-                        # Handle explicit end-file event
-                        elif msg.get('event') == 'end-file':
-                            if msg.get('reason') == 'eof':
-                                self.state['completed'] = True
+                        if val is not None:
+                            if req_id == 101 or name == "time-pos":
+                                try:
+                                    self.state["time_pos"] = round(float(val), 1)
+                                except (ValueError, TypeError):
+                                    pass
+                            elif req_id == 102 or name == "duration":
+                                try:
+                                    self.state["duration"] = round(float(val), 1)
+                                except (ValueError, TypeError):
+                                    pass
+                            elif req_id == 103 or name == "percent-pos":
+                                try:
+                                    self.state["percent"] = round(float(val), 1)
+                                except (ValueError, TypeError):
+                                    pass
+                            elif req_id == 104 or name == "pause":
+                                self.state["paused"] = bool(val)
+                            elif req_id == 105 or name == "eof-reached":
+                                if bool(val):
+                                    self.state["completed"] = True
 
-                    # Update completion threshold
-                    pct = self.state['percent']
-                    dur = self.state['duration']
-                    pos = self.state['time_pos']
-                    if pct >= 85 or (dur > 0 and dur - pos < 35):
-                        self.state['completed'] = True
+                        if msg.get("event") == "end-file" and msg.get("reason") == "eof":
+                            self.state["completed"] = True
 
+                except (socket.timeout, TimeoutError):
+                    pass
                 except Exception:
-                    # Periodically query properties as heartbeat
-                    try:
-                        for prop in ["time-pos", "duration", "percent-pos"]:
-                            f.write((json.dumps({"command": ["get_property", prop]}) + "\n").encode('utf-8'))
-                        f.flush()
-                    except Exception:
-                        pass
-                    time.sleep(0.5)
+                    break
+
+                # 3. Calculate derived percentage and completion
+                t_pos = self.state["time_pos"]
+                t_dur = self.state["duration"]
+                t_pct = self.state["percent"]
+
+                if t_pct <= 0 and t_dur > 0 and t_pos > 0:
+                    self.state["percent"] = round((t_pos / t_dur) * 100, 1)
+
+                if self.state["percent"] >= 85 or (t_dur > 0 and t_dur - t_pos < 35):
+                    self.state["completed"] = True
+
+                time.sleep(0.4)
 
         finally:
             try:
-                if f:
-                    f.close()
-                if s and s != f:
-                    s.close()
+                s.close()
             except Exception:
                 pass
 

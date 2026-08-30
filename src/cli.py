@@ -155,10 +155,21 @@ class AniCliWrapper:
 
         print(f"\033[1;34mPlaying episode {ep.number} ({selected_q.name})...\033[0m")
         
-        self.player.play(direct_url, f"{anime.title_en} - Episode {ep.number}")
+        playback_info = self.player.play(direct_url, f"{anime.title_en} - Episode {ep.number}")
         
-        self.history.mark_watched(anime.id, ep.display_num, anime.title_en)
-        self.history.save_history()
+        pos = playback_info.get('time_pos', 0.0) if isinstance(playback_info, dict) else 0.0
+        dur = playback_info.get('duration', 0.0) if isinstance(playback_info, dict) else 0.0
+        pct = playback_info.get('percent', 0.0) if isinstance(playback_info, dict) else 0.0
+        self.history.mark_watched(
+            anime.id, 
+            ep.display_num, 
+            anime.title_en,
+            time_pos=pos,
+            duration=dur,
+            percent=pct,
+            poster_url=getattr(anime, 'thumbnail', ''),
+            provider=getattr(self.provider, 'id', '')
+        )
         return True
 
     def _process_anime_list(self, results, title="Select Anime"):

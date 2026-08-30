@@ -1078,7 +1078,9 @@ class AniCliArApp:
                     selected_anime.title_en,
                     time_pos=pos,
                     duration=dur,
-                    percent=pct
+                    percent=pct,
+                    poster_url=getattr(selected_anime, 'thumbnail', ''),
+                    provider=getattr(self.provider, 'id', '')
                 )
                 self.rpc.update_selecting_episode(selected_anime.title_en, selected_anime.thumbnail)
                 return "watch"
