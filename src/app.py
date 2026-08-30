@@ -121,7 +121,22 @@ class AniCliArApp:
                 pass
         threading.Thread(target=run_cleanup_bg, daemon=True).start()
 
+        def check_broadcast_bg():
+            try:
+                from .broadcast import BroadcastManager
+                BroadcastManager.fetch_remote()
+            except Exception:
+                pass
+        threading.Thread(target=check_broadcast_bg, daemon=True).start()
+
         self.rpc_status = rpc_connected
+
+        # Show changelog modal on first run or after update
+        try:
+            from .changelog import render_changelog_popup
+            render_changelog_popup(self.ui.console)
+        except Exception:
+            pass
 
         try:
             self.unified_loop(initial_query)
@@ -238,6 +253,11 @@ class AniCliArApp:
                 self.provider = ProviderManager.get_provider(active_provider_id)
                 self.api = self.provider
                 ProviderManager.set_active_provider(active_provider_id)
+                continue
+
+            elif action == "changelog":
+                from .changelog import render_changelog_popup
+                render_changelog_popup(self.ui.console, force=True)
                 continue
 
             elif action == "donate":
@@ -1089,6 +1109,9 @@ class AniCliArApp:
                     ep_prog = self.history.get_episode_progress(selected_anime.id, selected_ep.display_num)
                     if ep_prog and 0 < ep_prog.get('percent', 0) < 90 and ep_prog.get('time_pos', 0) > 10:
                         actual_start = ep_prog['time_pos']
+                    elif getattr(self.provider, 'id', '') == 'anime3rb' or 'vid3rb.com' in direct_url:
+                        # Skip 5-second intro bumper for Anime3rb provider only
+                        actual_start = 5.0
 
                 time_hint = f" • Resuming at {format_seconds(actual_start)}" if (actual_start > 0) else ""
                 self.ui.render_now_playing(selected_anime.title_en, f"Episode {selected_ep.display_num}{time_hint}", quality.name)
