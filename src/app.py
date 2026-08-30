@@ -113,6 +113,14 @@ class AniCliArApp:
                 pass
         threading.Thread(target=check_version_bg, daemon=True).start()
         
+        def run_cleanup_bg():
+            try:
+                from .storage import cleanup_temporary_files
+                cleanup_temporary_files()
+            except Exception:
+                pass
+        threading.Thread(target=run_cleanup_bg, daemon=True).start()
+
         self.rpc_status = rpc_connected
 
         try:
@@ -140,7 +148,7 @@ class AniCliArApp:
             else:
                 self.current_mode = "tui"
                 result = self.run_tui_mode(query)
-                query = None
+                query = None # Clear query after first run
                 if result == "SWITCH_TO_CLI":
                     continue
                 break
@@ -243,6 +251,24 @@ class AniCliArApp:
                     continue
                 self.rpc.update_searching()
                 results = self.ui.run_with_loading("Searching...", self.api.search_anime, search_query)
+                if not results:
+                    q_clean = re.sub(r'[:\-!?,._\(\)\[\]]', ' ', search_query).strip()
+                    q_clean = re.sub(r'\s+', ' ', q_clean)
+                    variants = []
+                    if q_clean and q_clean.lower() != search_query.lower():
+                        variants.append(q_clean)
+                    ar_norm = search_query.replace('أ', 'ا').replace('إ', 'ا').replace('آ', 'ا').replace('ة', 'ه').replace('ى', 'ي')
+                    if ar_norm != search_query and ar_norm not in variants:
+                        variants.append(ar_norm)
+                    words = q_clean.split()
+                    if len(words) > 3:
+                        variants.append(' '.join(words[:3]))
+
+                    for alt_q in variants:
+                        results = self.api.search_anime(alt_q)
+                        if results:
+                            break
+
                 if not results:
                     self.ui.render_message(
                         "✗ No Anime Found", 
