@@ -52,11 +52,16 @@ class BroadcastManager:
             return cls._cached_broadcast
 
         def _fetch_worker():
-            for url in BROADCAST_URLS:
+            for base_url in BROADCAST_URLS:
                 try:
+                    url = f"{base_url}?_t={int(time.time())}"
                     req = urllib.request.Request(
                         url,
-                        headers={"User-Agent": f"ani-cli-arabic/{__version__}"}
+                        headers={
+                            "User-Agent": f"ani-cli-arabic/{__version__}",
+                            "Cache-Control": "no-cache, no-store, must-revalidate",
+                            "Pragma": "no-cache"
+                        }
                     )
                     with urllib.request.urlopen(req, timeout=3) as resp:
                         if resp.status == 200:
