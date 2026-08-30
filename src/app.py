@@ -512,72 +512,22 @@ class AniCliArApp:
                     target_ep.number,
                     selected_anime.type
                 )
-                if server_data:
-                    action_taken = self.handle_quality_selection(selected_anime, target_ep, server_data)
-                    if action_taken == "watch":
-                        current_idx = initial_idx
-                        while True:
-                            auto_next = self.settings.get('auto_next')
-                            if auto_next:
-                                if current_idx + 1 < len(episodes):
-                                    current_idx += 1
-                                    selected_ep = episodes[current_idx]
-                                    s_data = self.ui.run_with_loading(
-                                        "Loading servers...",
-                                        self.api.get_streaming_servers,
-                                        selected_anime.id,
-                                        selected_ep.number,
-                                        selected_anime.type
-                                    )
-                                    if s_data:
-                                        self.handle_quality_selection(selected_anime, selected_ep, s_data)
-                                        continue
-                                    else:
-                                        break
-                                else:
-                                    self.ui.render_message("Info", "No more episodes!", "info")
-                                    break
-                            
-                            next_action = self.ui.post_watch_menu(selected_anime.title_en, str(episodes[current_idx].display_num))
-                            if next_action == "Next Episode":
-                                if current_idx + 1 < len(episodes):
-                                    current_idx += 1
-                                    selected_ep = episodes[current_idx]
-                                    s_data = self.ui.run_with_loading(
-                                        "Loading servers...",
-                                        self.api.get_streaming_servers,
-                                        selected_anime.id,
-                                        selected_ep.number,
-                                        selected_anime.type
-                                    )
-                                    if s_data:
-                                        self.handle_quality_selection(selected_anime, selected_ep, s_data)
-                                        continue
-                                    else:
-                                        break
-                                else:
-                                    self.ui.render_message("Info", "No more episodes!", "info")
-                                    break
-                            elif next_action == "Previous Episode":
-                                if current_idx > 0:
-                                    current_idx -= 1
-                                    selected_ep = episodes[current_idx]
-                                    s_data = self.ui.run_with_loading(
-                                        "Loading servers...",
-                                        self.api.get_streaming_servers,
-                                        selected_anime.id,
-                                        selected_ep.number,
-                                        selected_anime.type
-                                    )
-                                    if s_data:
-                                        self.handle_quality_selection(selected_anime, selected_ep, s_data)
-                                        continue
-                                    else:
-                                        break
-                                else:
-                                    self.ui.render_message("Info", "This is the first episode.", "info")
-                                    break
-                            elif next_action == "Replay":
+                if not server_data:
+                    self.ui.render_message("Error", "No servers available for this episode.", "error")
+                    return
+
+                action_taken = self.handle_quality_selection(selected_anime, target_ep, server_data)
+                if not action_taken:
+                    # User cancelled quality selection -> return cleanly to caller
+                    return
+
+                if action_taken == "watch":
+                    current_idx = initial_idx
+                    while True:
+                        auto_next = self.settings.get('auto_next')
+                        if auto_next:
+                            if current_idx + 1 < len(episodes):
+                                current_idx += 1
                                 selected_ep = episodes[current_idx]
                                 s_data = self.ui.run_with_loading(
                                     "Loading servers...",
@@ -587,14 +537,73 @@ class AniCliArApp:
                                     selected_anime.type
                                 )
                                 if s_data:
-                                    self.handle_quality_selection(selected_anime, selected_ep, s_data, start_time=0.001)
-                                    continue
-                                else:
-                                    break
+                                    act = self.handle_quality_selection(selected_anime, selected_ep, s_data)
+                                    if act == "watch":
+                                        continue
                             else:
-                                break
-                        return
-            self.handle_episode_selection(selected_anime, episodes, initial_idx=initial_idx)
+                                self.ui.render_message("Info", "No more episodes!", "info")
+                            break
+                        
+                        next_action = self.ui.post_watch_menu(selected_anime.title_en, str(episodes[current_idx].display_num))
+                        if next_action == "Next Episode":
+                            if current_idx + 1 < len(episodes):
+                                current_idx += 1
+                                selected_ep = episodes[current_idx]
+                                s_data = self.ui.run_with_loading(
+                                    "Loading servers...",
+                                    self.api.get_streaming_servers,
+                                    selected_anime.id,
+                                    selected_ep.number,
+                                    selected_anime.type
+                                )
+                                if s_data:
+                                    act = self.handle_quality_selection(selected_anime, selected_ep, s_data)
+                                    if act == "watch":
+                                        continue
+                            else:
+                                self.ui.render_message("Info", "No more episodes!", "info")
+                            break
+                        elif next_action == "Previous Episode":
+                            if current_idx > 0:
+                                current_idx -= 1
+                                selected_ep = episodes[current_idx]
+                                s_data = self.ui.run_with_loading(
+                                    "Loading servers...",
+                                    self.api.get_streaming_servers,
+                                    selected_anime.id,
+                                    selected_ep.number,
+                                    selected_anime.type
+                                )
+                                if s_data:
+                                    act = self.handle_quality_selection(selected_anime, selected_ep, s_data)
+                                    if act == "watch":
+                                        continue
+                            else:
+                                self.ui.render_message("Info", "This is the first episode.", "info")
+                            break
+                        elif next_action == "Replay":
+                            selected_ep = episodes[current_idx]
+                            s_data = self.ui.run_with_loading(
+                                "Loading servers...",
+                                self.api.get_streaming_servers,
+                                selected_anime.id,
+                                selected_ep.number,
+                                selected_anime.type
+                            )
+                            if s_data:
+                                act = self.handle_quality_selection(selected_anime, selected_ep, s_data, start_time=0.001)
+                                if act == "watch":
+                                    continue
+                            break
+                        elif next_action == "Back to Episodes":
+                            self.handle_episode_selection(selected_anime, episodes, initial_idx=current_idx)
+                            return
+                        else:
+                            # User pressed Back/ESC/q: return cleanly to History
+                            return
+                    return
+            else:
+                self.handle_episode_selection(selected_anime, episodes, initial_idx=initial_idx)
 
     def handle_favorites(self):
         while True:

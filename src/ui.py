@@ -2329,7 +2329,7 @@ class UIManager:
                         return (selected, 'watch')
                     elif key == 'd' or key == 'D':
                         return (selected, 'download')
-                    elif key == 'b' or key == 'ESC' or key == 'q':
+                    elif key in ('b', 'B', 'q', 'Q', 'ESC', 'LEFT'):
                         return None
 
     def render_now_playing(self, anime_title: str, episode_info: str, quality_name: str = ""):
@@ -2461,8 +2461,8 @@ class UIManager:
                         live.update(generate_renderable(), refresh=True)
                     elif key == 'ENTER':
                         return options[selected]
-                    elif key == 'q' or key == 'b' or key == 'ESC':
-                        return "Back to Episodes"
+                    elif key in ('b', 'B', 'q', 'Q', 'ESC', 'LEFT'):
+                        return None
 
     def show_credits(self):
         """Display credits and contributors."""
