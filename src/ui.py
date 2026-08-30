@@ -322,17 +322,21 @@ class UIManager:
             tagline = Text("Direct Terminal Anime Streamer", style=f"bold {COLOR_SUBTITLE}")
             table.add_row(Align.center(tagline))
 
-            # 3. Reimagined Metadata Badges (No yellow, clean bracket badges)
+            # 3. Clean Minimal Metadata Badges
             meta = Text()
 
             meta.append("[ ", style="dim")
             meta.append(f"{APP_VERSION}", style="bold white")
             meta.append(" ]   ", style="dim")
+            
+            if active_provider:
+                p_display = active_provider.replace(" (English)", "").replace(" Provider", "").strip()
+                meta.append("[ ", style="dim")
+                meta.append(p_display, style=f"bold {COLOR_TITLE}")
+                meta.append(" ]   ", style="dim")
+
             meta.append("[ ", style="dim")
-            meta.append("@np4abdou1", style=f"bold {COLOR_TITLE}")
-            meta.append(" ]   ", style="dim")
-            meta.append("[ ", style="dim")
-            meta.append(f"★ {get_github_stars()}", style=f"bold {COLOR_TITLE}")
+            meta.append(f"★ {get_github_stars()}", style="bold white")
             meta.append(" ]", style="dim")
             
             table.add_row(Align.center(meta))
@@ -415,18 +419,6 @@ class UIManager:
             grid.add_row(*row3)
 
             table.add_row(Align.center(grid))
-            table.add_row(Text(""))
-
-            # 6. Status Bar (Provider & RPC) - Greyed out
-            status_text = Text()
-            if active_provider:
-                status_text.append(f"provider: {active_provider.lower()}   ", style="dim")
-            if rpc_status is not None:
-                rpc_state = "on" if rpc_status else "off"
-                status_text.append(f"rpc: {rpc_state}", style="dim")
-                
-            if status_text.plain:
-                table.add_row(Align.center(status_text))
 
             return Align.center(table, vertical="middle", height=self.console.height)
 
