@@ -2,6 +2,7 @@ import sys
 import re
 import platform
 import subprocess
+import shutil
 import requests
 from pathlib import Path
 
@@ -99,49 +100,57 @@ def check_pip_update():
     try:
         latest_version = get_pypi_latest_version()
         if not latest_version:
+            release_data = get_latest_release()
+            if release_data:
+                latest_version = release_data.get('tag_name', '').lstrip('v')
+                
+        if not latest_version:
             return False
         
         current = parse_version(__version__)
         latest = parse_version(latest_version)
         
         if latest > current:
-            sys.stdout.write("\033[2J\033[H")  # Clear screen for better UI
+            sys.stdout.write("\033[2J\033[H")
             sys.stdout.flush()
-            _print_header("Update Required")
+            _print_header("Update Available")
             _print_info(f"Current version: {__version__}  →  Latest version: {latest_version}")
             print()
-            _print_info("A mandatory update is available. Please update to continue using the application.")
+            _print_info("A new major version of ani-cli-arabic is available. Installing update...")
             print()
             
-            # Auto-update without asking
+            path_str = str(Path(__file__).resolve())
+            is_pipx = 'pipx' in path_str or ('pipx' in sys.prefix)
+            
+            if is_pipx and shutil.which('pipx'):
+                try:
+                    _print_info("Executing: pipx upgrade ani-cli-arabic ...")
+                    res = subprocess.run(['pipx', 'upgrade', 'ani-cli-arabic'], capture_output=True, text=True)
+                    if res.returncode == 0:
+                        _print_success("Successfully updated via pipx.")
+                        _print_info("Please restart the application to launch the new version.")
+                        print()
+                        sys.exit(0)
+                except Exception:
+                    pass
+
             try:
-                pip_cmd = [sys.executable, '-m', 'pip', 'install', '--upgrade', 'ani-cli-arabic']
-                
-                # Safely handle pipx and user installs
-                path_str = str(Path(__file__).resolve())
-                if 'pipx' in path_str:
-                    _print_error("Cannot automatically update a pipx-managed installation.")
-                    _print_info("Please execute the following command to update:")
-                    _print_info("  pipx upgrade ani-cli-arabic")
-                    print()
-                    sys.exit(1)
+                pip_cmd = [sys.executable, '-m', 'pip', 'install', '--upgrade', '--no-cache-dir', 'ani-cli-arabic']
                 
                 is_venv = sys.prefix != getattr(sys, "base_prefix", sys.prefix)
                 if platform.system() != 'Windows' and not is_venv:
-                    # System python on Linux/Mac, try using --user first 
                     pip_cmd.append('--user')
                 
-                _print_info("Downloading and installing the update...")
+                _print_info("Downloading and installing the update from PyPI...")
                 result = subprocess.run(
                     pip_cmd,
                     capture_output=True,
                     text=True
                 )
                 
-                # If it fails with PEP 668 internally managed error, retry aggressively with break-system-packages
+                # If it fails with PEP 668 externally managed environment, retry with --break-system-packages
                 if result.returncode != 0 and 'externally-managed-environment' in result.stderr:
                     _print_info("Restricted package environment detected. Re-attempting installation...")
-                    # Remove --user if appending break-system-packages for cleaner retry, though both can work.
                     if '--user' in pip_cmd:
                         pip_cmd.remove('--user')
                     pip_cmd.append('--break-system-packages')
@@ -153,27 +162,22 @@ def check_pip_update():
                     )
 
                 if result.returncode == 0:
-                    _print_success("Update installed successfully.")
+                    _print_success(f"Update to v{latest_version} installed successfully.")
                     print()
-                    _print_info("The application will now safely terminate.")
-                    _print_info("Please restart the application to apply the changes.")
+                    _print_info("Please restart the application to experience the new update.")
                     print()
                     sys.exit(0)
                 else:
                     _print_error(f"Automated update failed. (Exit code: {result.returncode})")
                     if "externally-managed-environment" in result.stderr:
-                        _print_info("Your system utilizes a restricted Python environment.")
-                        _print_info("Please run: pipx upgrade ani-cli-arabic")
+                        _print_info("Please run: pipx upgrade ani-cli-arabic or pip install --upgrade --break-system-packages ani-cli-arabic")
                     else:
                         _print_info("Please try installing the update manually: pip install --upgrade ani-cli-arabic")
-                    print()
-                    _print_error("Error details:")
-                    print(result.stderr.strip()[:500])  # print up to 500 chars of error
                     print()
                     sys.exit(1)
             except Exception as e:
                 _print_error(f"An unexpected error occurred during the update process: {e}")
-                _print_info("Please try installing the update manually: pip install --upgrade ani-cli-arabic")
+                _print_info("Please run: pip install --upgrade ani-cli-arabic")
                 print()
                 sys.exit(1)
             

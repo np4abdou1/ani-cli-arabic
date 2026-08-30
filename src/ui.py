@@ -327,6 +327,7 @@ class UIManager:
             {"key": "l", "label": "History", "action": "history"},
             {"key": "f", "label": "Favorites", "action": "favorites"},
             {"key": "c", "label": "Settings", "action": "settings"},
+            {"key": "n", "label": "Changelog", "action": "changelog"},
             {"key": "d", "label": "Donate", "action": "donate"},
             {"key": "q", "label": "Quit", "action": "quit"},
         ]
@@ -362,6 +363,25 @@ class UIManager:
             
             table.add_row(Align.center(meta))
             table.add_row(Text(""))
+
+            # 3.5. Remote Broadcast Banner (Cloudflare Worker / Server)
+            from .broadcast import BroadcastManager
+            active_banner = BroadcastManager.get_active_banner()
+            if active_banner:
+                b_title = active_banner.get("title", "⚡ Announcement")
+                b_msg = active_banner.get("message", "")
+                b_style = active_banner.get("style", COLOR_TITLE)
+                b_panel = Panel(
+                    Text(b_msg, style="bold white", justify="center"),
+                    title=f"[bold {b_style}]{b_title}[/bold {b_style}]",
+                    title_align="center",
+                    border_style=b_style,
+                    box=ROUNDED,
+                    padding=(0, 1),
+                    width=min(68, screen_w - 4)
+                )
+                table.add_row(Align.center(b_panel))
+                table.add_row(Text(""))
 
             # 4. Compact Search Box with Embedded Title Border
             box_width = min(68, screen_w - 4)

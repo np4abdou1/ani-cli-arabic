@@ -153,9 +153,14 @@ class AniCliWrapper:
             print(f"\033[1;31mFailed to extract direct link for {selected_q.name}\033[0m")
             return False
 
-        print(f"\033[1;34mPlaying episode {ep.number} ({selected_q.name})...\033[0m")
-        
-        playback_info = self.player.play(direct_url, f"{anime.title_en} - Episode {ep.number}")
+        start_time = 0.0
+        ep_prog = self.history.get_episode_progress(anime.id, ep.display_num)
+        if ep_prog and 0 < ep_prog.get('percent', 0) < 90 and ep_prog.get('time_pos', 0) > 10:
+            start_time = ep_prog['time_pos']
+        elif getattr(self.provider, 'id', '') == 'anime3rb' or 'vid3rb.com' in direct_url:
+            start_time = 5.0
+
+        playback_info = self.player.play(direct_url, f"{anime.title_en} - Episode {ep.number}", start_time=start_time)
         
         pos = playback_info.get('time_pos', 0.0) if isinstance(playback_info, dict) else 0.0
         dur = playback_info.get('duration', 0.0) if isinstance(playback_info, dict) else 0.0
