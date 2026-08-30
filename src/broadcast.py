@@ -15,9 +15,12 @@ from typing import Optional, Dict, Any
 from .version import __version__, parse_version
 from .logger import logger
 
-# Remote Broadcast JSON Endpoints (Primary: Cloudflare Worker, Fallback: Raw GitHub)
-BROADCAST_URL_WORKER = "https://broadcast.ani-cli-arabic.dev/broadcast.json"
-BROADCAST_URL_GITHUB = "https://raw.githubusercontent.com/np4abdou1/ani-cli-arabic/main/broadcast.json"
+# Remote Broadcast JSON Endpoints (Primary: Deployed Cloudflare Worker, Secondary: Custom Domain, Fallback: Raw GitHub)
+BROADCAST_URLS = [
+    "https://ani-cli-broadcast.talego4955.workers.dev/broadcast.json",
+    "https://broadcast.ani-cli-arabic.dev/broadcast.json",
+    "https://raw.githubusercontent.com/np4abdou1/ani-cli-arabic/main/broadcast.json"
+]
 
 _CACHE_FILE = Path.home() / ".ani-cli-arabic" / "database" / "broadcast_cache.json"
 _DISMISSED_FILE = Path.home() / ".ani-cli-arabic" / "database" / "dismissed_broadcasts.json"
@@ -49,7 +52,7 @@ class BroadcastManager:
             return cls._cached_broadcast
 
         def _fetch_worker():
-            for url in (BROADCAST_URL_WORKER, BROADCAST_URL_GITHUB):
+            for url in BROADCAST_URLS:
                 try:
                     req = urllib.request.Request(
                         url,
