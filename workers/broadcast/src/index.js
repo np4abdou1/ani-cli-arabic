@@ -3,14 +3,14 @@
  */
 
 const DEFAULT_BROADCAST = {
-  id: "welcome-v2",
+  id: "",
   active: false,
   type: "banner",
-  title: "⚡ Announcement",
-  message: "Welcome to ani-cli-arabic v2.0! Enjoy uninterrupted anime streaming.",
-  link: "https://github.com/np4abdou1/ani-cli-arabic",
-  min_version: "1.0.0",
-  max_version: "9.9.9",
+  title: "",
+  message: "",
+  link: "",
+  min_version: "",
+  max_version: "",
   dismissable: true,
   style: "cyan"
 };
