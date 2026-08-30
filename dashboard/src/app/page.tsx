@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from "react";
+import Sidebar from "@/components/Sidebar";
 import Header from "@/components/Header";
 import KpiGrid from "@/components/KpiGrid";
 import TrafficChart from "@/components/TrafficChart";
@@ -10,21 +11,21 @@ import VersionChart from "@/components/VersionChart";
 import EventExplorer from "@/components/EventExplorer";
 import UserModal from "@/components/UserModal";
 import BroadcastManager from "@/components/BroadcastManager";
+import SystemHealth from "@/components/SystemHealth";
+import SearchModal from "@/components/SearchModal";
 import { DashboardResponse } from "@/lib/types";
-import { Activity, Flame, Radio, Zap, LayoutDashboard, Terminal, RefreshCw } from "lucide-react";
 
-// Fallback initial data
 const INITIAL_DATA: DashboardResponse = {
   kpis: {
     totalUniqueUsers: 1413,
-    totalEvents: 24033,
-    totalStreams: 12304,
-    totalAppStarts: 11728,
-    dau: 38,
+    totalEvents: 24037,
+    totalStreams: 12308,
+    totalAppStarts: 11729,
+    dau: 45,
     wau: 109,
-    mau: 292,
+    mau: 297,
     growthRate: 14.8,
-    stickiness: 13.0,
+    stickiness: 15.2,
   },
   growthSeries: [],
   topAnime: [],
@@ -42,12 +43,12 @@ const INITIAL_DATA: DashboardResponse = {
   ],
   recentEvents: [],
   broadcast: {
-    id: "",
-    active: false,
-    type: "banner",
-    title: "",
-    message: "",
-    link: "",
+    id: "sample-popup-1",
+    active: true,
+    type: "popup",
+    title: "🚀 Welcome to ani-cli-arabic v2.0",
+    message: "Welcome to the brand new **v2.0 Multi-Provider Update**!\n\n◆ 4 Streaming engines: Anime3rb, Anime Slayer, Animeify, and AniDB\n◆ Real-Time MPV playback resumption\n◆ Instant auto-updater and zero-latency search",
+    link: "https://github.com/np4abdou1/ani-cli-arabic",
     style: "cyan",
   },
   timeRange: "30d",
@@ -60,7 +61,9 @@ export default function DashboardPage() {
   const [timeRange, setTimeRange] = useState("30d");
   const [autoRefreshInterval, setAutoRefreshInterval] = useState(30);
   const [selectedUser, setSelectedUser] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<"overview" | "anime" | "events" | "broadcast">("overview");
+  const [activeTab, setActiveTab] = useState<string>("overview");
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
 
   const fetchData = useCallback(async () => {
     if (typeof window === "undefined") return;
@@ -77,7 +80,7 @@ export default function DashboardPage() {
         }
       }
     } catch (e) {
-      console.warn("Using fallback state:", e);
+      console.warn("Using offline fallback:", e);
     } finally {
       setLoading(false);
     }
@@ -87,7 +90,7 @@ export default function DashboardPage() {
     fetchData();
   }, [fetchData]);
 
-  // Auto-refresh interval
+  // Auto-refresh timer
   useEffect(() => {
     if (autoRefreshInterval <= 0) return;
     const timer = setInterval(() => {
@@ -97,96 +100,106 @@ export default function DashboardPage() {
   }, [autoRefreshInterval, fetchData]);
 
   return (
-    <div className="min-h-screen bg-background text-slate-100 pb-16">
-      {/* Top Header with GMT+1 clock & controls */}
-      <Header
-        timeRange={timeRange}
-        setTimeRange={setTimeRange}
-        onRefresh={fetchData}
-        loading={loading}
-        autoRefreshInterval={autoRefreshInterval}
-        setAutoRefreshInterval={setAutoRefreshInterval}
+    <div className="min-h-screen bg-background text-slate-100 flex">
+      {/* Collapsible Left Sidebar */}
+      <Sidebar
+        activeTab={activeTab}
+        setActiveTab={setActiveTab}
+        collapsed={sidebarCollapsed}
+        setCollapsed={setSidebarCollapsed}
+        totalUsers={data.kpis.totalUniqueUsers}
+        totalEvents={data.kpis.totalEvents}
+        isBroadcastActive={Boolean(data.broadcast?.active)}
       />
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6">
-        {/* Navigation Tabs */}
-        <div className="flex items-center gap-2 mb-6 border-b border-border/80 pb-3 overflow-x-auto">
-          {[
-            { id: "overview", label: "Executive Overview", icon: LayoutDashboard },
-            { id: "anime", label: "Anime Leaderboard", icon: Flame },
-            { id: "events", label: "Live Telemetry Feed", icon: Activity },
-            { id: "broadcast", label: "Cloudflare Broadcast", icon: Radio },
-          ].map((tab) => {
-            const Icon = tab.icon;
-            const isActive = activeTab === tab.id;
-            return (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id as any)}
-                className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap ${
-                  isActive
-                    ? "bg-primary text-slate-900 shadow-md shadow-primary/20"
-                    : "text-slate-400 hover:text-white hover:bg-surface"
-                }`}
-              >
-                <Icon className="w-4 h-4" />
-                <span>{tab.label}</span>
-              </button>
-            );
-          })}
-        </div>
+      {/* Main App Content Area */}
+      <div
+        className={`flex-1 flex flex-col min-w-0 transition-all duration-300 ${
+          sidebarCollapsed ? "pl-20" : "pl-64"
+        }`}
+      >
+        {/* Top Header */}
+        <Header
+          activeTab={activeTab}
+          timeRange={timeRange}
+          setTimeRange={setTimeRange}
+          onRefresh={fetchData}
+          loading={loading}
+          autoRefreshInterval={autoRefreshInterval}
+          setAutoRefreshInterval={setAutoRefreshInterval}
+          onOpenSearch={() => setIsSearchOpen(true)}
+        />
 
-        {/* Tab 1: Executive Overview */}
-        {activeTab === "overview" && (
-          <div className="space-y-6 animate-in fade-in duration-300">
-            {/* KPI Metric Cards */}
-            <KpiGrid kpis={data.kpis} />
-
-            {/* Main Area Chart */}
-            <TrafficChart data={data.growthSeries} timeRange={timeRange} />
-
-            {/* Secondary Row: Top 10 Anime + OS & Version Breakdown */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              <div className="lg:col-span-2">
-                <TopAnimeTable animeList={data.topAnime} />
+        {/* Dynamic Page Views */}
+        <main className="flex-1 px-6 pb-16 max-w-[1600px] w-full mx-auto">
+          {/* Tab 1: Executive Overview */}
+          {activeTab === "overview" && (
+            <div className="space-y-6 animate-in fade-in duration-300">
+              <KpiGrid kpis={data.kpis} />
+              <TrafficChart data={data.growthSeries} timeRange={timeRange} />
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div className="lg:col-span-2">
+                  <TopAnimeTable animeList={data.topAnime} />
+                </div>
+                <div className="space-y-6">
+                  <OsChart osList={data.osBreakdown} />
+                  <VersionChart versionList={data.versionBreakdown} />
+                </div>
               </div>
-              <div className="space-y-6">
-                <OsChart osList={data.osBreakdown} />
-                <VersionChart versionList={data.versionBreakdown} />
-              </div>
+              <EventExplorer onSelectUser={(id) => setSelectedUser(id)} />
             </div>
+          )}
 
-            {/* Recent Telemetry Stream preview */}
-            <EventExplorer onSelectUser={(id) => setSelectedUser(id)} />
-          </div>
-        )}
+          {/* Tab 2: Anime Rankings */}
+          {activeTab === "anime" && (
+            <div className="space-y-6 animate-in fade-in duration-300">
+              <TopAnimeTable animeList={data.topAnime} />
+            </div>
+          )}
 
-        {/* Tab 2: Anime Leaderboard */}
-        {activeTab === "anime" && (
-          <div className="space-y-6 animate-in fade-in duration-300">
-            <TopAnimeTable animeList={data.topAnime} />
-          </div>
-        )}
+          {/* Tab 3: Live Telemetry Feed */}
+          {activeTab === "events" && (
+            <div className="space-y-6 animate-in fade-in duration-300">
+              <EventExplorer onSelectUser={(id) => setSelectedUser(id)} />
+            </div>
+          )}
 
-        {/* Tab 3: Full Event Explorer */}
-        {activeTab === "events" && (
-          <div className="space-y-6 animate-in fade-in duration-300">
-            <EventExplorer onSelectUser={(id) => setSelectedUser(id)} />
-          </div>
-        )}
+          {/* Tab 4: Users Directory */}
+          {activeTab === "users" && (
+            <div className="space-y-6 animate-in fade-in duration-300">
+              <EventExplorer onSelectUser={(id) => setSelectedUser(id)} />
+            </div>
+          )}
 
-        {/* Tab 4: Broadcast Control */}
-        {activeTab === "broadcast" && (
-          <div className="space-y-6 animate-in fade-in duration-300 max-w-3xl mx-auto">
-            <BroadcastManager
-              initialBroadcast={data.broadcast}
-              onUpdateSuccess={fetchData}
-            />
-          </div>
-        )}
-      </main>
+          {/* Tab 5: Broadcast Studio */}
+          {activeTab === "broadcast" && (
+            <div className="space-y-6 animate-in fade-in duration-300">
+              <BroadcastManager
+                initialBroadcast={data.broadcast}
+                onUpdateSuccess={fetchData}
+              />
+            </div>
+          )}
 
-      {/* User Deep-Dive Modal Drawer */}
+          {/* Tab 6: System & Database Health */}
+          {activeTab === "health" && (
+            <div className="space-y-6 animate-in fade-in duration-300">
+              <SystemHealth kpis={data.kpis} serverTimeGmt1={data.serverTimeGmt1} />
+            </div>
+          )}
+        </main>
+      </div>
+
+      {/* Global Cmd+K Search Modal */}
+      <SearchModal
+        isOpen={isSearchOpen}
+        onClose={() => setIsSearchOpen(false)}
+        topAnime={data.topAnime}
+        onNavigateTab={(tab) => setActiveTab(tab)}
+        onSelectUser={(fp) => setSelectedUser(fp)}
+      />
+
+      {/* User Watch History Deep-Dive Modal */}
       <UserModal
         fingerprint={selectedUser}
         onClose={() => setSelectedUser(null)}
