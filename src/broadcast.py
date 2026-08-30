@@ -1,7 +1,7 @@
 """
 Remote broadcast and banner messaging system for ani-cli-arabic.
-Enables server-driven global announcements, domain switch alerts, and emergency updates
-via Cloudflare Worker / JSON endpoint without requiring user client updates.
+Enables server-driven global announcements, modal popups, domain switch alerts,
+and emergency updates via Cloudflare Worker / KV without requiring client updates.
 """
 
 import os
@@ -45,6 +45,37 @@ class BroadcastManager:
         return None
 
     @classmethod
+    def fetch_remote_sync(cls, timeout: float = 1.0) -> Optional[Dict[str, Any]]:
+        """Quick synchronous fetch on startup (1s max) to get instant live announcements."""
+        now = time.time()
+        if cls._cached_broadcast and (now - cls._last_fetch_time < 30):
+            return cls._cached_broadcast
+
+        for base_url in BROADCAST_URLS:
+            try:
+                url = f"{base_url}?_t={int(time.time())}"
+                req = urllib.request.Request(
+                    url,
+                    headers={
+                        "User-Agent": f"ani-cli-arabic/{__version__}",
+                        "Cache-Control": "no-cache, no-store, must-revalidate",
+                        "Pragma": "no-cache"
+                    }
+                )
+                with urllib.request.urlopen(req, timeout=timeout) as resp:
+                    if resp.status == 200:
+                        data = json.loads(resp.read().decode("utf-8"))
+                        if isinstance(data, dict):
+                            cls._cached_broadcast = data
+                            cls._last_fetch_time = time.time()
+                            cls._save_cache(data)
+                            return data
+            except Exception:
+                continue
+
+        return cls._cached_broadcast or cls.load_cached()
+
+    @classmethod
     def fetch_remote(cls, force: bool = False) -> Optional[Dict[str, Any]]:
         """Fetches remote broadcast message in the background."""
         now = time.time()
@@ -69,15 +100,7 @@ class BroadcastManager:
                             if isinstance(data, dict):
                                 cls._cached_broadcast = data
                                 cls._last_fetch_time = time.time()
-                                try:
-                                    _CACHE_FILE.parent.mkdir(parents=True, exist_ok=True)
-                                    with open(_CACHE_FILE, "w", encoding="utf-8") as f:
-                                        json.dump({
-                                            "broadcast": data,
-                                            "fetched_at": cls._last_fetch_time
-                                        }, f, indent=4)
-                                except Exception:
-                                    pass
+                                cls._save_cache(data)
                                 return
                 except Exception:
                     continue
@@ -86,11 +109,20 @@ class BroadcastManager:
         return cls._cached_broadcast or cls.load_cached()
 
     @classmethod
-    def get_active_banner(cls) -> Optional[Dict[str, Any]]:
-        """
-        Returns active banner if it matches current client version
-        and is enabled.
-        """
+    def _save_cache(cls, data: Dict[str, Any]) -> None:
+        try:
+            _CACHE_FILE.parent.mkdir(parents=True, exist_ok=True)
+            with open(_CACHE_FILE, "w", encoding="utf-8") as f:
+                json.dump({
+                    "broadcast": data,
+                    "fetched_at": cls._last_fetch_time
+                }, f, indent=4)
+        except Exception:
+            pass
+
+    @classmethod
+    def get_active_broadcast(cls) -> Optional[Dict[str, Any]]:
+        """Returns the active broadcast if it matches version constraints."""
         b = cls._cached_broadcast or cls.load_cached()
         if not b:
             return None
@@ -103,7 +135,6 @@ class BroadcastManager:
         if not is_active or not msg:
             return None
 
-        # Check version constraints
         min_ver = b.get("min_version")
         max_ver = b.get("max_version")
         from .version import parse_version
@@ -119,6 +150,28 @@ class BroadcastManager:
             return None
 
         return b
+
+    @classmethod
+    def get_active_popup(cls) -> Optional[Dict[str, Any]]:
+        """Returns active broadcast strictly if type is 'popup' or 'modal'."""
+        b = cls.get_active_broadcast()
+        if not b:
+            return None
+        b_type = str(b.get("type", "banner")).lower()
+        if b_type in ("popup", "modal"):
+            return b
+        return None
+
+    @classmethod
+    def get_active_banner(cls) -> Optional[Dict[str, Any]]:
+        """Returns active banner strictly if type is 'banner'."""
+        b = cls.get_active_broadcast()
+        if not b:
+            return None
+        b_type = str(b.get("type", "banner")).lower()
+        if b_type not in ("popup", "modal"):
+            return b
+        return None
 
     @classmethod
     def is_dismissed(cls, broadcast_id: str) -> bool:
