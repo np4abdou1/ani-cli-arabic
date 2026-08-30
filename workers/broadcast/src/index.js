@@ -23,7 +23,7 @@ export default {
       "Access-Control-Allow-Origin": "*",
       "Access-Control-Allow-Methods": "GET, HEAD, OPTIONS",
       "Access-Control-Allow-Headers": "Content-Type, User-Agent",
-      "Cache-Control": "public, max-age=300, s-maxage=300"
+      "Cache-Control": "no-cache, no-store, must-revalidate, max-age=0"
     };
 
     if (request.method === "OPTIONS") {
