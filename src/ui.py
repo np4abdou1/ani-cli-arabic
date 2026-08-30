@@ -401,8 +401,6 @@ class UIManager:
                         t.append("↵ search", style=f"bold {COLOR_HIGHLIGHT_FG} on {COLOR_BORDER}")
                     elif key == "q":
                         t.append("^c quit", style="bold black on #d97979")
-                    elif key == "d":
-                        t.append(" [d] donate ♥ ", style="bold black on #ff79c6")
                     else:
                         t.append(f"[{key}] {label}", style=f"bold {COLOR_HIGHLIGHT_FG} on {COLOR_BORDER}")
                 else:
@@ -412,12 +410,6 @@ class UIManager:
                     elif key == "q":
                         t.append("^c", style=f"bold {fg}")
                         t.append(f" {label}", style="dim")
-                    elif key == "d":
-                        t.append("[", style="bold #ff79c6")
-                        t.append("d", style="bold white on #ff79c6")
-                        t.append("]", style="bold #ff79c6")
-                        t.append(" donate ", style="bold white")
-                        t.append("♥", style="bold #ff79c6")
                     else:
                         t.append("[", style="dim")
                         t.append(key, style=f"bold {fg}")
@@ -450,7 +442,7 @@ class UIManager:
             table.add_row(Align.center(grid))
             table.add_row(Text(""))
 
-            table.add_row(Align.center(format_item("d", "donate ♥", "d", "#ff79c6")))
+            table.add_row(Align.center(format_item("d", "donate", "d", COLOR_TITLE)))
 
             return Align.center(table, vertical="middle", height=self.console.height)
 
