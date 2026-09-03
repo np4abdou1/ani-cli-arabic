@@ -363,20 +363,6 @@ class UIManager:
             
             table.add_row(Align.center(meta))
             table.add_row(Text(""))
-
-            # 3.5. Remote Broadcast Message (Cloudflare Worker / Server)
-            from .broadcast import BroadcastManager
-            active_banner = BroadcastManager.get_active_banner()
-            if active_banner:
-                b_msg = str(active_banner.get("message") or "").strip()
-                if b_msg:
-                    b_style = active_banner.get("style", COLOR_TITLE)
-                    b_text = Text()
-                    b_text.append("⚡ ", style=f"bold {b_style}")
-                    b_text.append(b_msg, style=f"bold {b_style}")
-                    table.add_row(Align.center(b_text))
-                    table.add_row(Text(""))
-
             # 4. Compact Search Box with Embedded Title Border
             box_width = min(68, screen_w - 4)
             input_text = Text()
@@ -462,9 +448,6 @@ class UIManager:
 
         self.clear()
 
-        last_broadcast_check = time.time()
-        last_banner_state = None
-
         with MouseTerminal():
             with Live(
                 generate_renderable(query, hovered_btn),
@@ -476,15 +459,6 @@ class UIManager:
                 while True:
                     ev = get_home_input_event()
                     if not ev:
-                        now_t = time.time()
-                        if now_t - last_broadcast_check > 1.0:
-                            last_broadcast_check = now_t
-                            from .broadcast import BroadcastManager
-                            cur_banner = BroadcastManager.get_active_banner()
-                            cur_b_id = cur_banner.get("id", "") + cur_banner.get("message", "") if cur_banner else ""
-                            if cur_b_id != last_banner_state:
-                                last_banner_state = cur_b_id
-                                live.update(generate_renderable(query, hovered_btn), refresh=True)
                         time.sleep(0.02)
                         continue
 

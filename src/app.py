@@ -1126,7 +1126,8 @@ class AniCliArApp:
                 self.ui.render_now_playing(selected_anime.title_en, f"Episode {selected_ep.display_num}{time_hint}", quality.name)
                 
                 self.rpc.update_watching(selected_anime.title_en, str(selected_ep.display_num), selected_anime.thumbnail)
-                monitor.track_video_play(selected_anime.title_en, str(selected_ep.display_num))
+                provider_name = getattr(self.provider, 'name', getattr(self.provider, 'id', 'Anime3rb'))
+                monitor.track_video_play(selected_anime.title_en, str(selected_ep.display_num), provider=provider_name)
                 
                 playback_info = self.player.play(
                     direct_url, 

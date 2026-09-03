@@ -4,9 +4,11 @@ Detects first-run and post-update states to automatically showcase new features.
 """
 
 import os
+import re
 import json
 import time
 import textwrap
+import urllib.request
 from pathlib import Path
 from typing import Optional, Dict, List, Any
 
@@ -122,20 +124,112 @@ def clear_version_seen() -> None:
         pass
 
 
-def _build_changelog_lines(content_w: int) -> List[Text]:
+_CHANGELOG_CACHE_FILE = Path.home() / ".ani-cli-arabic" / "database" / "changelog_cache.json"
+
+def fetch_remote_changelog(timeout: float = 0.8) -> Optional[Dict[str, Any]]:
+    """Fetches remote changelog if configured in Cloudflare KV."""
+    urls = [
+        "https://ani-cli-broadcast.talego4955.workers.dev/changelog.json",
+        "https://broadcast.ani-cli-arabic.dev/changelog.json"
+    ]
+    for u in urls:
+        try:
+            req = urllib.request.Request(
+                f"{u}?_t={int(time.time())}",
+                headers={"User-Agent": f"ani-cli-arabic/{__version__}"}
+            )
+            with urllib.request.urlopen(req, timeout=timeout) as resp:
+                if resp.status == 200:
+                    data = json.loads(resp.read().decode("utf-8"))
+                    if isinstance(data, dict):
+                        try:
+                            _CHANGELOG_CACHE_FILE.parent.mkdir(parents=True, exist_ok=True)
+                            with open(_CHANGELOG_CACHE_FILE, "w", encoding="utf-8") as cf:
+                                json.dump(data, cf)
+                        except Exception:
+                            pass
+                        return data
+        except Exception:
+            continue
+    try:
+        if _CHANGELOG_CACHE_FILE.exists():
+            with open(_CHANGELOG_CACHE_FILE, "r", encoding="utf-8") as cf:
+                return json.load(cf)
+    except Exception:
+        pass
+    return None
+
+
+def _sub_changelog_vars(text: str, latest_ver: str = "") -> str:
+    """Substitutes {version}, {latest_version}, and {os} in changelog text."""
+    if not text:
+        return ""
+    import platform
+    return (
+        text.replace("{version}", APP_VERSION)
+            .replace("{latest_version}", latest_ver or APP_VERSION)
+            .replace("{os}", platform.system())
+    )
+
+
+def _build_changelog_lines(content_w: int, remote_data: Optional[Dict[str, Any]] = None) -> List[Text]:
     """Generates wrapped, beautifully styled lines for the changelog modal."""
     all_lines: List[Text] = []
+    latest_ver = (remote_data or {}).get("latest_version") or ""
+    outdated_notice = (remote_data or {}).get("outdated_notice") or "⚠️ YOUR VERSION {version} IS OUTDATED PLEASE UPDATE."
 
+    # Check if user is outdated
+    is_outdated = False
+    if latest_ver:
+        try:
+            v_curr = [int(x) for x in re.sub(r'[^0-9.]', '', __version__).split('.') if x]
+            v_late = [int(x) for x in re.sub(r'[^0-9.]', '', latest_ver).split('.') if x]
+            if v_curr < v_late:
+                is_outdated = True
+        except Exception:
+            pass
+
+    if is_outdated:
+        notice_text = _sub_changelog_vars(outdated_notice, latest_ver)
+        t_out = Text()
+        t_out.append("  🚨 ", style="bold red")
+        t_out.append(notice_text, style="bold #ff6b6b")
+        all_lines.append(t_out)
+        all_lines.append(Text(""))
+
+    # If remote custom body is provided
+    body_text = (remote_data or {}).get("body") or ""
+    if body_text.strip():
+        for line in body_text.split("\n"):
+            line_clean = line.strip()
+            if not line_clean:
+                all_lines.append(Text(""))
+                continue
+            line_sub = _sub_changelog_vars(line_clean, latest_ver)
+            if line_sub.startswith(("◆", "•", "- ")):
+                bullet_content = re.sub(r'^[◆•\-]\s*', '', line_sub)
+                t = Text()
+                t.append("  ◆ ", style=f"bold {COLOR_TITLE}")
+                t.append(bullet_content, style="white")
+                all_lines.append(t)
+            else:
+                wrapped = textwrap.wrap(line_sub, width=max(20, content_w - 4))
+                for w in wrapped:
+                    t = Text("  ")
+                    t.append(w, style="white")
+                    all_lines.append(t)
+        return all_lines
+
+    # Default built-in items
     for item in _CHANGELOG_ITEMS:
-        # Line 1: Bullet + Badge + Title
         t1 = Text()
         t1.append("  ◆ ", style=f"bold {COLOR_TITLE}")
         t1.append(f"[{item['badge']}]", style=item["badge_style"])
         t1.append(f" {item['title']}", style="bold white")
         all_lines.append(t1)
 
-        # Line 2+: Description wrapped nicely
-        wrapped = textwrap.wrap(item["desc"], width=max(20, content_w - 6))
+        desc = _sub_changelog_vars(item["desc"], latest_ver)
+        wrapped = textwrap.wrap(desc, width=max(20, content_w - 6))
         for w in wrapped:
             t2 = Text()
             t2.append("    ", style="dim")
@@ -163,7 +257,12 @@ def render_changelog_popup(console, force: bool = False) -> None:
     content_w = panel_w - 6  # Margin for borders, padding, and scrollbar
     viewport_h = min(14, max(6, screen_h - 10))
 
-    lines = _build_changelog_lines(content_w)
+    remote_data = fetch_remote_changelog()
+    title_template = (remote_data or {}).get("title") or f"⚡ What's New in {APP_VERSION}"
+    latest_ver = (remote_data or {}).get("latest_version") or APP_VERSION
+    panel_title = _sub_changelog_vars(title_template, latest_ver)
+
+    lines = _build_changelog_lines(content_w, remote_data)
     total_lines = len(lines)
     scroll_offset = 0
 
@@ -211,7 +310,7 @@ def render_changelog_popup(console, force: bool = False) -> None:
 
         panel = Panel(
             body,
-            title=f"[bold {COLOR_TITLE}] ⚡ What's New in {APP_VERSION} [/bold {COLOR_TITLE}]",
+            title=f"[bold {COLOR_TITLE}] {panel_title} [/bold {COLOR_TITLE}]",
             subtitle=f"[dim]↑/↓ to scroll • [bold {COLOR_TITLE}]{pct_str}[/bold {COLOR_TITLE}] • Enter / Esc to close[/dim]",
             box=HEAVY,
             border_style=COLOR_BORDER,
