@@ -117,9 +117,28 @@ def render_broadcast_popup(console, broadcast_data: Dict[str, Any]) -> None:
     if not broadcast_data:
         return
 
-    title = broadcast_data.get("title") or "🚨 Remote Broadcast Announcement"
-    message = broadcast_data.get("message") or ""
-    link = (broadcast_data.get("link") or "").strip()
+    from .version import APP_VERSION
+    import platform
+
+    def _sub_vars(text: str) -> str:
+        if not text:
+            return ""
+        return (
+            text.replace("{version}", APP_VERSION)
+                .replace("{os}", platform.system())
+                .replace("{python}", platform.python_version())
+        )
+
+    raw_title = str(broadcast_data.get("title") or "").strip()
+    raw_message = str(broadcast_data.get("message") or "").strip()
+    raw_link = str(broadcast_data.get("link") or "").strip()
+
+    title = _sub_vars(raw_title)
+    message = _sub_vars(raw_message)
+    link = _sub_vars(raw_link)
+
+    if not message and not title:
+        return
     style_key = str(broadcast_data.get("style") or "cyan").lower()
     
     accent_style = STYLE_COLOR_MAP.get(style_key, "bold #7dcfff")
@@ -181,7 +200,7 @@ def render_broadcast_popup(console, broadcast_data: Dict[str, Any]) -> None:
 
         panel = Panel(
             body,
-            title=f"[{accent_style}] {title} [/{accent_style}]",
+            title=f"[{accent_style}] {title} [/{accent_style}]" if title else None,
             subtitle=f"[dim]↑/↓ to scroll • [{accent_style}]{pct_str}[/{accent_style}] • Enter / Esc to close[/dim]",
             box=HEAVY,
             border_style=border_color,
