@@ -194,7 +194,7 @@ class AniCliWrapper:
             cat_cmd = "type" if platform.system() == "Windows" else "cat"
             preview_arg = [
                 f"--preview={cat_cmd} {temp_dir.name}/{{1}}.txt",
-                "--preview-window=left:48%:wrap"
+                "--preview-window=right:50%:wrap"
             ]
 
         args = [
@@ -864,7 +864,7 @@ class AniCliWrapper:
                 print()
 
                 try:
-                    self.console.print(f"  [{border_color}]╭─  Search (or E, M, T, P, R, F, H, G, S, C, A)[/{border_color}]")
+                    self.console.print(f"  [{border_color}]╭─  Search[/{border_color}]")
                     self.console.print(f"  [{border_color}]╰─>[/{border_color}] ", end="")
                     query = input().strip()
                 except (KeyboardInterrupt, EOFError):
