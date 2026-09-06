@@ -15,7 +15,7 @@ from rich.panel import Panel
 from rich.table import Table
 
 from src.version import APP_VERSION
-from src.config import MINIMAL_ASCII_ART, GOODBYE_ART, THEMES, POPULAR_GENRES
+from src.config import DEFAULT_HEADER_ART, GOODBYE_ART, THEMES, POPULAR_GENRES
 from src.models import QualityOption, Episode, AnimeResult
 from src.providers import ProviderManager
 from src.utils import download_file
@@ -823,8 +823,16 @@ class AniCliWrapper:
         time.sleep(0.8)
 
     def _print_header(self):
-        ascii_color = self.get_theme_color("ascii")
-        self.console.print(MINIMAL_ASCII_ART.strip(), style=ascii_color)
+        title_col = self.get_theme_color("title")
+        border_col = self.get_theme_color("border")
+        bolt_col = self.get_theme_color("bolt")
+        lines = DEFAULT_HEADER_ART.strip().split("\n")
+        self.console.print(f"       [bold {bolt_col}]⚡[/bold {bolt_col}]")
+        if len(lines) >= 2:
+            self.console.print(f"  [bold {title_col}]{lines[0]}[/bold {title_col}]")
+            self.console.print(f"  [bold {border_col}]{lines[1]}[/bold {border_col}]")
+        else:
+            self.console.print(f"  [bold {title_col}]{DEFAULT_HEADER_ART.strip()}[/bold {title_col}]")
         active_prov = getattr(self.api, 'name', 'Anime3rb')
         self.console.print(
             f"  [dim]{APP_VERSION}[/dim] • [cyan]Provider: {active_prov}[/cyan] • [dim]gh:np4abdou1/ani-cli-arabic[/dim]"

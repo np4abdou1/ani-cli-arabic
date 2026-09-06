@@ -12,12 +12,8 @@ DISCORD_CLIENT_ID = "1437470271895376063"
 DISCORD_LOGO_URL = "https://i.postimg.cc/DydJfKY3/logo.gif"
 DISCORD_LOGO_TEXT = f"ani-cli-arabic {APP_VERSION}"
 
-MINIMAL_ASCII_ART = r"""
- ▄▀█ █▄░█ █   ▄▄   █▀▀ █░░ █   ▄▄   ▄▀█ █▀█ ▄▀█ █▄▄ █ █▀▀
- █▀█ █░▀█ █   ░░   █▄▄ █▄▄ █   ░░   █▀█ █▀▄ █▀█ █▄█ █ █▄▄
-"""
-
-DEFAULT_HEADER_ART = MINIMAL_ASCII_ART.strip()
+DEFAULT_HEADER_ART = """█▀█ █▄ █ █   █▀▀ █   █   █▀█ █▀▄
+█▀█ █ ▀█ █   █▄▄ █▄▄ █   █▀█ █▀▄"""
 
 GOODBYE_ART = r"""
  _             _ 

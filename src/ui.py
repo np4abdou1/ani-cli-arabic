@@ -112,19 +112,20 @@ class UIManager:
         return Text(HEADER_ART, style=COLOR_ASCII)
 
     def _get_torlink_ascii_logo(self, frame_idx=0):
-        art = getattr(config_module, "HEADER_ART", HEADER_ART).strip()
-        lines = art.split("\n")
-        max_w = max(len(l) for l in lines) if lines else 32
+        """
+        Returns a fixed-width (32 columns) renderable of the ANICLI AR ASCII art
+        with Torlink two-tone split shading and neon green lightning bolt precisely
+        locked at column 5 directly above the letter 'N'.
+        """
         grid = Table.grid(padding=0)
-        grid.add_column(width=max_w, justify="left")
+        grid.add_column(width=32, justify="left")
+        bolt_colors = getattr(config_module, "COLOR_BOLT_GLOW", COLOR_BOLT_GLOW)
+        bolt_col = bolt_colors[frame_idx % len(bolt_colors)] if frame_idx > 0 else getattr(config_module, "COLOR_BOLT", COLOR_BOLT)
         title_col = getattr(config_module, "COLOR_TITLE", COLOR_TITLE)
         border_col = getattr(config_module, "COLOR_BORDER", COLOR_BORDER)
-        if len(lines) >= 2:
-            grid.add_row(Text(lines[0], style=f"bold {title_col}"))
-            grid.add_row(Text(lines[1], style=f"bold {border_col}"))
-        else:
-            for l in lines:
-                grid.add_row(Text(l, style=f"bold {title_col}"))
+        grid.add_row(Text("     ⚡", style=f"bold {bolt_col}"))
+        grid.add_row(Text("█▀█ █▄ █ █   █▀▀ █   █   █▀█ █▀▄", style=f"bold {title_col}"))
+        grid.add_row(Text("█▀█ █ ▀█ █   █▄▄ █▄▄ █   █▀█ █▀▄", style=f"bold {border_col}"))
         return grid
 
     def render_message(self, title: str, message: str, style_name: str = "info"):
