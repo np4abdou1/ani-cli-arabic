@@ -104,7 +104,7 @@ class AniCliWrapper:
             '--cycle',
             '--height=85%',
             '--prompt', f"{prompt_text} > ",
-            '--bind', 'esc:abort,left:abort'
+            '--bind', 'esc:abort,left:abort,left-click:accept,double-click:accept,enter:accept'
         ]
 
         if multi:
@@ -123,7 +123,7 @@ class AniCliWrapper:
             if result.returncode != 0:
                 return []
 
-            lines = [l.strip() for l in result.stdout.splitlines() if l.strip()]
+            lines = [l.rstrip('\r\n') for l in result.stdout.splitlines() if l.strip()]
             return lines
         except Exception:
             return self._fallback_launcher(items, prompt_text, multi=multi)
@@ -376,10 +376,12 @@ class AniCliWrapper:
             line = f"\033[36m{t_str}\033[0m{padding}{meta_str}{score_str}{fav_str}"
             display_lines.append(line)
             anime_map[line] = res
+            anime_map[line.strip()] = res
 
             ansi_escape = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
             clean_line = ansi_escape.sub('', line)
             anime_map[clean_line] = res
+            anime_map[clean_line.strip()] = res
 
         while True:
             selected_lines = self._launcher(display_lines, title)
@@ -387,11 +389,18 @@ class AniCliWrapper:
                 break
 
             sel_text = selected_lines[0]
-            selected_anime = anime_map.get(sel_text)
+            clean = ansi_escape.sub('', sel_text).strip()
+            selected_anime = (
+                anime_map.get(sel_text) or
+                anime_map.get(sel_text.strip()) or
+                anime_map.get(clean)
+            )
+
             if not selected_anime:
-                ansi_escape = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
-                clean = ansi_escape.sub('', sel_text)
-                selected_anime = anime_map.get(clean)
+                for idx, res in enumerate(results):
+                    if clean_titles[idx] in clean:
+                        selected_anime = res
+                        break
 
             if not selected_anime:
                 continue
@@ -421,16 +430,26 @@ class AniCliWrapper:
                 pct = prog.get('percent', 0)
                 is_last = str(ep.number) == str(last_watched)
 
-                star_tag = "\033[33m★ Recent\033[0m " if is_last else ""
-                prog_tag = f"\033[32m[✓ {pct}%]\033[0m" if prog.get('completed') else (f"\033[36m[{pct}%]\033[0m" if pct > 0 else "")
+                tags = []
+                if is_last:
+                    tags.append("\033[33m★ Recent\033[0m")
+                if prog.get('completed'):
+                    tags.append(f"\033[32m[✓ {pct}%]\033[0m")
+                elif pct > 0:
+                    tags.append(f"\033[36m[{pct}%]\033[0m")
 
-                line = f"\033[1mEpisode {str(ep.number):>3}\033[0m  {star_tag}{prog_tag}"
+                tags_str = ("  " + " ".join(tags)) if tags else ""
+                line = f"\033[1mEpisode {str(ep.number):>3}\033[0m{tags_str}"
                 ep_lines.append(line)
-                ep_map[line] = ep
 
                 ansi_escape = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
                 clean_line = ansi_escape.sub('', line)
+                ep_map[line] = ep
+                ep_map[line.strip()] = ep
                 ep_map[clean_line] = ep
+                ep_map[clean_line.strip()] = ep
+                ep_map[str(ep.number)] = ep
+                ep_map[str(ep.display_num)] = ep
 
             prompt = f"{anime.title_en} (1-{len(episodes)})"
             selected_lines = self._launcher(ep_lines, prompt, multi=True)
@@ -441,7 +460,19 @@ class AniCliWrapper:
             queue = []
             ansi_escape = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
             for line in selected_lines:
-                ep_obj = ep_map.get(line) or ep_map.get(ansi_escape.sub('', line))
+                clean = ansi_escape.sub('', line).strip()
+                ep_obj = None
+
+                # 1. Regex match for episode number: "Episode   1", "Episode 12", "Episode 1.5", etc.
+                m = re.search(r'Episode\s+([0-9.]+)', clean, re.IGNORECASE)
+                if m:
+                    num_str = m.group(1)
+                    ep_obj = next((e for e in episodes if str(e.number) == num_str or str(e.display_num) == num_str), None)
+
+                # 2. Map lookup fallback
+                if not ep_obj:
+                    ep_obj = ep_map.get(line) or ep_map.get(line.strip()) or ep_map.get(clean)
+
                 if ep_obj:
                     queue.append(ep_obj)
 
