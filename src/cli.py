@@ -239,10 +239,20 @@ class AniCliWrapper:
                 stderr=None
             )
             if result.returncode == 0:
-                raw_output = result.stdout.strip().split('\n')
-                key_pressed = raw_output[0].strip() if raw_output else ""
+                lines = result.stdout.splitlines()
+                if not lines:
+                    return [], ""
+
+                first_line = lines[0].strip()
+                if first_line in expects or first_line == "":
+                    key_pressed = first_line.lower() if first_line else "enter"
+                    raw_selected = lines[1:]
+                else:
+                    key_pressed = "enter"
+                    raw_selected = lines
+
                 selected = []
-                for line in raw_output[1:]:
+                for line in raw_selected:
                     line_clean = line.strip()
                     if preview_map and '\t' in line_clean:
                         line_clean = line_clean.split('\t', 1)[1]
@@ -488,7 +498,6 @@ class AniCliWrapper:
             return
 
         anime_map: Dict[str, Any] = {}
-        preview_map: Dict[str, str] = {}
         display_lines: List[str] = []
 
         max_len = min(50, max(len(r.title_en) for r in results))
@@ -521,11 +530,8 @@ class AniCliWrapper:
             clean_line = ansi_escape.sub('', line)
             anime_map[clean_line] = res
 
-            # Pre-render ANSI preview for left pane in fzf
-            preview_map[line] = self._generate_anime_preview(res)
-
         while True:
-            selected_lines, key = self._launcher(display_lines, title, preview_map=preview_map)
+            selected_lines, key = self._launcher(display_lines, title)
             if not selected_lines:
                 break
 
