@@ -48,8 +48,8 @@ class SettingsManager:
             import sys
             print(f"Warning: Failed to save settings: {e}", file=sys.stderr)
 
-    def get(self, key):
-        return self.settings.get(key)
+    def get(self, key, default=None):
+        return self.settings.get(key, default)
 
     def set(self, key, value):
         self.settings[key] = value
