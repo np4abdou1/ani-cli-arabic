@@ -33,8 +33,6 @@ DEFAULT_HEADERS = {
     "Sec-Fetch-Site": "same-origin",
 }
 
-def get_trailers_base() -> str:
-    return "https://www.youtube.com/watch?v="
 
 def retry_with_backoff(retries=3, backoff_factor=1.5):
     """Decorator to retry network calls on failure."""
@@ -353,7 +351,6 @@ class AnimeAPI:
         genres = []
         other_names = []
         external_links = {}
-        trailers = []
         batch_download_url = ""
 
         full_text = soup.text
@@ -398,9 +395,6 @@ class AnimeAPI:
             href = a.get("href")
             if site_name and href:
                 external_links[site_name] = href
-
-        for yt_id in set(re.findall(r"(?:https?://)?(?:www\.)?(?:youtube\.com/watch\?v=|youtu\.be/|youtube\.com/embed/)([a-zA-Z0-9_\-]{11})", r.text)):
-            trailers.append(f"https://www.youtube.com/watch?v={yt_id}")
 
         batch_a = soup.find("a", href=re.compile(rf"/titles/{re.escape(slug)}/download"))
         if batch_a:
@@ -458,15 +452,12 @@ class AnimeAPI:
             premiered=season,
             creators=author or studio,
             thumbnail=poster,
-            trailer=trailers[0] if trailers else "",
-            yt_trailer=trailers[0] if trailers else "",
             synopsis=synopsis,
             studio=studio,
             author=author,
             batch_download_url=batch_download_url,
             other_names=other_names,
-            external_links=external_links,
-            trailers=trailers
+            external_links=external_links
         )
 
         with self._cache_lock:

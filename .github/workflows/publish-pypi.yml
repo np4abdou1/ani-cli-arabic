@@ -48,20 +48,9 @@ jobs:
       - name: Update version in version.py
         run: |
           VERSION="${{ steps.get_version.outputs.VERSION }}"
-          cat > src/version.py << EOF
-          # Version info for ani-cli-arabic
-          # THIS IS THE SINGLE SOURCE OF TRUTH FOR VERSION
-          # All other files (pyproject.toml, workflows, etc.) read from here
-
-          __version__ = "$VERSION"
-
-          APP_VERSION = f"v{__version__}"
-          APP_NAME = "ani-cli-arabic"
-          GITHUB_REPO = "np4abdou1/ani-cli-arabic"
-          RELEASES_URL = f"https://github.com/{GITHUB_REPO}/releases"
-          API_RELEASES_URL = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
-          EOF
+          sed -i "s/__version__ = .*/__version__ = \"$VERSION\"/" src/version.py
           cat src/version.py
+          python -c "from src.version import __version__, parse_version; print('Validated version:', __version__)"
       
       - name: Build package
         run: |

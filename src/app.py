@@ -10,7 +10,7 @@ from rich.box import HEAVY
 
 from .config import COLOR_PROMPT, COLOR_BORDER, COLOR_TITLE, GOODBYE_ART, POPULAR_GENRES
 from .ui import UIManager
-from .api import AnimeAPI, get_trailers_base
+from .api import AnimeAPI
 from .providers import ProviderManager
 from .monitoring import monitor
 from .player import PlayerManager
@@ -183,7 +183,8 @@ class AniCliArApp:
             'player': self.player,
             'history': self.history,
             'settings': self.settings,
-            'rpc': self.rpc
+            'rpc': self.rpc,
+            'favorites': self.favorites
         }
         return run_simple_cli(query, deps=deps)
 
@@ -725,9 +726,6 @@ class AniCliArApp:
             selected_anime.premiered = detailed.premiered
             selected_anime.creators = detailed.creators
             selected_anime.synopsis = detailed.synopsis
-            selected_anime.trailer = detailed.trailer
-            selected_anime.yt_trailer = detailed.yt_trailer
-            selected_anime.trailers = detailed.trailers
             if detailed.thumbnail:
                 selected_anime.thumbnail = detailed.thumbnail
 
@@ -740,57 +738,6 @@ class AniCliArApp:
             if poster_height > 0:
                 self.ui._generate_poster_ansi(selected_anime.thumbnail, poster_height)
         return eps
-
-    def play_trailer(self, anime):
-        import requests
-        
-        trailer_url = None
-        
-        if anime.trailer and anime.trailer not in ["N/A", "None", None, ""]:
-            if anime.trailer.startswith(('http://', 'https://')):
-                trailer_url = anime.trailer
-            else:
-                trailer_url = get_trailers_base() + anime.trailer
-            
-            try:
-                check = requests.head(trailer_url, timeout=5)
-                if check.status_code == 404:
-                    trailer_url = None
-            except Exception:
-                trailer_url = None
-        
-        if not trailer_url and anime.yt_trailer and anime.yt_trailer not in ["N/A", "None", None, ""]:
-            if anime.yt_trailer.startswith(('http://', 'https://')):
-                trailer_url = anime.yt_trailer
-            else:
-                trailer_url = f"https://www.youtube.com/watch?v={anime.yt_trailer}"
-        
-        if not trailer_url and anime.mal_id and anime.mal_id not in ["0", "N/A", "None", None, ""]:
-            try:
-                jikan_response = requests.get(
-                    f"https://api.jikan.moe/v4/anime/{anime.mal_id}",
-                    timeout=10
-                )
-                if jikan_response.status_code == 200:
-                    jikan_data = jikan_response.json()
-                    trailer_data = jikan_data.get('data', {}).get('trailer', {})
-                    embed_url = trailer_data.get('embed_url', '')
-                    
-                    if embed_url:
-                        # Extract YouTube ID from embed URL
-                        match = re.search(r'/embed/([a-zA-Z0-9_-]+)', embed_url)
-                        if match:
-                            yt_id = match.group(1)
-                            trailer_url = f"https://www.youtube.com/watch?v={yt_id}"
-            except Exception:
-                pass
-        
-        if not trailer_url:
-            self.ui.render_message("Error", "No trailer available for this anime.", "error")
-            return
-        
-        self.ui.render_now_playing(anime.title_en, "Official Trailer", "YouTube / Direct Stream")
-        self.player.play(trailer_url, f"Trailer - {anime.title_en}")
 
     def handle_episode_selection(self, selected_anime, episodes, initial_idx=0):
         current_idx = max(0, min(int(initial_idx or 0), len(episodes) - 1))
@@ -811,9 +758,7 @@ class AniCliArApp:
                 'episodes': selected_anime.episodes,
                 'status': selected_anime.status,
                 'studio': selected_anime.creators,
-                'genres': selected_anime.genres,
-                'trailer': selected_anime.trailer,
-                'yt_trailer': selected_anime.yt_trailer
+                'genres': selected_anime.genres
             }
 
             ep_idx = self.ui.episode_selection_menu(
@@ -849,9 +794,6 @@ class AniCliArApp:
                 continue
             elif ep_idx == 'batch_mode':
                 self.handle_batch_download(selected_anime, episodes)
-                continue
-            elif ep_idx == 'trailer':
-                self.play_trailer(selected_anime)
                 continue
             
             current_idx = ep_idx
@@ -1217,6 +1159,7 @@ class AniCliArApp:
 
 
 def main():
+    install_global_exception_handler()
     home_dir = Path.home()
     db_dir = home_dir / ".ani-cli-arabic" / "database"
     db_dir.mkdir(parents=True, exist_ok=True)

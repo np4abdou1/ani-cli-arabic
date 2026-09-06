@@ -309,10 +309,7 @@ class UIManager:
         return result_container.get('result')
 
     def home_screen_menu(self, rpc_status=None, version_info=None, active_provider=None):
-        """
-        Interactive, ultra-minimal home screen with live character input,
-        tactile mechanical keycaps, mouse click & hover support, and zero box clutter.
-        """
+        """Main home screen with search input and category navigation shortcuts."""
         query = ""
         hovered_btn = None
 
@@ -1350,8 +1347,6 @@ class UIManager:
                         return ('download_current', selected)
                     elif key == 'm' or key == 'M':
                         return 'batch_mode'
-                    elif key == 't' or key == 'T':
-                        return 'trailer'
                     elif key == 'b' or key == 'ESC' or key == 'q':
                         return None
                     elif key == 'g' or key == 'G':

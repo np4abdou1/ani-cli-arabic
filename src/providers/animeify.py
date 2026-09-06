@@ -24,7 +24,6 @@ DEFAULT_AUTH_SECRET = "6rK9z0XyW8vQ3J7pL2mN4sB1tH5gD0fA"
 FALLBACK_API_BASE = "https://animeify.net/animeify/apis_v4/"
 FALLBACK_TOKEN = "8cnY80AZSbUCmR26Vku1VUUY4"
 FALLBACK_THUMBNAILS_BASE = "https://animeify.net/animeify/files/thumbnails/"
-FALLBACK_TRAILERS_BASE = "https://animeify.net/animeify/files/trailers/"
 
 
 class AnimeifyAPICache:
@@ -41,8 +40,7 @@ class AnimeifyAPICache:
         return {
             'ANI_CLI_AR_API_BASE': FALLBACK_API_BASE,
             'ANI_CLI_AR_TOKEN': FALLBACK_TOKEN,
-            'THUMBNAILS_BASE_URL': FALLBACK_THUMBNAILS_BASE,
-            'TRAILERS_BASE_URL': FALLBACK_TRAILERS_BASE
+            'THUMBNAILS_BASE_URL': FALLBACK_THUMBNAILS_BASE
         }
 
     @staticmethod
@@ -160,10 +158,6 @@ class AnimeifyProvider(BaseAnimeProvider):
     def thumbnails_base(self) -> str:
         return self._ensure_creds().get('THUMBNAILS_BASE_URL', FALLBACK_THUMBNAILS_BASE)
 
-    @property
-    def trailers_base(self) -> str:
-        return self._ensure_creds().get('TRAILERS_BASE_URL', FALLBACK_TRAILERS_BASE)
-
     def _post(self, endpoint: str, payload: Dict[str, Any], timeout: int = 10) -> Optional[requests.Response]:
         """Safe HTTP POST with graceful error handling and token injection."""
         try:
@@ -210,8 +204,6 @@ class AnimeifyProvider(BaseAnimeProvider):
             duration=str(item.get('Duration', 'N/A')),
             thumbnail=thumb_url,
             title_romaji=item.get('EN_Title', ''),
-            trailer=item.get('Trailer', ''),
-            yt_trailer=item.get('YTTrailer', ''),
             synopsis=item.get('Story', '') or item.get('Synopsis', '')
         )
 

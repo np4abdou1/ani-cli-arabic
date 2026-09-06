@@ -1,41 +1,98 @@
 """
-Dependency Manager
-Auto-installs media tools: mpv (streaming), ffmpeg (helper), yt-dlp (trailers)
+Dependency management and automated installation for ani-cli-arabic.
+Installs and verifies media playback dependencies: mpv, ffmpeg, and fzf.
 """
 
 import os
 import sys
 import shutil
-import subprocess
-import platform
-import requests
 import zipfile
+import platform
+import tempfile
+import subprocess
 from pathlib import Path
+from typing import Dict, List, Optional
+import requests
 from rich.console import Console
 from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, DownloadColumn, TransferSpeedColumn
 
 console = Console()
+
 try:
     DEPS_DIR = Path.home() / ".ani-cli-arabic" / "deps"
-except RuntimeError:
-    import tempfile
+except Exception:
     DEPS_DIR = Path(tempfile.gettempdir()) / ".ani-cli-arabic" / "deps"
-MPV_FALLBACK = "https://github.com/shinchiro/mpv-winbuild-cmake/releases/download/20260307/mpv-x86_64-v3-20260307-git-f9190e5.7z"
-FZF_FALLBACK = "https://github.com/junegunn/fzf/releases/download/v0.67.0/fzf-0.67.0-windows_amd64.zip"
-FFMPEG_FALLBACK = "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip"
+
+# Verified mirrors for direct Windows/fallback downloads
 SEVENZIP_URL = "https://www.7-zip.org/a/7zr.exe"
+FZF_WIN_URL = "https://github.com/junegunn/fzf/releases/download/v0.67.0/fzf-0.67.0-windows_amd64.zip"
+FFMPEG_WIN_MIRRORS = [
+    "https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip",
+    "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip"
+]
+MPV_WIN_MIRRORS = [
+    "https://github.com/shinchiro/mpv-winbuild-cmake/releases/download/20260307/mpv-x86_64-v3-20260307-git-f9190e5.7z",
+    "https://sourceforge.net/projects/mpv-player-windows/files/64bit/mpv-x86_64-20240128-git-c95e1e1.7z/download"
+]
 
 
-def is_installed(tool):
+def is_installed(tool: str) -> bool:
     return shutil.which(tool) is not None
 
 
-def _clean_deps_keep_important():
+def is_termux() -> bool:
+    return "ANDROID_ROOT" in os.environ or "com.termux" in os.environ.get("PREFIX", "")
+
+
+def get_platform_name() -> str:
+    if is_termux():
+        return "Android (Termux)"
+    sys_name = platform.system()
+    if sys_name == "Darwin":
+        return "macOS"
+    if sys_name == "Windows":
+        rel = platform.release()
+        return f"Windows {rel}" if rel else "Windows"
+    if sys_name == "Linux":
+        try:
+            os_info = platform.freedesktop_os_release()
+            name = os_info.get("NAME") or os_info.get("ID")
+            if name:
+                return f"Linux ({name})"
+        except Exception:
+            pass
+        if os.path.exists("/etc/os-release"):
+            try:
+                with open("/etc/os-release", "r", encoding="utf-8", errors="ignore") as f:
+                    for line in f:
+                        if line.startswith("NAME="):
+                            return f"Linux ({line.split('=', 1)[1].strip('\"\'')})"
+            except Exception:
+                pass
+        return "Linux"
+    return sys_name or "Unknown"
+
+
+def _prepend_to_path(dir_path: Path) -> None:
+    dir_str = str(dir_path)
+    current = os.environ.get("PATH", "")
+    if dir_str and dir_str not in current:
+        os.environ["PATH"] = dir_str + os.pathsep + current
+
+
+def _local_deps_root() -> Optional[Path]:
+    executables = ["mpv.exe", "fzf.exe", "ffmpeg.exe", "mpv", "fzf", "ffmpeg"]
+    if any((DEPS_DIR / f).exists() for f in executables):
+        return DEPS_DIR
+    return None
+
+
+def _clean_deps_directory():
     if not DEPS_DIR.exists():
         return
-        
+    keep = {"mpv.exe", "fzf.exe", "7zr.exe", "ffmpeg.exe", "ffprobe.exe", "mpv", "ffmpeg", "fzf"}
     for item in DEPS_DIR.iterdir():
-        if item.name.lower() in ("mpv.exe", "fzf.exe", "7zr.exe", "ffmpeg.exe", "ffprobe.exe", "yt-dlp.exe", "yt-dlp"):
+        if item.name.lower() in keep:
             continue
         try:
             if item.is_dir():
@@ -46,21 +103,7 @@ def _clean_deps_keep_important():
             pass
 
 
-def _prepend_to_path(dir_path: Path) -> None:
-    dir_str = str(dir_path)
-    current = os.environ.get("PATH", "")
-    if dir_str and dir_str not in current:
-        os.environ["PATH"] = dir_str + os.pathsep + current
-
-
-def _local_deps_root() -> Path | None:
-    executables = ["mpv.exe", "fzf.exe", "ffmpeg.exe", "yt-dlp.exe", "mpv", "fzf", "ffmpeg", "yt-dlp"]
-    if any((DEPS_DIR / f).exists() for f in executables):
-        return DEPS_DIR
-    return None
-
-
-def check_dependencies_status():
+def check_dependencies_status() -> Dict[str, bool]:
     if platform.system() != "Windows":
         local_bin = str(Path.home() / ".local" / "bin")
         if local_bin not in os.environ.get("PATH", ""):
@@ -73,60 +116,25 @@ def check_dependencies_status():
     return {
         "mpv": is_installed("mpv"),
         "ffmpeg": is_installed("ffmpeg"),
-        "yt-dlp": is_installed("yt-dlp"),
         "fzf": is_installed("fzf")
     }
 
 
-def print_explanation(tool):
-    explanations = {
-        "mpv": "Media player for streaming",
-        "ffmpeg": "Video/audio processing",
-        "yt-dlp": "Stream URL extraction",
-        "fzf": "Command-line fuzzy finder"
-    }
-    return explanations.get(tool, "")
-
-
-def print_status(status):
-    console.print("\n[bold magenta]Dependency Check[/bold magenta]")
-    all_good = True
-    for tool, installed in status.items():
-        if installed:
-            console.print(f"  [green]✔[/green] {tool}")
-        else:
-            console.print(f"  [red]✘[/red] {tool} [dim]({print_explanation(tool)})[/dim]")
-            all_good = False
-    return all_good
-
-
-def get_latest_github_release(repo, asset_filter):
-    try:
-        url = f"https://api.github.com/repos/{repo}/releases/latest"
-        response = requests.get(url, timeout=5)
-        if response.status_code == 200:
-            for asset in response.json().get("assets", []):
-                if asset_filter in asset.get("name", ""):
-                    return asset.get("browser_download_url")
-    except Exception:
-        pass
-    return None
-
-
-def download_file_with_progress(urls, dest_path, description="Downloading"):
+def download_file_with_progress(urls: List[str] | str, dest_path: Path, description: str = "Downloading") -> bool:
     if isinstance(urls, str):
         urls = [urls]
 
+    headers = {"User-Agent": "Mozilla/5.0 (ani-cli-arabic dependency installer)"}
     for url in urls:
         if not url:
             continue
         try:
-            response = requests.get(url, stream=True, timeout=30)
+            response = requests.get(url, stream=True, timeout=30, headers=headers)
             response.raise_for_status()
-            total_size = int(response.headers.get('content-length', 0))
-            
+            total_size = int(response.headers.get("content-length", 0))
+
             with Progress(
-                SpinnerColumn(spinner_name="bouncingBar"),
+                SpinnerColumn(spinner_name="dots"),
                 TextColumn("[cyan]{task.description}"),
                 BarColumn(bar_width=30),
                 "[progress.percentage]{task.percentage:>3.0f}%",
@@ -136,318 +144,238 @@ def download_file_with_progress(urls, dest_path, description="Downloading"):
                 transient=True
             ) as progress:
                 task = progress.add_task(description, total=total_size)
-                
-                with open(dest_path, "wb") as file:
-                    for data in response.iter_content(chunk_size=8192):
-                        file.write(data)
-                        progress.update(task, advance=len(data))
+                with open(dest_path, "wb") as f:
+                    for chunk in response.iter_content(chunk_size=16384):
+                        f.write(chunk)
+                        progress.update(task, advance=len(chunk))
             return True
-        except Exception as e:
-            console.print(f"[dim]Download failed from {url}: {e}[/dim]")
+        except Exception:
             continue
-            
-    console.print(f"[red]Failed to download {description} from all available mirrors.[/red]")
-    if Path(dest_path).exists():
-        Path(dest_path).unlink()
+
+    if dest_path.exists():
+        try:
+            dest_path.unlink()
+        except Exception:
+            pass
     return False
 
 
-def install_ytdlp():
-    console.print("[cyan]Installing yt-dlp...[/cyan]")
-    DEPS_DIR.mkdir(parents=True, exist_ok=True)
-    
-    system = platform.system()
-    filename = "yt-dlp.exe" if system == "Windows" else "yt-dlp"
-    
-    if (DEPS_DIR / filename).exists():
-        console.print("[green]✔[/green] yt-dlp already present")
-        _prepend_to_path(DEPS_DIR)
-        return True
-        
-    if system == "Windows":
-        asset_name = "yt-dlp.exe"
-        fallback_url = "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe"
-    elif system == "Darwin":
-        asset_name = "yt-dlp_macos"
-        fallback_url = "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_macos"
-    else:
-        asset_name = "yt-dlp_linux"
-        fallback_url = "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_linux"
-        
-    urls = [
-        get_latest_github_release("yt-dlp/yt-dlp", asset_name),
-        fallback_url
-    ]
-    
-    dest_path = DEPS_DIR / filename
-    if download_file_with_progress(urls, dest_path, "yt-dlp"):
-        if system != "Windows":
-            try:
-                os.chmod(dest_path, 0o755)  # Make it executable for Linux/Mac
-            except (OSError, PermissionError) as e:
-                console.print(f"[yellow]⚠ Could not make yt-dlp executable: {e}[/yellow]")
-        console.print("[green]✔[/green] yt-dlp ready")
-        _prepend_to_path(DEPS_DIR)
-        _clean_deps_keep_important()
-        return True
-        
-    return False
 
-
-def get_7z_extractor():
-    if is_installed("7z"): return "7z"
-    if is_installed("7za"): return "7za"
-    
+def get_7z_extractor() -> Optional[str]:
+    for tool in ("7z", "7za"):
+        if is_installed(tool):
+            return tool
     local_7z = DEPS_DIR / "7zr.exe"
-    if local_7z.exists(): return str(local_7z)
-    
+    if local_7z.exists():
+        return str(local_7z)
+
     DEPS_DIR.mkdir(parents=True, exist_ok=True)
-    console.print("[dim]Downloading 7z extractor...[/dim]")
     try:
-        response = requests.get(SEVENZIP_URL, timeout=30)
-        local_7z.write_bytes(response.content)
+        resp = requests.get(SEVENZIP_URL, timeout=20)
+        local_7z.write_bytes(resp.content)
         return str(local_7z)
     except Exception:
         return None
 
 
-def install_mpv_windows():
-    console.print("[cyan]Installing MPV...[/cyan]")
-    
-    existing_root = _local_deps_root()
-    if existing_root and (existing_root / "mpv.exe").exists():
-        _prepend_to_path(existing_root)
-        console.print("[green]✔[/green] MPV ready")
-        return True
-    
+def install_mpv_windows() -> bool:
+    console.print("[cyan]Installing MPV player...[/cyan]")
     DEPS_DIR.mkdir(parents=True, exist_ok=True)
     extractor = get_7z_extractor()
     if not extractor:
-        console.print("[red]✘[/red] Could not get 7z extractor")
+        console.print("[red]✗[/red] 7z extractor unavailable")
         return False
-    
-    urls = [
-        get_latest_github_release("shinchiro/mpv-winbuild-cmake", "mpv-x86_64-v3"),
-        get_latest_github_release("shinchiro/mpv-winbuild-cmake", "mpv-x86_64-"),
-        get_latest_github_release("shinchiro/mpv-winbuild-cmake", "mpv-i686-"),
-        MPV_FALLBACK
-    ]
-    
+
     archive_path = DEPS_DIR / "mpv.7z"
-    if not download_file_with_progress(urls, archive_path, "MPV"): return False
-    
-    console.print("[dim]Extracting...[/dim]")
+    if not download_file_with_progress(MPV_WIN_MIRRORS, archive_path, "MPV"):
+        return False
+
     try:
-        if subprocess.run([extractor, "x", str(archive_path), f"-o{DEPS_DIR}", "-y"], capture_output=True).returncode != 0:
-            console.print("[red]✘[/red] Extraction failed")
+        res = subprocess.run([extractor, "x", str(archive_path), f"-o{DEPS_DIR}", "-y"], capture_output=True)
+        archive_path.unlink(missing_ok=True)
+        if res.returncode != 0:
             return False
-            
-        archive_path.unlink()
-        
-        # Flatten directory
+
         for item in DEPS_DIR.rglob("mpv.exe"):
             if item.parent != DEPS_DIR:
                 shutil.move(str(item), str(DEPS_DIR / "mpv.exe"))
                 break
-                
-        _clean_deps_keep_important()
+
+        _clean_deps_directory()
         _prepend_to_path(DEPS_DIR)
-        
         if (DEPS_DIR / "mpv.exe").exists():
-            console.print("[green]✔[/green] MPV ready")
+            console.print("[green]✓[/green] MPV installed successfully")
             return True
-            
     except Exception as e:
-        console.print(f"[red]✘[/red] MPV Install Error: {e}")
+        console.print(f"[red]✗[/red] Extraction error: {e}")
     return False
 
 
-def install_fzf_windows():
+def install_fzf_windows() -> bool:
     console.print("[cyan]Installing fzf...[/cyan]")
     DEPS_DIR.mkdir(parents=True, exist_ok=True)
-    
-    if (DEPS_DIR / "fzf.exe").exists():
-        console.print("[green]✔[/green] fzf already present")
-        _prepend_to_path(DEPS_DIR)
-        return True
-
-    urls = [get_latest_github_release("junegunn/fzf", "windows_amd64.zip"), FZF_FALLBACK]
     archive_path = DEPS_DIR / "fzf.zip"
-    
-    if not download_file_with_progress(urls, archive_path, "fzf"): return False
-    
-    console.print("[dim]Extracting fzf...[/dim]")
+
+    if not download_file_with_progress(FZF_WIN_URL, archive_path, "fzf"):
+        return False
+
     try:
-        with zipfile.ZipFile(archive_path, 'r') as zip_ref:
-            zip_ref.extractall(DEPS_DIR)
-        archive_path.unlink()
-        
+        with zipfile.ZipFile(archive_path, "r") as zf:
+            zf.extractall(DEPS_DIR)
+        archive_path.unlink(missing_ok=True)
+
         for item in DEPS_DIR.rglob("fzf.exe"):
             if item.parent != DEPS_DIR:
                 shutil.move(str(item), str(DEPS_DIR / "fzf.exe"))
                 break
 
+        _prepend_to_path(DEPS_DIR)
         if (DEPS_DIR / "fzf.exe").exists():
-            console.print("[green]✔[/green] fzf ready")
-            _prepend_to_path(DEPS_DIR)
-            _clean_deps_keep_important()
+            console.print("[green]✓[/green] fzf installed successfully")
             return True
     except Exception as e:
-        console.print(f"[red]✘[/red] fzf Install error: {e}")
+        console.print(f"[red]✗[/red] fzf error: {e}")
     return False
 
 
-def install_ffmpeg_windows_direct():
-    """Fallback direct download for ffmpeg if package managers fail."""
-    urls = [get_latest_github_release("BtbN/FFmpeg-Builds", "ffmpeg-master-latest-win64-gpl.zip"), FFMPEG_FALLBACK]
+def install_ffmpeg_windows() -> bool:
+    console.print("[cyan]Installing FFmpeg...[/cyan]")
+    DEPS_DIR.mkdir(parents=True, exist_ok=True)
+
+    # Package managers check
+    for pm, args in [
+        ("winget", ["install", "-e", "--id", "Gyan.FFmpeg", "--accept-source-agreements", "--accept-package-agreements"]),
+        ("scoop", ["install", "ffmpeg"]),
+        ("choco", ["install", "ffmpeg", "-y"])
+    ]:
+        if is_installed(pm):
+            try:
+                res = subprocess.run([pm] + args, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                if res.returncode == 0:
+                    console.print(f"[green]✓[/green] FFmpeg installed via {pm}")
+                    return True
+            except Exception:
+                pass
+
+    # Direct zip fallback
     archive_path = DEPS_DIR / "ffmpeg.zip"
-    
-    if not download_file_with_progress(urls, archive_path, "FFmpeg"): return False
-    console.print("[dim]Extracting FFmpeg...[/dim]")
+    if not download_file_with_progress(FFMPEG_WIN_MIRRORS, archive_path, "FFmpeg"):
+        return False
+
     try:
-        with zipfile.ZipFile(archive_path, 'r') as zip_ref:
-            zip_ref.extractall(DEPS_DIR)
-        archive_path.unlink()
-        
+        with zipfile.ZipFile(archive_path, "r") as zf:
+            zf.extractall(DEPS_DIR)
+        archive_path.unlink(missing_ok=True)
+
         for item in DEPS_DIR.rglob("ffmpeg.exe"):
             shutil.move(str(item), str(DEPS_DIR / "ffmpeg.exe"))
         for item in DEPS_DIR.rglob("ffprobe.exe"):
             shutil.move(str(item), str(DEPS_DIR / "ffprobe.exe"))
 
-        if (DEPS_DIR / "ffmpeg.exe").exists():
-            console.print("[green]✔[/green] FFmpeg downloaded directly")
-            _prepend_to_path(DEPS_DIR)
-            _clean_deps_keep_important()
-            return True
-    except Exception:
-        pass
-    return False
-
-
-def install_ffmpeg_windows():
-    console.print("[cyan]Installing FFmpeg...[/cyan]")
-    DEPS_DIR.mkdir(parents=True, exist_ok=True)
-    
-    if (DEPS_DIR / "ffmpeg.exe").exists():
         _prepend_to_path(DEPS_DIR)
-        console.print("[green]✔[/green] FFmpeg ready")
-        return True
-
-    # Try winget
-    if is_installed("winget"):
-        console.print("[dim]Trying winget...[/dim]")
-        if subprocess.run(["winget", "install", "-e", "--id", "Gyan.FFmpeg", "--accept-source-agreements", "--accept-package-agreements"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode == 0:
-            console.print("[green]✔[/green] FFmpeg installed via winget")
+        _clean_deps_directory()
+        if (DEPS_DIR / "ffmpeg.exe").exists():
+            console.print("[green]✓[/green] FFmpeg installed successfully")
             return True
-
-    # Try scoop
-    if is_installed("scoop"):
-        console.print("[dim]Trying scoop...[/dim]")
-        if subprocess.run(["scoop", "install", "ffmpeg"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode == 0:
-            console.print("[green]✔[/green] FFmpeg installed via scoop")
-            return True
-
-    # Try choco
-    if is_installed("choco"):
-        console.print("[dim]Trying choco...[/dim]")
-        if subprocess.run(["choco", "install", "ffmpeg", "-y"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode == 0:
-            console.print("[green]✔[/green] FFmpeg installed via choco")
-            return True
-
-    console.print("[dim]Package managers failed or missing. falling back to direct download...[/dim]")
-    return install_ffmpeg_windows_direct()
-
-
-def install_deps_windows():
-    success = True
-    if not is_installed("ffmpeg"):
-        if not install_ffmpeg_windows(): success = False
-    if not is_installed("mpv"):
-        if not install_mpv_windows(): success = False
-    if not is_installed("fzf"):
-        if not install_fzf_windows(): success = False
-    return success
-
-
-def install_deps_linux():
-    console.print("[cyan]Detecting package manager...[/cyan]")
-    
-    pm_commands = [
-        {"pm": "apt", "cmd": "sudo apt update && sudo apt install -y mpv ffmpeg fzf"},
-        {"pm": "pacman", "cmd": "sudo pacman -Sy --noconfirm mpv ffmpeg fzf"},
-        {"pm": "dnf", "cmd": "sudo dnf install -y mpv ffmpeg fzf"},
-        {"pm": "zypper", "cmd": "sudo zypper install -y mpv ffmpeg fzf"},
-        {"pm": "apk", "cmd": "sudo apk add mpv ffmpeg fzf"},
-        {"pm": "yum", "cmd": "sudo yum install -y mpv ffmpeg fzf"},
-        {"pm": "nix-env", "cmd": "nix-env -iA nixpkgs.mpv nixpkgs.ffmpeg nixpkgs.fzf"}
-    ]
-    
-    for pm in pm_commands:
-        if is_installed(pm["pm"]):
-            console.print(f"[dim]Running: {pm['cmd']}[/dim]")
-            if subprocess.run(pm['cmd'], shell=True, check=False).returncode == 0:
-                console.print(f"[green]✔ Dependencies installed via {pm['pm']}[/green]")
-                return True
-            else:
-                console.print(f"[red]Installation via {pm['pm']} failed, trying fallbacks if any...[/red]")
-                
-    console.print("[red]Could not determine package manager or installation failed. Please install mpv, ffmpeg, and fzf manually.[/red]")
+    except Exception as e:
+        console.print(f"[red]✗[/red] FFmpeg error: {e}")
     return False
 
 
-def ensure_dependencies():
-    if all(check_dependencies_status().values()):
+def install_deps_windows() -> bool:
+    ok = True
+    if not is_installed("ffmpeg") and not install_ffmpeg_windows():
+        ok = False
+    if not is_installed("mpv") and not install_mpv_windows():
+        ok = False
+    if not is_installed("fzf") and not install_fzf_windows():
+        ok = False
+    return ok
+
+
+def install_deps_linux() -> bool:
+    console.print("[cyan]Detecting package manager...[/cyan]")
+
+    if is_termux():
+        console.print("[cyan]Android Termux detected. Running: pkg install mpv ffmpeg fzf[/cyan]")
+        res = subprocess.run(["pkg", "install", "-y", "mpv", "ffmpeg", "fzf"])
+        return res.returncode == 0
+
+    managers = [
+        ("pacman", "sudo pacman -S --needed --noconfirm mpv ffmpeg fzf"),
+        ("apt", "sudo apt update && sudo apt install -y mpv ffmpeg fzf"),
+        ("dnf", "sudo dnf install -y mpv ffmpeg fzf"),
+        ("zypper", "sudo zypper install -y mpv ffmpeg fzf"),
+        ("apk", "sudo apk add mpv ffmpeg fzf"),
+        ("xbps-install", "sudo xbps-install -Sy mpv ffmpeg fzf"),
+        ("emerge", "sudo emerge -av media-video/mpv media-video/ffmpeg app-shells/fzf"),
+        ("nix-env", "nix-env -iA nixpkgs.mpv nixpkgs.ffmpeg nixpkgs.fzf"),
+        ("pkg", "sudo pkg install -y mpv ffmpeg fzf")
+    ]
+
+    for pm, cmd in managers:
+        if is_installed(pm):
+            console.print(f"[dim]Executing: {cmd}[/dim]")
+            res = subprocess.run(cmd, shell=True)
+            if res.returncode == 0:
+                console.print(f"[green]✓ Dependencies installed via {pm}[/green]")
+                return True
+
+    console.print("[red]Automatic package installation failed. Please install mpv, ffmpeg, and fzf manually.[/red]")
+    return False
+
+
+def install_deps_macos() -> bool:
+    if is_installed("brew"):
+        console.print("[dim]Executing: brew install mpv ffmpeg fzf[/dim]")
+        res = subprocess.run(["brew", "install", "mpv", "ffmpeg", "fzf"])
+        if res.returncode == 0:
+            console.print("[green]✓ Dependencies installed via Homebrew[/green]")
+            return True
+    elif is_installed("port"):
+        console.print("[dim]Executing: sudo port install mpv ffmpeg fzf[/dim]")
+        res = subprocess.run(["sudo", "port", "install", "mpv", "ffmpeg", "fzf"])
+        if res.returncode == 0:
+            console.print("[green]✓ Dependencies installed via MacPorts[/green]")
+            return True
+
+    console.print("[yellow]Please install Homebrew (https://brew.sh) and run: brew install mpv ffmpeg fzf[/yellow]")
+    return False
+
+
+def ensure_dependencies() -> bool:
+    status = check_dependencies_status()
+    if all(status.values()):
         return True
 
-    status = check_dependencies_status()
-    print_status(status)
-    
-    console.print("\n[dim]Auto-install available (mostly works)[/dim]")
-    
-    if platform.system() == "Darwin":
-        if is_installed("brew"):
-            console.print("[dim]Running: brew install mpv ffmpeg yt-dlp fzf[/dim]")
-            if subprocess.run(["brew", "install", "mpv", "ffmpeg", "yt-dlp", "fzf"]).returncode == 0:
-                console.print("[green]✔ Dependencies installed via brew[/green]")
-                return True
-        console.print("[yellow]Please run: brew install mpv ffmpeg yt-dlp fzf[/yellow]")
-        console.input("Press Enter after installation...")
-        return all(check_dependencies_status().values())
+    console.print("\n[bold]System Dependency Check[/bold]")
+    for tool, present in status.items():
+        if present:
+            console.print(f"  [green]✓[/green] {tool}")
+        else:
+            console.print(f"  [red]✗[/red] {tool} (missing)")
 
     try:
-        choice = console.input("\nInstall missing? [Y/n]: ").strip().lower()
+        ans = console.input("\nInstall missing media tools? [Y/n]: ").strip().lower()
     except (EOFError, KeyboardInterrupt):
-        console.print("\n[red]Exiting.[/red]")
-        sys.exit(1)
-    
-    if choice == 'n':
-        console.print("[red]Exiting.[/red]")
         sys.exit(1)
 
-    if not status["yt-dlp"]:
-        install_ytdlp()
+    if ans == "n":
+        return False
 
-    if not (status["mpv"] and status["ffmpeg"] and status["fzf"]):
-        if platform.system() == "Windows":
-            install_deps_windows()
-        elif platform.system() == "Linux":
-            install_deps_linux()
-    
-    console.print("\n[dim]Checking installation...[/dim]")
-    new_status = check_dependencies_status()
-    
-    if all(new_status.values()):
-        console.print("[green]✔ All dependencies ready![/green]\n")
+    sys_platform = platform.system()
+    if sys_platform == "Windows":
+        install_deps_windows()
+    elif sys_platform == "Darwin":
+        install_deps_macos()
+    else:
+        install_deps_linux()
+
+    updated = check_dependencies_status()
+    if all(updated.values()):
+        console.print("[green]✓ All dependencies ready.[/green]\n")
         return True
-    
-    console.print("\n[yellow]Still missing:[/yellow]")
-    for tool, installed in new_status.items():
-        if not installed:
-            console.print(f"  [red]✘[/red] {tool}")
-    
-    if platform.system() == "Windows":
-        console.print("\n[yellow]Note: Some tools might need a terminal restart to be detected.[/yellow]")
-    
-    console.print("\n[red]Installation incomplete. You may need to install them manually.[/red]")
-    console.input("Press Enter to exit...")
-    sys.exit(1)
+
+    missing = [t for t, p in updated.items() if not p]
+    console.print(f"\n[yellow]Warning: Missing dependencies: {', '.join(missing)}[/yellow]")
+    return False

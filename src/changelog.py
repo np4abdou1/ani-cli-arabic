@@ -28,58 +28,46 @@ from .utils import get_key, RawTerminal
 
 _CHANGELOG_ITEMS: List[Dict[str, Any]] = [
     {
-        "badge": "Multi-Provider",
+        "badge": "Providers",
         "badge_style": "bold cyan",
-        "title": "4 Distinct Streaming Engines",
-        "desc": "Stream seamlessly across Anime3rb, Anime Slayer (VIP CDN), Animeify, and AniDB (English Sub & Dub) with instant runtime switching."
+        "title": "Multiple Streaming Providers",
+        "desc": "Search and stream from Anime3rb, Anime Slayer, Animeify, and AniDB (Sub/Dub)."
     },
     {
-        "badge": "Watch Progress",
+        "badge": "Progress",
         "badge_style": "bold yellow",
-        "title": "Real-Time MPV Socket Resumption",
-        "desc": "Background IPC socket tracking records exact timestamps and percentage, resuming instantly from where you left off."
+        "title": "Watch History & Resume",
+        "desc": "Tracks playback time via MPV socket and resumes automatically from where you left off."
     },
     {
-        "badge": "Minimal TUI",
+        "badge": "Interface",
         "badge_style": "bold magenta",
-        "title": "Streamlined Tactile Interface",
-        "desc": "Compact 4x3 shortcut dock, integrated top pill badges, live star cache, and zero visual clutter."
+        "title": "Terminal Interface",
+        "desc": "Navigation shortcuts, favorite management, and quick provider switching."
     },
     {
-        "badge": "Multi-Player",
+        "badge": "Players",
         "badge_style": "bold green",
-        "title": "Expanded Player Ecosystem",
-        "desc": "Auto-detection and timestamp seeking for Celluloid, IINA, Syncplay, MPV, VLC, and MPC-HC."
+        "title": "External Media Players",
+        "desc": "Playback support for MPV, VLC, Celluloid, IINA, and Syncplay."
     },
     {
-        "badge": "Broadcast",
+        "badge": "Announcements",
         "badge_style": "bold blue",
-        "title": "Cloudflare Remote Announcements",
-        "desc": "Instant global announcements and maintenance notices delivered live via Cloudflare Worker."
+        "title": "Remote Announcements",
+        "desc": "Displays maintenance notices and updates configured on Cloudflare."
     },
     {
-        "badge": "Smart Search",
+        "badge": "Search",
         "badge_style": "bold cyan",
-        "title": "Typo Normalization & Fallbacks",
-        "desc": "Automatic Arabic orthographic normalization and chunked token search fallbacks for zero-miss lookups."
+        "title": "Arabic Search Normalization",
+        "desc": "Normalizes Arabic characters and provides typo-tolerant query fallbacks."
     },
     {
-        "badge": "Intro Skip",
-        "badge_style": "bold yellow",
-        "title": "Anime3rb Bumper Auto-Skip",
-        "desc": "Automatically skips the 5-second intro bumper strictly on Anime3rb streams when starting fresh episodes."
-    },
-    {
-        "badge": "Auto-Updater",
+        "badge": "Updater",
         "badge_style": "bold green",
-        "title": "Bulletproof Upgrade Engine",
-        "desc": "Automated PyPI and pipx updates with automatic PEP 668 managed environment handling."
-    },
-    {
-        "badge": "Maintenance",
-        "badge_style": "bold #d97979",
-        "title": "Automated Cache Optimization",
-        "desc": "Background IPC socket cleanup and temporary database pruning on startup."
+        "title": "Platform Auto-Updater",
+        "desc": "Direct updates for pip, pipx, AUR (yay/paru), Homebrew, and standalone binaries."
     }
 ]
 
@@ -130,6 +118,7 @@ def fetch_remote_changelog(timeout: float = 0.8) -> Optional[Dict[str, Any]]:
     """Fetches remote changelog if configured in Cloudflare KV."""
     urls = [
         "https://ani-cli-broadcast.talego4955.workers.dev/changelog.json",
+        "https://anicliar-dashboard.pages.dev/changelog.json",
         "https://broadcast.ani-cli-arabic.dev/changelog.json"
     ]
     for u in urls:

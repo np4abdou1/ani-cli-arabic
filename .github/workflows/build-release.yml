@@ -51,19 +51,7 @@ jobs:
           $cleanVer = $version -replace '^v', ''
           
           # Update version.py with the release version
-          @"
-          # Version info for ani-cli-arabic
-          # THIS IS THE SINGLE SOURCE OF TRUTH FOR VERSION
-          # All other files (pyproject.toml, workflows, etc.) read from here
-
-          __version__ = "$cleanVer"
-
-          APP_VERSION = "$version"
-          APP_NAME = "ani-cli-arabic"
-          GITHUB_REPO = "np4abdou1/ani-cli-arabic"
-          RELEASES_URL = f"https://github.com/{GITHUB_REPO}/releases"
-          API_RELEASES_URL = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
-          "@ | Out-File -FilePath "src/version.py" -Encoding utf8
+          (Get-Content src/version.py) -replace '__version__ = .*', "__version__ = `"$cleanVer`"" | Set-Content src/version.py
           
           # Parse version numbers - strip any non-numeric suffix
           $cleanVer = $version -replace '^v', '' -replace '-.*$', ''
@@ -130,10 +118,10 @@ jobs:
           $version = "${{ inputs.version }}"
           
           # Build without MPV
-          pyinstaller --onefile --name "ani-cli-arabic-windows-x64-$version" --console --clean --noconfirm --distpath . --workpath build --specpath build --icon "$currentDir\assets\icon.ico" --version-file "$currentDir\version_info.txt" --add-data "$currentDir\src;src" --hidden-import pypresence --hidden-import rich --hidden-import requests --hidden-import cryptography --hidden-import cryptography.fernet main.py
+          pyinstaller --onefile --name "ani-cli-arabic-windows-x64-$version" --console --clean --noconfirm --distpath . --workpath build --specpath build --icon "$currentDir\assets\icon.ico" --version-file "$currentDir\version_info.txt" --add-data "$currentDir\src;src" --hidden-import pypresence --hidden-import rich --hidden-import requests --hidden-import cryptography --hidden-import cryptography.fernet --hidden-import curl_cffi --hidden-import bs4 --hidden-import arabic_reshaper --hidden-import bidi --hidden-import bidi.algorithm --hidden-import Cryptodome main.py
           
           # Build with MPV
-          pyinstaller --onefile --name "ani-cli-arabic-windows-x64-$version-with-mpv" --console --clean --noconfirm --distpath . --workpath build --specpath build --icon "$currentDir\assets\icon.ico" --version-file "$currentDir\version_info.txt" --add-data "$currentDir\src;src" --add-binary "$currentDir\mpv_bundle.exe;mpv" --hidden-import pypresence --hidden-import rich --hidden-import requests --hidden-import cryptography --hidden-import cryptography.fernet main.py
+          pyinstaller --onefile --name "ani-cli-arabic-windows-x64-$version-with-mpv" --console --clean --noconfirm --distpath . --workpath build --specpath build --icon "$currentDir\assets\icon.ico" --version-file "$currentDir\version_info.txt" --add-data "$currentDir\src;src" --add-binary "$currentDir\mpv_bundle.exe;mpv" --hidden-import pypresence --hidden-import rich --hidden-import requests --hidden-import cryptography --hidden-import cryptography.fernet --hidden-import curl_cffi --hidden-import bs4 --hidden-import arabic_reshaper --hidden-import bidi --hidden-import bidi.algorithm --hidden-import Cryptodome main.py
 
       - name: Upload to release
         env:
@@ -155,18 +143,9 @@ jobs:
       - name: Inject version into source
         run: |
           VERSION="${{ inputs.version }}"
-          cat > src/version.py << 'VERSIONEOF'
-          # Version info for ani-cli-arabic
-          # This file gets updated by the build workflow
-
-          APP_VERSION = "VERSION_PLACEHOLDER"
-          APP_NAME = "ani-cli-arabic"
-          GITHUB_REPO = "np4abdou1/ani-cli-arabic"
-          RELEASES_URL = f"https://github.com/{GITHUB_REPO}/releases"
-          API_RELEASES_URL = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
-          VERSIONEOF
-          
-          sed -i "s/VERSION_PLACEHOLDER/$VERSION/g" src/version.py
+          CLEAN_VER="${VERSION#v}"
+          sed -i "s/__version__ = .*/__version__ = \"$CLEAN_VER\"/" src/version.py
+          cat src/version.py
 
       - name: Install dependencies
         run: |
@@ -182,11 +161,11 @@ jobs:
           VERSION="${{ inputs.version }}"
           
           # Build without MPV
-          pyinstaller --onefile --name "ani-cli-arabic-linux-x64-$VERSION" --console --clean --noconfirm --distpath . --workpath build --specpath build --add-data "$PWD/src:src" --hidden-import pypresence --hidden-import rich --hidden-import requests --hidden-import cryptography --hidden-import cryptography.fernet main.py
+          pyinstaller --onefile --name "ani-cli-arabic-linux-x64-$VERSION" --console --clean --noconfirm --distpath . --workpath build --specpath build --add-data "$PWD/src:src" --hidden-import pypresence --hidden-import rich --hidden-import requests --hidden-import cryptography --hidden-import cryptography.fernet --hidden-import curl_cffi --hidden-import bs4 --hidden-import arabic_reshaper --hidden-import bidi --hidden-import bidi.algorithm --hidden-import Cryptodome main.py
           
           # Build with MPV
           MPV_PATH=$(which mpv)
-          pyinstaller --onefile --name "ani-cli-arabic-linux-x64-$VERSION-with-mpv" --console --clean --noconfirm --distpath . --workpath build --specpath build --add-data "$PWD/src:src" --add-binary "${MPV_PATH}:mpv" --hidden-import pypresence --hidden-import rich --hidden-import requests --hidden-import cryptography --hidden-import cryptography.fernet main.py
+          pyinstaller --onefile --name "ani-cli-arabic-linux-x64-$VERSION-with-mpv" --console --clean --noconfirm --distpath . --workpath build --specpath build --add-data "$PWD/src:src" --add-binary "${MPV_PATH}:mpv" --hidden-import pypresence --hidden-import rich --hidden-import requests --hidden-import cryptography --hidden-import cryptography.fernet --hidden-import curl_cffi --hidden-import bs4 --hidden-import arabic_reshaper --hidden-import bidi --hidden-import bidi.algorithm --hidden-import Cryptodome main.py
 
       - name: Upload to release
         env:
