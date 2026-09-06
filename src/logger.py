@@ -108,38 +108,112 @@ class DebugLogger:
     def is_enabled(self) -> bool:
         return self._enabled
 
-    def debug(self, category: str, message: str):
+    def _format_msg(self, category: str, message: str) -> str:
+        return f"[{category.upper()}] {message}"
+
+    def debug(self, category_or_msg: str, message: Optional[str] = None):
         if not self._enabled:
             return
-        line = f"[{category.upper()}] {message}"
-        self._logger.debug(line)
+        cat = "SYSTEM" if message is None else category_or_msg
+        msg = category_or_msg if message is None else message
+        formatted = self._format_msg(cat, msg)
+        self._logger.debug(formatted)
         if self._console_mirror:
-            print(f"\033[90m[DEBUG] {line}\033[0m", file=sys.stderr)
+            print(f"\033[90m[DEBUG] {formatted}\033[0m", file=sys.stderr)
 
     def info(self, category_or_msg: str, message: Optional[str] = None):
         if not self._enabled:
             return
         cat = "SYSTEM" if message is None else category_or_msg
         msg = category_or_msg if message is None else message
-        line = f"[{cat.upper()}] {msg}"
-        self._logger.info(line)
+        formatted = self._format_msg(cat, msg)
+        self._logger.info(formatted)
         if self._console_mirror:
-            print(f"\033[36m[INFO] {line}\033[0m", file=sys.stderr)
+            print(f"\033[36m[INFO] {formatted}\033[0m", file=sys.stderr)
 
-    def warning(self, category: str, message: str):
+    def warning(self, category_or_msg: str, message: Optional[str] = None):
         if not self._enabled:
             return
-        line = f"[{category.upper()}] {message}"
-        self._logger.warning(line)
+        cat = "SYSTEM" if message is None else category_or_msg
+        msg = category_or_msg if message is None else message
+        formatted = self._format_msg(cat, msg)
+        self._logger.warning(formatted)
         if self._console_mirror:
-            print(f"\033[33m[WARN] {line}\033[0m", file=sys.stderr)
+            print(f"\033[33m[WARN] {formatted}\033[0m", file=sys.stderr)
 
-    def error(self, category: str, message: str, exc_info: bool = False):
-        line = f"[{category.upper()}] {message}"
+    def error(self, category_or_msg: str, message: Optional[str] = None, exc_info: bool = False):
+        cat = "SYSTEM" if message is None else category_or_msg
+        msg = category_or_msg if message is None else message
+        formatted = self._format_msg(cat, msg)
         if self._enabled:
-            self._logger.error(line, exc_info=exc_info)
+            self._logger.error(formatted, exc_info=exc_info)
         if self._console_mirror:
-            print(f"\033[31m[ERROR] {line}\033[0m", file=sys.stderr)
+            print(f"\033[31m[ERROR] {formatted}\033[0m", file=sys.stderr)
+
+    def log_request(
+        self,
+        method: str,
+        url: str,
+        params: Optional[Dict[str, Any]] = None,
+        data: Optional[Any] = None,
+        headers: Optional[Dict[str, Any]] = None,
+        status_code: Optional[int] = None,
+        duration: Optional[float] = None,
+        error: Optional[Exception] = None
+    ):
+        if not self._enabled:
+            return
+        dur_str = f" in {duration:.3f}s" if duration is not None else ""
+        if error:
+            self.error("API", f"{method} {url}{dur_str} -> FAILED: {error}")
+        else:
+            status_str = f" -> HTTP {status_code}" if status_code is not None else ""
+            self.debug("API", f"{method} {url}{dur_str}{status_str}")
+            if params:
+                self.debug("API", f"  Params: {params}")
+
+    def log_crypto(self, action: str, details: str = ""):
+        if not self._enabled:
+            return
+        self.debug("CRYPTO", f"{action} | {details}" if details else action)
+
+    def log_player(
+        self,
+        player_name: str,
+        cmd_args: List[str],
+        exit_code: Optional[int] = None,
+        stderr_output: Optional[str] = None,
+        duration: Optional[float] = None
+    ):
+        if not self._enabled:
+            return
+        dur_str = f" duration: {duration:.1f}s," if duration is not None else ""
+        if exit_code is not None:
+            level = "PLAYER" if exit_code == 0 else "PLAYER_ERR"
+            msg = f"{player_name} exited with code {exit_code} ({dur_str} args: {cmd_args})"
+            if exit_code == 0:
+                self.debug(level, msg)
+            else:
+                self.warning(level, msg)
+                if stderr_output:
+                    self.warning(level, f"  stderr: {stderr_output.strip()[:400]}")
+        else:
+            self.debug("PLAYER", f"Spawning {player_name} with command: {' '.join(cmd_args)}")
+
+    def log_downloader(self, mode: str, url: str, filename: str, success: bool, error: Optional[str] = None):
+        if not self._enabled:
+            return
+        if success:
+            self.info("DOWNLOAD", f"[{mode}] Successfully downloaded '{filename}' from {url[:60]}...")
+        else:
+            self.error("DOWNLOAD", f"[{mode}] Download failed for '{filename}' from {url[:60]}... Reason: {error or 'Unknown'}")
+
+    def log_exception(self, exc: Exception, context: str = ""):
+        if not self._enabled:
+            return
+        ctx_str = f" in {context}" if context else ""
+        tb = "".join(traceback.format_exception(type(exc), exc, exc.__traceback__))
+        self.error("CRASH", f"Unhandled Exception{ctx_str}: {exc}\n{tb}")
 
 
 logger = DebugLogger()
