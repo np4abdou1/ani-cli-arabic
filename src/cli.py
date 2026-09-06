@@ -2,6 +2,7 @@
 ani-cli-arabic CLI Launcher
 Fast, native, organic terminal interface with pure fzf and full-screen parity.
 Zero details preview split, zero RTL Arabic season glitches.
+Interactive action menu on selection: Play, Change Quality, Download, Batch Download.
 """
 
 import os
@@ -69,12 +70,12 @@ class AniCliWrapper:
         self.autoplay = bool(self.settings_manager.get("auto_next", False))
 
     def get_theme_color(self, key: str = "ascii") -> str:
-        t_name = self.settings_manager.get("theme") or "blue"
+        t_name = self.settings_manager.get("theme", "blue") or "blue"
         theme = THEMES.get(t_name, THEMES.get("auto", THEMES["blue"]))
         return theme.get(key, "#7eb3d4")
 
     def _get_rpc_status_text(self) -> Text:
-        if not self.settings_manager.get('discord_rpc'):
+        if not self.settings_manager.get('discord_rpc', False):
             return Text("")
         if getattr(self.rpc, 'connected', False):
             return Text("RPC: Connected", style="green")
@@ -84,21 +85,17 @@ class AniCliWrapper:
         self,
         items: List[str],
         prompt_text: str,
-        multi: bool = False,
-        expect_keys: Optional[List[str]] = None
-    ) -> Tuple[List[str], str]:
+        multi: bool = False
+    ) -> List[str]:
         """
-        Native fzf launcher: pure, fast, organic list selection with keybinds.
-        No preview pane, no terminal split.
+        Native fzf launcher: pure, fast, organic list selection.
+        No preview pane, no terminal split, no key collisions.
         """
         if not items:
-            return [], ""
+            return []
 
         if not self.fzf_available:
             return self._fallback_launcher(items, prompt_text, multi=multi)
-
-        expects = expect_keys or ['ctrl-d', 'ctrl-f', 'ctrl-m', 'ctrl-g']
-        expect_arg = f"--expect={','.join(expects)}"
 
         args = [
             'fzf',
@@ -107,7 +104,6 @@ class AniCliWrapper:
             '--cycle',
             '--height=85%',
             '--prompt', f"{prompt_text} > ",
-            expect_arg,
             '--bind', 'esc:abort,left:abort'
         ]
 
@@ -125,24 +121,10 @@ class AniCliWrapper:
                 check=False
             )
             if result.returncode != 0:
-                return [], ""
+                return []
 
-            lines = result.stdout.splitlines()
-            if not lines:
-                return [], ""
-
-            first_line = lines[0].strip().lower()
-            if first_line in [k.lower() for k in expects]:
-                key_pressed = first_line
-                selected_lines = [l for l in lines[1:] if l]
-            elif first_line == "":
-                key_pressed = "enter"
-                selected_lines = [l for l in lines[1:] if l]
-            else:
-                key_pressed = "enter"
-                selected_lines = [l for l in lines if l]
-
-            return selected_lines, key_pressed
+            lines = [l.strip() for l in result.stdout.splitlines() if l.strip()]
+            return lines
         except Exception:
             return self._fallback_launcher(items, prompt_text, multi=multi)
 
@@ -151,7 +133,7 @@ class AniCliWrapper:
         items: List[str],
         prompt_text: str,
         multi: bool = False
-    ) -> Tuple[List[str], str]:
+    ) -> List[str]:
         """Native inline numbered menu when fzf is unavailable."""
         self.console.print(f"\n[bold cyan]─ {prompt_text} ─[/bold cyan]")
         ansi_escape = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
@@ -159,35 +141,17 @@ class AniCliWrapper:
             clean_item = ansi_escape.sub('', item)
             self.console.print(f"  [cyan]{i:>2}.[/cyan] {clean_item}")
 
-        self.console.print("[dim]Actions: <num> select | 'd <num>' download | 'f <num>' favorite | 'm' batch | 'b' back[/dim]")
         try:
-            self.console.print("╰─> ", end="")
+            self.console.print("\n[dim]Enter selection number (or 'b' to back):[/dim] ╰─> ", end="")
             choice = input().strip()
         except (KeyboardInterrupt, EOFError):
-            return [], "esc"
+            return []
 
         if not choice or choice.lower() in ['b', 'back', 'q', 'quit']:
-            return [], "esc"
-
-        parts = choice.split()
-        if parts[0].lower() in ['d', 'dl', 'download'] and len(parts) > 1 and parts[1].isdigit():
-            idx = int(parts[1]) - 1
-            if 0 <= idx < len(items):
-                return [items[idx]], "ctrl-d"
-
-        if parts[0].lower() in ['f', 'fav', 'favorite'] and len(parts) > 1 and parts[1].isdigit():
-            idx = int(parts[1]) - 1
-            if 0 <= idx < len(items):
-                return [items[idx]], "ctrl-f"
-
-        if parts[0].lower() == 'm':
-            return [], "ctrl-m"
-
-        if parts[0].lower() == 'g':
-            return [], "ctrl-g"
+            return []
 
         selected = []
-        for p in parts:
+        for p in choice.split():
             if '-' in p:
                 try:
                     s, e = map(int, p.split('-'))
@@ -200,7 +164,7 @@ class AniCliWrapper:
                 idx = int(p) - 1
                 if 0 <= idx < len(items):
                     selected.append(items[idx])
-        return selected, "enter"
+        return selected
 
     def get_quality_preference(self, server_data: Any) -> List[QualityOption]:
         if isinstance(server_data, dict):
@@ -242,7 +206,7 @@ class AniCliWrapper:
                     break
 
         if not selected_q:
-            default_q = self.settings_manager.get('default_quality') or '1080p'
+            default_q = self.settings_manager.get('default_quality', '1080p') or '1080p'
             for q in available:
                 if default_q in getattr(q, 'name', ''):
                     selected_q = q
@@ -325,8 +289,8 @@ class AniCliWrapper:
 
         q_tag = getattr(selected_q, 'name', 'HD')
         filename = f"{anime.title_en} - Ep {ep.display_num} [{q_tag}].mp4"
-        mode = self.settings_manager.get('download_mode') or 'internal'
-        d_dir = self.settings_manager.get('download_directory') or 'downloads'
+        mode = self.settings_manager.get('download_mode', 'internal') or 'internal'
+        d_dir = self.settings_manager.get('download_directory', 'downloads') or 'downloads'
 
         return download_file(direct_url, filename, self.console, mode=mode, download_dir=d_dir)
 
@@ -418,8 +382,8 @@ class AniCliWrapper:
             anime_map[clean_line] = res
 
         while True:
-            selected_lines, key = self._launcher(display_lines, title)
-            if not selected_lines or key in ('esc', 'q'):
+            selected_lines = self._launcher(display_lines, title)
+            if not selected_lines:
                 break
 
             sel_text = selected_lines[0]
@@ -430,16 +394,6 @@ class AniCliWrapper:
                 selected_anime = anime_map.get(clean)
 
             if not selected_anime:
-                continue
-
-            if key == 'ctrl-f':
-                if self.favorites.is_favorite(selected_anime.id):
-                    self.favorites.remove(selected_anime.id)
-                    self.console.print(f"[dim]Removed from favorites: {selected_anime.title_en}[/dim]")
-                else:
-                    self.favorites.add(selected_anime.id, selected_anime.title_en, getattr(selected_anime, 'thumbnail', ''))
-                    self.console.print(f"[magenta]♥ Added to favorites: {selected_anime.title_en}[/magenta]")
-                time.sleep(0.5)
                 continue
 
             self._select_episodes(selected_anime)
@@ -479,35 +433,10 @@ class AniCliWrapper:
                 ep_map[clean_line] = ep
 
             prompt = f"{anime.title_en} (1-{len(episodes)})"
-            selected_lines, key = self._launcher(ep_lines, prompt, multi=True)
+            selected_lines = self._launcher(ep_lines, prompt, multi=True)
 
-            if not selected_lines or key in ('esc', 'q'):
+            if not selected_lines:
                 break
-
-            if key == 'ctrl-g':
-                try:
-                    target_str = self.console.input("\n[bold cyan]Jump to Episode #[/bold cyan]: ").strip()
-                    target_num = int(target_str)
-                    target_ep = next((e for e in episodes if e.display_num == target_num or str(e.number) == target_str), None)
-                    if target_ep:
-                        self.play_video(anime, target_ep)
-                except (ValueError, KeyboardInterrupt, EOFError):
-                    pass
-                continue
-
-            if key == 'ctrl-m':
-                self.batch_download(anime, episodes)
-                continue
-
-            if key == 'ctrl-f':
-                if self.favorites.is_favorite(anime.id):
-                    self.favorites.remove(anime.id)
-                    self.console.print(f"[dim]Removed from favorites: {anime.title_en}[/dim]")
-                else:
-                    self.favorites.add(anime.id, anime.title_en, getattr(anime, 'thumbnail', ''))
-                    self.console.print(f"[magenta]♥ Added to favorites: {anime.title_en}[/magenta]")
-                time.sleep(0.5)
-                continue
 
             queue = []
             ansi_escape = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
@@ -519,13 +448,69 @@ class AniCliWrapper:
             if not queue:
                 continue
 
-            if key == 'ctrl-d':
+            # Interactive action menu for selected episode(s)
+            ep_label = f"Episode {queue[0].display_num}" if len(queue) == 1 else f"{len(queue)} Episodes"
+            action_opts = [
+                "▶ Play",
+                "⚙ Change Quality",
+                "📥 Download",
+                "📦 Batch Download",
+                "♥ Favorite Toggle",
+                "← Back"
+            ]
+
+            action_sel = self._launcher(action_opts, f"{anime.title_en} • {ep_label}")
+            if not action_sel:
+                continue
+
+            act = action_sel[0]
+
+            if "Back" in act:
+                continue
+
+            if "Favorite" in act:
+                if self.favorites.is_favorite(anime.id):
+                    self.favorites.remove(anime.id)
+                    self.console.print(f"[dim]Removed from favorites: {anime.title_en}[/dim]")
+                else:
+                    self.favorites.add(anime.id, anime.title_en, getattr(anime, 'thumbnail', ''))
+                    self.console.print(f"[magenta]♥ Added to favorites: {anime.title_en}[/magenta]")
+                time.sleep(0.5)
+                continue
+
+            if "Batch" in act:
+                self.batch_download(anime, episodes)
+                continue
+
+            if "Download" in act:
                 for q_ep in queue:
                     self.download_video(anime, q_ep)
                 continue
 
-            played_idx = 0
             current_quality = None
+            if "Quality" in act:
+                # Fetch available qualities to let user pick
+                with self.console.status(f"[bold blue]Resolving stream qualities...[/bold blue]"):
+                    s_data = self.api.get_streaming_servers(anime.id, queue[0].number, getattr(anime, 'type', 'SERIES'))
+                avail_q = self.get_quality_preference(s_data) if s_data else []
+                if avail_q:
+                    q_choices = [getattr(q, 'name', 'HD') for q in avail_q]
+                    q_sel = self._launcher(q_choices, "Select Stream Quality")
+                    if q_sel:
+                        current_quality = q_sel[0]
+                        sub_act = self._launcher(["▶ Play with " + current_quality, "📥 Download with " + current_quality, "← Back"], "Action")
+                        if sub_act and "Download" in sub_act[0]:
+                            for q_ep in queue:
+                                self.download_video(anime, q_ep, quality_override=current_quality)
+                            continue
+                        elif not sub_act or "Back" in sub_act[0]:
+                            continue
+                else:
+                    self.console.print("[yellow]Could not pre-fetch quality options. Playing with default...[/yellow]")
+                    time.sleep(0.8)
+
+            # Playback Loop
+            played_idx = 0
 
             while played_idx < len(queue):
                 ep = queue[played_idx]
@@ -545,12 +530,12 @@ class AniCliWrapper:
                             played_idx = 0
                             continue
 
-                # After playback finishes, offer quick next action
-                action_opts = ["Next Episode", "Replay", "Previous Episode", "Select Episode", "Back"]
-                act_lines, _ = self._launcher(action_opts, f"Episode {ep.number} Finished")
+                # Interactive post-playback menu
+                action_opts = ["▶ Next Episode", "🔁 Replay", "◀ Previous Episode", "📋 Select Episode", "← Back"]
+                act_lines = self._launcher(action_opts, f"Episode {ep.number} Finished")
                 if act_lines:
-                    act = act_lines[0]
-                    if act == "Next Episode":
+                    act_post = act_lines[0]
+                    if "Next" in act_post:
                         next_ep_num = self._get_next_ep_num(episodes, ep)
                         if next_ep_num:
                             next_ep = next((e for e in episodes if e.number == next_ep_num), None)
@@ -558,11 +543,11 @@ class AniCliWrapper:
                                 queue = [next_ep]
                                 played_idx = 0
                                 continue
-                    elif act == "Replay":
+                    elif "Replay" in act_post:
                         queue = [ep]
                         played_idx = 0
                         continue
-                    elif act == "Previous Episode":
+                    elif "Previous" in act_post:
                         prev_ep_num = self._get_prev_ep_num(episodes, ep)
                         if prev_ep_num:
                             prev_ep = next((e for e in episodes if e.number == prev_ep_num), None)
@@ -570,7 +555,7 @@ class AniCliWrapper:
                                 queue = [prev_ep]
                                 played_idx = 0
                                 continue
-                    elif act == "Select Episode":
+                    elif "Select" in act_post:
                         break
                 break
 
@@ -617,7 +602,7 @@ class AniCliWrapper:
             clean_line = ansi_escape.sub('', line)
             map_h[clean_line] = h
 
-        sel, key = self._launcher(lines, "Watch History")
+        sel = self._launcher(lines, "Watch History")
         if sel:
             chosen = map_h.get(sel[0]) or map_h.get(re.sub(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])', '', sel[0]))
             if chosen:
@@ -661,7 +646,7 @@ class AniCliWrapper:
             clean_line = ansi_escape.sub('', line)
             map_f[clean_line] = f
 
-        sel, key = self._launcher(lines, "Favorites")
+        sel = self._launcher(lines, "Favorites")
         if sel:
             chosen = map_f.get(sel[0]) or map_f.get(re.sub(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])', '', sel[0]))
             if chosen:
@@ -689,7 +674,7 @@ class AniCliWrapper:
     def _switch_provider(self):
         provs = ProviderManager.get_available_providers()
         p_lines = [f"\033[1m{p['id']}\033[0m: {p['name']} ({p['description']})" for p in provs]
-        sel, _ = self._launcher(p_lines, "Select Provider")
+        sel = self._launcher(p_lines, "Select Provider")
         if sel:
             p_id = sel[0].split(":")[0].strip()
             ansi_escape = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
@@ -846,7 +831,7 @@ class AniCliWrapper:
 
             if cmd == 'g':
                 genres = POPULAR_GENRES
-                sel_g, _ = self._launcher(genres, "Select Genre")
+                sel_g = self._launcher(genres, "Select Genre")
                 if sel_g:
                     g_slug = sel_g[0].lower().replace(" ", "-")
                     with self.console.status(f"[bold blue]Fetching {sel_g[0]} anime...[/bold blue]"):
@@ -858,7 +843,7 @@ class AniCliWrapper:
             if cmd == 's':
                 from src.config import POPULAR_STUDIOS_MAP
                 studios = list(POPULAR_STUDIOS_MAP.keys())
-                sel_s, _ = self._launcher(studios, "Select Studio")
+                sel_s = self._launcher(studios, "Select Studio")
                 if sel_s:
                     s_name = sel_s[0]
                     with self.console.status(f"[bold blue]Fetching anime from {s_name}...[/bold blue]"):
@@ -902,4 +887,3 @@ def run_simple_cli(query: Optional[str] = None, deps: Optional[Dict[str, Any]] =
 
     wrapper = AniCliWrapper(api, player, history, settings, rpc)
     return wrapper.run(query)
-
