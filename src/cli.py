@@ -184,18 +184,20 @@ class AniCliWrapper:
 
     def play_video(self, anime: Any, ep: Any, quality_override: Optional[str] = None) -> bool:
         server_data = None
+        prov_name = getattr(self.api, 'name', 'current provider')
         with self.console.status(f"[bold blue]Fetching servers for Episode {ep.number}...[/bold blue]"):
             server_data = self.api.get_streaming_servers(anime.id, ep.number, getattr(anime, 'type', 'SERIES'))
 
         if not server_data:
-            self.console.print("[bold red]No streaming servers found.[/bold red]")
-            time.sleep(1.0)
+            self.console.print(f"\n[bold red]✖ No streaming servers found for this episode on {prov_name}.[/bold red]")
+            self.console.print("[dim]Tip: You can switch provider from the main menu by pressing 'p'.[/dim]\n")
+            time.sleep(1.8)
             return False
 
         available = self.get_quality_preference(server_data)
         if not available:
-            self.console.print("[bold red]No streamable qualities available.[/bold red]")
-            time.sleep(1.0)
+            self.console.print(f"\n[bold red]✖ No streamable qualities available on {prov_name}.[/bold red]")
+            time.sleep(1.8)
             return False
 
         selected_q = None
@@ -220,8 +222,8 @@ class AniCliWrapper:
             direct_url = current_ep_data.get(selected_q.server_key)
 
         if not direct_url or not direct_url.startswith("http"):
-            self.console.print("[bold red]Failed to resolve direct video link.[/bold red]")
-            time.sleep(1.0)
+            self.console.print("\n[bold red]✖ Failed to resolve direct video link.[/bold red]")
+            time.sleep(1.8)
             return False
 
         start_time = 0.0
@@ -263,12 +265,16 @@ class AniCliWrapper:
             server_data = self.api.get_streaming_servers(anime.id, ep.number, getattr(anime, 'type', 'SERIES'))
 
         if not server_data:
-            self.console.print("[red]No download links found.[/red]")
+            prov_name = getattr(self.api, 'name', 'current provider')
+            self.console.print(f"\n[bold red]✖ No download links found for this episode on {prov_name}.[/bold red]")
+            self.console.print("[dim]Tip: You can switch provider from the main menu by pressing 'p'.[/dim]\n")
+            time.sleep(1.8)
             return False
 
         available = self.get_quality_preference(server_data)
         if not available:
-            self.console.print("[red]No suitable download quality found.[/red]")
+            self.console.print(f"\n[bold red]✖ No suitable download quality found on {prov_name}.[/bold red]")
+            time.sleep(1.8)
             return False
 
         selected_q = available[0]
@@ -545,8 +551,11 @@ class AniCliWrapper:
 
             while played_idx < len(queue):
                 ep = queue[played_idx]
-                self.play_video(anime, ep, current_quality)
+                played_ok = self.play_video(anime, ep, current_quality)
                 played_idx += 1
+
+                if not played_ok:
+                    break
 
                 if played_idx < len(queue):
                     continue
