@@ -488,7 +488,7 @@ class AnimeAPI:
 
         s = self._get_session()
         try:
-            r = s.get(ep_url, headers=DEFAULT_HEADERS)
+            r = s.get(ep_url, headers=DEFAULT_HEADERS, timeout=6)
             if r.status_code != 200:
                 return None
 
@@ -515,10 +515,10 @@ class AnimeAPI:
                 return None
 
             player_headers = {
-                "Referer": player_url.split("?")[0],
+                "Referer": "https://anime3rb.com/",
                 **DEFAULT_HEADERS
             }
-            r_player = s.get(player_url, headers=player_headers)
+            r_player = s.get(player_url, headers=player_headers, timeout=6)
             if r_player.status_code != 200:
                 return None
 
@@ -552,7 +552,7 @@ class AnimeAPI:
 
                 direct_url = raw_src
                 try:
-                    r_redirect = s.get(raw_src, headers=DEFAULT_HEADERS, allow_redirects=False)
+                    r_redirect = s.get(raw_src, headers=DEFAULT_HEADERS, allow_redirects=False, timeout=5)
                     if r_redirect.status_code in [301, 302, 307, 308]:
                         direct_url = r_redirect.headers.get("Location") or r_redirect.headers.get("location") or raw_src
                 except Exception:
