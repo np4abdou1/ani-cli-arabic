@@ -532,6 +532,23 @@ class AnimeAPI:
                         pass
 
             if not sources:
+                tor_proxy = os.environ.get("TOR_PROXY") or "socks5://127.0.0.1:9050"
+                try:
+                    s_tor = requests.Session(impersonate=DEFAULT_IMPERSONATE)
+                    s_tor.proxies = {"https": tor_proxy, "http": tor_proxy}
+                    r_tor = s_tor.get(player_url, headers=player_headers, timeout=6)
+                    for vs in re.findall(r'var video_sources = (\[.*?\]);', r_tor.text, re.DOTALL):
+                        if 'src' in vs and 'http' in vs:
+                            try:
+                                sources = json.loads(vs.replace('\\/', '/'))
+                                s = s_tor
+                                break
+                            except Exception:
+                                pass
+                except Exception:
+                    pass
+
+            if not sources:
                 return None
 
             # Resolve 302 redirects for direct MP4 CDN links
