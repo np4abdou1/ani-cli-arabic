@@ -7,7 +7,7 @@ from typing import Dict, List, Type, Optional
 from .base import BaseAnimeProvider
 from .anime3rb import Anime3rbProvider
 from .anime_slayer import AnimeSlayerProvider
-from .anidb import AniDBProvider
+from .hianime import HiAnimeProvider
 from .animeify import AnimeifyProvider
 
 
@@ -19,8 +19,9 @@ class ProviderManager:
         "anime_slayer": AnimeSlayerProvider,
         "animeify": AnimeifyProvider,
         "animefy": AnimeifyProvider,
-        "anidb": AniDBProvider,
-        "ani-cli": AniDBProvider,
+        "anidb": HiAnimeProvider,
+        "ani-cli": HiAnimeProvider,
+        "hianime": HiAnimeProvider,
     }
 
     _INSTANCES: Dict[str, BaseAnimeProvider] = {}
