@@ -104,7 +104,7 @@ class AniCliWrapper:
             '--cycle',
             '--height=85%',
             '--prompt', f"{prompt_text} > ",
-            '--bind', 'esc:abort,left:abort,left-click:accept,double-click:accept,enter:accept'
+            '--bind', 'esc:abort,left:abort,double-click:accept,enter:accept'
         ]
 
         if multi:

@@ -97,7 +97,6 @@ class AniCliArApp:
                 rpc_connected['status'] = self.rpc.connect()
             threading.Thread(target=connect_rpc, daemon=True).start()
         
-        threading.Thread(target=lambda: monitor.track_app_start(), daemon=True).start()
         
         def check_updates_bg():
             try:
@@ -138,14 +137,14 @@ class AniCliArApp:
             pass
 
         # Show active remote broadcast popup modal if enabled
-        try:
-            from .broadcast import BroadcastManager
-            from .broadcast_popup import render_broadcast_popup
-            active_popup = BroadcastManager.get_active_popup()
-            if active_popup:
-                render_broadcast_popup(self.ui.console, active_popup)
-        except Exception:
-            pass
+        # try:
+        #     from .broadcast import BroadcastManager
+        #     from .broadcast_popup import render_broadcast_popup
+        #     active_popup = BroadcastManager.get_active_popup()
+        #     if active_popup:
+        #         render_broadcast_popup(self.ui.console, active_popup)
+        # except Exception:
+        #     pass
 
         try:
             self.unified_loop(initial_query)
@@ -1069,7 +1068,7 @@ class AniCliArApp:
                 
                 self.rpc.update_watching(selected_anime.title_en, str(selected_ep.display_num), selected_anime.thumbnail)
                 provider_name = getattr(self.provider, 'name', getattr(self.provider, 'id', 'Anime3rb'))
-                monitor.track_video_play(selected_anime.title_en, str(selected_ep.display_num), provider=provider_name)
+                # monitor.track_video_play(selected_anime.title_en, str(selected_ep.display_num), provider=provider_name)
                 
                 playback_info = self.player.play(
                     direct_url, 

@@ -1894,7 +1894,6 @@ class UIManager:
             ("System", [
                 ("Discord Rich Presence", [True, False], "discord_rpc"),
                 ("Debug Logging", [False, True], "debug_logging"),
-                ("Anonymous Telemetry", [False, True], "analytics"),
             ])
         ]
         
