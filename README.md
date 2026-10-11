@@ -1,4 +1,4 @@
-<h1 align="center">                          NEW MAJOR UPDATE COMING IN LATE SUMMER </h1> 
+<h1 align="center">                          NEW MAJOR UPDATE COMING IN "probably this month" </h1> 
 
 <div align="center">
 
