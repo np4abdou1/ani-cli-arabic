@@ -16,10 +16,9 @@ from urllib.parse import urljoin, urlparse
 from curl_cffi import requests
 from bs4 import BeautifulSoup
 from functools import wraps
-import concurrent.futures
 
 from .models import AnimeResult, Episode, QualityOption
-from .config import GENRE_NAME_TO_SLUG, POPULAR_GENRES, POPULAR_STUDIOS_MAP
+from .config import GENRE_NAME_TO_SLUG, POPULAR_STUDIOS_MAP
 from .logger import logger
 
 BASE_URL = "https://anime3rb.com"
@@ -91,8 +90,8 @@ DEFAULT_HEADERS = {
 }
 
 
-def retry_with_backoff(retries=3, backoff_factor=1.5):
-    """Decorator to retry network calls on failure."""
+def retry_with_backoff(retries=3, initial_delay=0.4, backoff_factor=1.5):
+    """Decorator to retry network calls on failure with progressive backoff."""
     def decorator(func):
         @wraps(func)
         def wrapper(*args, **kwargs):
@@ -106,7 +105,8 @@ def retry_with_backoff(retries=3, backoff_factor=1.5):
                     pass
                 attempt += 1
                 if attempt < retries:
-                    time.sleep(backoff_factor ** attempt)
+                    delay = initial_delay * (backoff_factor ** (attempt - 1))
+                    time.sleep(delay)
             return None
         return wrapper
     return decorator

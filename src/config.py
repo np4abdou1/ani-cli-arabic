@@ -1,9 +1,8 @@
-import os
 import re
 import json
 import subprocess
 from pathlib import Path
-from typing import Tuple, Dict, Any, Optional, List
+from typing import Tuple, Dict, Any, List
 
 from .version import APP_VERSION
 

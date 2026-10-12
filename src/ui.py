@@ -2,12 +2,11 @@ import time
 import threading
 import importlib
 import os
-import sys
 import re
 import json
 import urllib.request
 from pathlib import Path
-from typing import Optional, Tuple, Dict, Any
+from typing import Optional, Tuple
 import requests
 from io import BytesIO
 from functools import lru_cache
@@ -19,11 +18,9 @@ from rich.text import Text
 from rich.live import Live
 from rich.align import Align
 from rich.prompt import Prompt
-from rich.layout import Layout
 from rich.table import Table
 from rich.theme import Theme
 from rich.box import HEAVY, ROUNDED
-from rich.spinner import Spinner
 from rich.cells import cell_len
 
 from .version import APP_VERSION
@@ -35,10 +32,11 @@ from .config import (
 )
 from .utils import (
     get_key, RawTerminal, restore_terminal_for_input, enter_raw_mode_after_input,
-    ar, ar_wrap, MouseTerminal, get_home_input_event,
-    clean_genre, clean_type, clean_status, hide_cursor, show_cursor
+    ar, MouseTerminal, get_home_input_event,
+    clean_type, hide_cursor
 )
 from .logger import logger
+from .history import format_seconds
 from . import config as config_module
 
 _STARS_CACHE_FILE = Path.home() / ".ani-cli-arabic" / "database" / "stars_cache.json"
@@ -134,21 +132,8 @@ def _trigger_background_fetch(timeout: float = 3.0):
     t = threading.Thread(target=_worker, daemon=True)
     t.start()
 
-# If no cached stars exist or cache is older than 5 minutes, initiate background refresh immediately
-if _initial_stars is None:
-    _quick_cnt = _fetch_stars_from_network(timeout=0.6)
-    if _quick_cnt is not None:
-        _stars_cache["count"] = _quick_cnt
-        _stars_cache["last_fetch"] = time.time()
-        try:
-            _STARS_CACHE_FILE.parent.mkdir(parents=True, exist_ok=True)
-            with open(_STARS_CACHE_FILE, "w", encoding="utf-8") as f:
-                json.dump({"count": _quick_cnt, "last_fetch": time.time()}, f)
-        except Exception:
-            pass
-    else:
-        _trigger_background_fetch(timeout=4.0)
-elif time.time() - _initial_fetch_time > 300:
+# If no cached stars exist or cache is older than 5 minutes, initiate background refresh asynchronously
+if _initial_stars is None or time.time() - _initial_fetch_time > 300:
     _trigger_background_fetch(timeout=4.0)
 
 def get_github_stars(refresh_if_stale: bool = True) -> str:
@@ -280,7 +265,6 @@ class UIManager:
     def render_timed_message(self, title: str, message: str, style_name: str = "info", duration: float = 1.4):
         self.clear()
 
-        c_title = getattr(config_module, 'COLOR_TITLE', COLOR_TITLE)
         c_border = getattr(config_module, 'COLOR_BORDER', COLOR_BORDER)
         c_error = getattr(config_module, 'COLOR_ERROR', COLOR_ERROR)
         
@@ -1014,8 +998,9 @@ class UIManager:
                     if needs_update:
                         live.update(generate_renderable(), refresh=True)
 
+    @staticmethod
     @lru_cache(maxsize=50)
-    def _generate_poster_ansi(self, url, max_height):
+    def _generate_poster_ansi(url, max_height):
         """Generate ANSI art from poster URL with automatic LRU caching."""
         if not url:
             return Text("No poster available", style="secondary")
@@ -1967,9 +1952,14 @@ class UIManager:
                         return None
 
     def settings_menu(self, settings_mgr):
+        from .providers.manager import ProviderManager
+        prov_list = ProviderManager.list_providers()
+        provider_choices = [p["id"] for p in prov_list]
+        provider_names = {p["id"]: p["name"] for p in prov_list}
+
         tabs = [
             ("General", [
-                ("Provider", ["anime3rb", "anime_slayer", "animeify", "anidb"], "anime_provider"),
+                ("Provider", provider_choices, "anime_provider"),
                 ("Default Player", ["mpv", "vlc"], "player"),
                 ("Color Theme", ["auto", "blue", "purple", "cyan", "rose", "sunset", "gold", "mint", "lavender", "pink", "coral", "teal", "magenta", "red", "green"], "theme"),
                 ("Show Donation Link", [True, False], "show_donation"),
@@ -1981,7 +1971,8 @@ class UIManager:
             ]),
             ("Downloads", [
                 ("Download Quality", ["1080p", "720p", "480p"], "default_download_quality"),
-                ("Download Engine", ["internal", "aria2c", "idm", "auto"], "download_mode"),
+                ("Parallel Threads", [1, 2, 3, 4, 5], "download_parallel"),
+                ("Speed Limit", ["unlimited", "5M", "2M", "1M", "500K"], "download_speed_limit"),
                 ("Download Directory", [], "download_directory"),
             ]),
             ("System", [
@@ -2007,15 +1998,7 @@ class UIManager:
         last_notification_time = 0
 
         def format_provider_name(pid):
-            if pid == "anime3rb":
-                return "Anime3rb"
-            elif pid == "anime_slayer":
-                return "Anime Slayer"
-            elif pid in ["animeify", "animefy"]:
-                return "Animeify"
-            elif pid in ["anidb", "ani-cli"]:
-                return "AniDB (English)"
-            return str(pid).title()
+            return provider_names.get(pid, str(pid).replace("_", " ").title())
 
         def generate_renderable():
             tab_name, options = tabs[cur_tab]

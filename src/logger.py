@@ -7,7 +7,6 @@ diagnostic crash telemetry to the operational dashboard.
 import os
 import sys
 import json
-import time
 import logging
 import platform
 import traceback
@@ -58,7 +57,8 @@ def get_system_summary() -> str:
                 with open("/etc/os-release", "r", encoding="utf-8", errors="ignore") as f:
                     for line in f:
                         if line.startswith("NAME="):
-                            return f"Linux ({line.split('=', 1)[1].strip('\"\'')})"
+                            distro_name = line.split("=", 1)[1].strip('"\'')
+                            return f"Linux ({distro_name})"
             except Exception:
                 pass
         return "Linux"
@@ -307,10 +307,10 @@ def record_crash(exc_type, exc_value, exc_traceback, context: str = "unhandled")
     send_crash_telemetry(telemetry_payload)
 
     # Terminal alert
-    print(f"\n\033[1;31m[!] ani-cli-arabic encountered an unexpected error:\033[0m")
+    print("\n\033[1;31m[!] ani-cli-arabic encountered an unexpected error:\033[0m")
     print(f"    \033[31m{crash_data['error_type']}: {crash_data['error_message']}\033[0m")
     print(f"\033[90m    Crash dump saved to: {dump_file}\033[0m")
-    print(f"\033[90m    Crash report automatically submitted to diagnostics center.\033[0m\n")
+    print("\033[90m    Crash report automatically submitted to diagnostics center.\033[0m\n")
 
 
 def install_global_exception_handler():

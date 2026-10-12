@@ -3,7 +3,6 @@ Changelog management and interactive scrollable UI for ani-cli-arabic.
 Detects first-run and post-update states to automatically showcase new features.
 """
 
-import os
 import re
 import json
 import time
@@ -21,8 +20,7 @@ from rich.box import HEAVY
 
 from .version import __version__, APP_VERSION
 from .config import (
-    COLOR_BORDER, COLOR_TITLE, COLOR_SUBTITLE,
-    COLOR_HIGHLIGHT_FG, COLOR_HIGHLIGHT_BG
+    COLOR_BORDER, COLOR_TITLE
 )
 from .utils import get_key, RawTerminal
 

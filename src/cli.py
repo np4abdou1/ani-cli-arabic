@@ -5,25 +5,23 @@ Zero details preview split, zero RTL Arabic season glitches.
 Interactive action menu on selection: Play, Change Quality, Download, Batch Download.
 """
 
-import os
 import sys
 import subprocess
 import shutil
 import time
 import re
-from pathlib import Path
-from typing import Optional, List, Dict, Any, Tuple
+from typing import Optional, List, Dict, Any
 
 from rich.console import Console
 from rich.text import Text
 
 from src.version import APP_VERSION
-from src.config import DEFAULT_HEADER_ART, GOODBYE_ART, THEMES, POPULAR_GENRES
-from src.models import QualityOption, Episode, AnimeResult
+from src.config import DEFAULT_HEADER_ART, THEMES, POPULAR_GENRES
+from src.models import QualityOption, AnimeResult
 from src.providers import ProviderManager
 from src.utils import download_file
-from src.history import HistoryManager, format_seconds
 from src.favorites import FavoritesManager
+from src.downloader import prompt_download_options, execute_batch_download, parse_batch_ranges
 
 
 def clean_season(season_str: Optional[str]) -> str:
@@ -311,31 +309,31 @@ class AniCliWrapper:
         if not prompt:
             return
 
-        target_eps = []
-        if prompt == 'all':
+        if prompt in ('all', '*'):
             target_eps = episodes
         else:
-            nums = set()
-            for part in prompt.split():
-                if '-' in part:
-                    try:
-                        s, e = map(int, part.split('-'))
-                        nums.update(range(s, e + 1))
-                    except ValueError:
-                        pass
-                elif part.isdigit():
-                    nums.add(int(part))
+            nums = set(parse_batch_ranges(prompt, max_eps=len(episodes)))
             target_eps = [e for e in episodes if e.display_num in nums]
 
         if not target_eps:
             self.console.print("[yellow]No matching episodes specified.[/yellow]")
             return
 
-        self.console.print(f"[green]Starting batch download of {len(target_eps)} episodes...[/green]")
-        for idx, ep in enumerate(target_eps, 1):
-            self.console.print(f"\n[cyan][{idx}/{len(target_eps)}] Downloading Episode {ep.display_num}...[/cyan]")
-            self.download_video(anime, ep)
-        self.console.print("\n[bold green]✓ Batch download process finished.[/bold green]")
+        # Prompt user for download directory, parallel workers, speed limits, and quality
+        default_dir = self.settings_manager.get('download_directory', 'downloads') or 'downloads'
+        default_q = self.settings_manager.get('default_download_quality', '1080p') or '1080p'
+        config = prompt_download_options(self.console, default_dir=default_dir, default_quality=default_q, batch_mode=True)
+        if not config:
+            return
+
+        execute_batch_download(
+            api=self.api,
+            anime=anime,
+            episodes=target_eps,
+            config=config,
+            console=self.console,
+            history_manager=self.history
+        )
 
     def _process_anime_list(self, results: List[Any], title: str = "Select Anime"):
         if not results:
@@ -527,7 +525,7 @@ class AniCliWrapper:
             current_quality = None
             if "Quality" in act:
                 # Fetch available qualities to let user pick
-                with self.console.status(f"[bold blue]Resolving stream qualities...[/bold blue]"):
+                with self.console.status("[bold blue]Resolving stream qualities...[/bold blue]"):
                     s_data = self.api.get_streaming_servers(anime.id, queue[0].number, getattr(anime, 'type', 'SERIES'))
                 avail_q = self.get_quality_preference(s_data) if s_data else []
                 if avail_q:
@@ -712,18 +710,146 @@ class AniCliWrapper:
                 self._select_episodes(mock_anime)
 
     def _switch_provider(self):
-        provs = ProviderManager.get_available_providers()
-        p_lines = [f"\033[1m{p['id']}\033[0m: {p['name']} ({p['description']})" for p in provs]
+        provs = ProviderManager.list_providers()
+        current_id = ProviderManager.get_active_provider_id()
+        p_lines = []
+        p_map = {}
+        ansi_escape = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
+        for p in provs:
+            active_badge = " \033[32m[Active]\033[0m" if p['id'] == current_id else ""
+            desc = f" ({p['description']})" if p.get('description') else ""
+            line = f"\033[1m{p['name']}\033[0m [{p['id']}]{active_badge}{desc}"
+            p_lines.append(line)
+            clean_line = ansi_escape.sub('', line)
+            p_map[line] = p['id']
+            p_map[clean_line] = p['id']
+            p_map[p['id']] = p['id']
+
         sel = self._launcher(p_lines, "Select Provider")
         if sel:
-            p_id = sel[0].split(":")[0].strip()
-            ansi_escape = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
-            p_id = ansi_escape.sub('', p_id)
-            ProviderManager.set_active_provider(p_id)
-            self.api = ProviderManager.get_provider(p_id)
-            self.settings_manager.set("anime_provider", p_id)
-            self.console.print(f"\n[green]Switched active provider to: {self.api.name}[/green]")
-            time.sleep(0.8)
+            clean = ansi_escape.sub('', sel[0]).strip()
+            p_id = p_map.get(sel[0]) or p_map.get(clean)
+            if not p_id:
+                m = re.search(r'\[([a-zA-Z0-9_-]+)\]', clean)
+                if m:
+                    p_id = m.group(1)
+            if p_id:
+                ProviderManager.set_active_provider(p_id)
+                self.api = ProviderManager.get_provider(p_id)
+                self.settings_manager.set("anime_provider", p_id)
+                self.console.print(f"\n[green]✔ Switched active provider to: {self.api.name}[/green]")
+                time.sleep(0.8)
+
+    def _show_settings_menu(self):
+        """Native fzf settings dialog for -i CLI mode."""
+        ansi_escape = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
+        while True:
+            cur_prov = getattr(self.api, 'name', self.settings_manager.get('anime_provider', 'anime3rb'))
+            cur_player = self.settings_manager.get('player', 'mpv')
+            cur_stream_q = self.settings_manager.get('default_quality', '1080p')
+            cur_dl_q = self.settings_manager.get('default_download_quality', '1080p')
+            cur_dl_dir = self.settings_manager.get('download_directory', 'downloads')
+            cur_auto = "ON" if self.settings_manager.get('auto_next', False) else "OFF"
+            cur_rpc = "ON" if self.settings_manager.get('discord_rpc', True) else "OFF"
+            cur_theme = self.settings_manager.get('theme', 'auto')
+
+            options = [
+                f"\033[36m1. Provider:\033[0m           {cur_prov}",
+                f"\033[36m2. Video Player:\033[0m       {cur_player}",
+                f"\033[36m3. Streaming Quality:\033[0m  {cur_stream_q}",
+                f"\033[36m4. Download Quality:\033[0m   {cur_dl_q}",
+                f"\033[36m5. Download Directory:\033[0m {cur_dl_dir}",
+                f"\033[36m6. Autoplay Next:\033[0m      {cur_auto}",
+                f"\033[36m7. Discord RPC:\033[0m        {cur_rpc}",
+                f"\033[36m8. Theme:\033[0m              {cur_theme}",
+                "← Back to Main Menu"
+            ]
+
+            sel = self._launcher(options, "Settings & Preferences")
+            if not sel or "Back" in sel[0]:
+                break
+
+            choice = ansi_escape.sub('', sel[0])
+            if "Provider:" in choice:
+                self._switch_provider()
+            elif "Video Player:" in choice:
+                players = ["mpv", "vlc", "celluloid", "iina", "syncplay", "mpc-hc"]
+                active_tag = "\033[32m[Active]\033[0m"
+                p_lines = [f"{p} {active_tag if p == cur_player else ''}".strip() for p in players]
+                p_sel = self._launcher(p_lines, "Select Video Player")
+                if p_sel:
+                    chosen_p = ansi_escape.sub('', p_sel[0]).split()[0]
+                    self.settings_manager.set("player", chosen_p)
+                    self.console.print(f"[green]✔ Set Video Player to: {chosen_p}[/green]")
+                    time.sleep(0.6)
+            elif "Streaming Quality:" in choice:
+                qualities = ["1080p", "720p", "480p", "360p", "auto"]
+                active_tag = "\033[32m[Active]\033[0m"
+                q_lines = [f"{q} {active_tag if q == cur_stream_q else ''}".strip() for q in qualities]
+                q_sel = self._launcher(q_lines, "Select Default Streaming Quality")
+                if q_sel:
+                    chosen_q = ansi_escape.sub('', q_sel[0]).split()[0]
+                    self.settings_manager.set("default_quality", chosen_q)
+                    self.console.print(f"[green]✔ Set Default Streaming Quality to: {chosen_q}[/green]")
+                    time.sleep(0.6)
+            elif "Download Quality:" in choice:
+                qualities = ["1080p", "720p", "480p", "360p"]
+                active_tag = "\033[32m[Active]\033[0m"
+                q_lines = [f"{q} {active_tag if q == cur_dl_q else ''}".strip() for q in qualities]
+                q_sel = self._launcher(q_lines, "Select Default Download Quality")
+                if q_sel:
+                    chosen_q = ansi_escape.sub('', q_sel[0]).split()[0]
+                    self.settings_manager.set("default_download_quality", chosen_q)
+                    self.console.print(f"[green]✔ Set Default Download Quality to: {chosen_q}[/green]")
+                    time.sleep(0.6)
+            elif "Download Directory:" in choice:
+                self.console.print(f"\n[cyan]Current download directory:[/cyan] [bold]{cur_dl_dir}[/bold]")
+                try:
+                    new_dir = input("Enter new path (or press Enter to keep current): ").strip()
+                    if new_dir:
+                        self.settings_manager.set("download_directory", new_dir)
+                        self.console.print(f"[green]✔ Download directory updated to: {new_dir}[/green]")
+                        time.sleep(0.6)
+                except (KeyboardInterrupt, EOFError):
+                    pass
+            elif "Autoplay Next:" in choice:
+                self._toggle_autoplay()
+            elif "Discord RPC:" in choice:
+                current_rpc = bool(self.settings_manager.get("discord_rpc", True))
+                new_rpc = not current_rpc
+                self.settings_manager.set("discord_rpc", new_rpc)
+                if not new_rpc and self.rpc and getattr(self.rpc, 'connected', False):
+                    try:
+                        self.rpc.close()
+                    except Exception:
+                        pass
+                elif new_rpc and self.rpc and not getattr(self.rpc, 'connected', False):
+                    try:
+                        self.rpc.connect()
+                    except Exception:
+                        pass
+                status_str = "[green]Enabled[/green]" if new_rpc else "[yellow]Disabled[/yellow]"
+                self.console.print(f"\nDiscord RPC is now: {status_str}")
+                time.sleep(0.6)
+            elif "Theme:" in choice:
+                from src import config as config_mod
+                theme_options = ["auto"] + list(THEMES.keys())
+                active_tag = "\033[32m[Active]\033[0m"
+                t_lines = [f"{t} {active_tag if t == cur_theme else ''}".strip() for t in theme_options]
+                t_sel = self._launcher(t_lines, "Select Color Theme")
+                if t_sel:
+                    chosen_t = ansi_escape.sub('', t_sel[0]).split()[0]
+                    self.settings_manager.set("theme", chosen_t)
+                    import importlib
+                    importlib.reload(config_mod)
+                    for mod_name, mod in list(sys.modules.items()):
+                        if mod and (mod_name.startswith('src.') or mod_name == '__main__'):
+                            for attr_name in dir(config_mod):
+                                if attr_name.startswith('COLOR_') or attr_name in ['HEADER_ART', 'GOODBYE_ART']:
+                                    if hasattr(mod, attr_name):
+                                        setattr(mod, attr_name, getattr(config_mod, attr_name))
+                    self.console.print(f"[green]✔ Theme switched to: {chosen_t}[/green]")
+                    time.sleep(0.6)
 
     def _toggle_autoplay(self):
         self.autoplay = not self.autoplay
@@ -778,7 +904,7 @@ class AniCliWrapper:
                     style="dim"
                 )
                 self.console.print(
-                    margin + f"[cyan]A[/cyan]: Autoplay ({'ON' if self.autoplay else 'OFF'})  [cyan]Q[/cyan]: Quit",
+                    margin + f"[cyan]A[/cyan]: Autoplay ({'ON' if self.autoplay else 'OFF'})  [cyan]O[/cyan]: Settings  [cyan]Q[/cyan]: Quit",
                     style="dim"
                 )
                 print()
@@ -870,6 +996,10 @@ class AniCliWrapper:
 
             if cmd == 'c':
                 self._switch_provider()
+                continue
+
+            if cmd in ['o', 'settings', 'config']:
+                self._show_settings_menu()
                 continue
 
             if cmd == 'g':

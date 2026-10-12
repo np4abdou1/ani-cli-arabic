@@ -66,7 +66,8 @@ def get_platform_name() -> str:
                 with open("/etc/os-release", "r", encoding="utf-8", errors="ignore") as f:
                     for line in f:
                         if line.startswith("NAME="):
-                            return f"Linux ({line.split('=', 1)[1].strip('\"\'')})"
+                            distro_name = line.split("=", 1)[1].strip('"\'')
+                            return f"Linux ({distro_name})"
             except Exception:
                 pass
         return "Linux"

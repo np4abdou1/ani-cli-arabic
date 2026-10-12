@@ -19,6 +19,8 @@ class SettingsManager:
             "default_download_quality": "1080p",
             "download_mode": "internal",
             "download_directory": "downloads",
+            "download_parallel": 2,
+            "download_speed_limit": "unlimited",
             "player": "mpv",
             "auto_next": False,
             "discord_rpc": True,

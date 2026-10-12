@@ -5,8 +5,6 @@ import shutil
 import subprocess
 import tempfile
 import threading
-import socket
-import json
 from typing import Optional
 from .utils import is_bundled
 from .logger import logger

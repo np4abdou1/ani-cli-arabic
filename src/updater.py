@@ -187,7 +187,7 @@ def update_binary(latest_ver: str, release_data: Dict[str, Any]) -> bool:
             break
 
     if not download_url:
-        console.print(f"[yellow]Please download the latest release manually from:[/yellow]")
+        console.print("[yellow]Please download the latest release manually from:[/yellow]")
         console.print(f"  {release_data.get('html_url', 'https://github.com/np4abdou1/ani-cli-arabic/releases')}")
         return False
 

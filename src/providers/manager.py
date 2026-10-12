@@ -75,6 +75,11 @@ class ProviderManager:
         return providers
 
     @classmethod
+    def get_available_providers(cls) -> List[Dict[str, str]]:
+        """Alias for list_providers for backward compatibility."""
+        return cls.list_providers()
+
+    @classmethod
     def get_provider_choices(cls) -> List[str]:
         """Get list of valid provider IDs."""
         return list(cls._PROVIDERS.keys())

@@ -129,6 +129,9 @@ class AnimeifyProvider(BaseAnimeProvider):
         """Thread-local requests session."""
         if not hasattr(self._local, "session"):
             s = requests.Session()
+            adapter = requests.adapters.HTTPAdapter(pool_connections=25, pool_maxsize=25, max_retries=3)
+            s.mount("https://", adapter)
+            s.mount("http://", adapter)
             s.headers.update({
                 "User-Agent": self.DEFAULT_USER_AGENT,
                 "Accept": "*/*",

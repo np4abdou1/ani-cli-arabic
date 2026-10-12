@@ -25,7 +25,7 @@ from curl_cffi import requests
 import time
 from .base import BaseAnimeProvider
 from ..models import AnimeResult, Episode, QualityOption
-from ..config import POPULAR_STUDIOS_MAP, GENRE_NAME_TO_SLUG
+from ..config import POPULAR_STUDIOS_MAP
 from ..logger import logger
 
 # Complete official Anime Slayer Genre Map (from animes/get-anime-dropdowns)
@@ -220,7 +220,6 @@ class AnimeSlayerProvider(BaseAnimeProvider):
         if eps_data:
             episodes = []
             for it in eps_data:
-                ep_id = str(it.get("episode_id") or "")
                 ep_name = it.get("episode_name") or ""
                 num_raw = str(it.get("episode_number") or "1")
                 try:

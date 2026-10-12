@@ -3,11 +3,10 @@ Remote broadcast interactive scrollable modal popup for ani-cli-arabic.
 Displays server-driven rich announcements, markdown messages, and community alerts on startup.
 """
 
-import os
 import re
 import textwrap
 import webbrowser
-from typing import Optional, Dict, List, Any
+from typing import Dict, List, Any
 
 from rich.text import Text
 from rich.panel import Panel
@@ -17,8 +16,7 @@ from rich.live import Live
 from rich.box import HEAVY
 
 from .config import (
-    COLOR_BORDER, COLOR_TITLE, COLOR_SUBTITLE,
-    COLOR_HIGHLIGHT_FG, COLOR_HIGHLIGHT_BG
+    COLOR_BORDER
 )
 from .utils import get_key, RawTerminal
 

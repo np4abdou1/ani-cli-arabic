@@ -4,7 +4,6 @@ Enables server-driven global announcements, modal popups, domain switch alerts,
 and emergency updates via Cloudflare Worker / KV without requiring client updates.
 """
 
-import os
 import json
 import time
 import urllib.request
@@ -12,8 +11,7 @@ import threading
 from pathlib import Path
 from typing import Optional, Dict, Any
 
-from .version import __version__, parse_version
-from .logger import logger
+from .version import __version__
 
 # Remote Broadcast JSON Endpoints (Primary: Deployed Cloudflare Worker, Secondary: Custom Domain, Fallback: Raw GitHub)
 BROADCAST_URLS = [

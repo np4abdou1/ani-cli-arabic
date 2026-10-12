@@ -5,24 +5,22 @@ from pathlib import Path
 from rich.align import Align
 from rich.panel import Panel
 from rich.text import Text
-from rich.prompt import Prompt
 from rich.box import HEAVY
 
-from .config import COLOR_PROMPT, COLOR_BORDER, COLOR_TITLE, GOODBYE_ART, POPULAR_GENRES
+from .config import COLOR_BORDER, COLOR_TITLE, GOODBYE_ART, POPULAR_GENRES
 from .ui import UIManager
-from .api import AnimeAPI
 from .providers import ProviderManager
-from .monitoring import monitor
 from .player import PlayerManager
 from .discord_rpc import DiscordRPCManager
 from .models import QualityOption
-from .utils import download_file, flush_stdin, show_cursor, hide_cursor
+from .utils import download_file, show_cursor, hide_cursor
 from .history import HistoryManager, format_seconds
 from .settings import SettingsManager
 from .favorites import FavoritesManager
 from .updater import check_for_updates, get_version_status
 from .deps import ensure_dependencies
 from .cli import run_simple_cli
+from .downloader import prompt_download_options, execute_batch_download
 from .logger import logger, install_global_exception_handler
 import shutil
 import argparse
@@ -323,7 +321,7 @@ class AniCliArApp:
             
             episodes = self.ui.run_with_loading(
                 "Loading episodes & poster...",
-                lambda: self._fetch_episodes_and_poster(selected_anime)
+                lambda a=selected_anime: self._fetch_episodes_and_poster(a)
             )
             
             if not episodes:
@@ -699,7 +697,7 @@ class AniCliArApp:
             
             episodes = self.ui.run_with_loading(
                 "Loading episodes & poster...",
-                lambda: self._fetch_episodes_and_poster(selected_anime)
+                lambda a=selected_anime: self._fetch_episodes_and_poster(a)
             )
             
             if not episodes:
@@ -951,49 +949,33 @@ class AniCliArApp:
         if not selected_indices:
             return
 
-        self.ui.render_timed_message(
-            "Batch Download",
-            f"Preparing {len(selected_indices)} episode(s) for download...",
-            "info",
-            duration=1.0
-        )
-        download_mode = self._get_download_mode()
+        target_eps = [episodes[idx] for idx in selected_indices]
         download_directory = self._get_download_directory()
-        success_count = 0
-        failed_count = 0
-        
-        for idx in selected_indices:
-            ep = episodes[idx]
-            direct_url, filename, error = self.resolve_default_download_target(selected_anime, ep, show_loading=True)
+        default_q = self.settings.get("default_download_quality", "1080p") or "1080p"
 
-            if error:
-                failed_count += 1
-                continue
-
-            success = download_file(
-                direct_url,
-                filename,
-                self.ui.console,
-                mode=download_mode,
-                download_dir=download_directory
-            )
-            if success:
-                success_count += 1
-                self.history.mark_watched(selected_anime.id, ep.display_num, selected_anime.title_en)
-            else:
-                failed_count += 1
-        
-        summary_style = "error" if success_count == 0 else "info"
-        summary_message = f"Completed: {success_count}"
-        if failed_count:
-            summary_message += f" | Failed: {failed_count}"
-
-        self.ui.render_timed_message(
-            "Batch Download Finished",
-            summary_message,
-            summary_style,
-            duration=1.6
+        from .utils import restore_terminal_for_input, enter_raw_mode_after_input
+        restore_terminal_for_input()
+        config = prompt_download_options(
+            self.ui.console,
+            default_dir=download_directory,
+            default_quality=default_q,
+            batch_mode=True
         )
+        if config:
+            execute_batch_download(
+                api=self.api,
+                anime=selected_anime,
+                episodes=target_eps,
+                config=config,
+                console=self.ui.console,
+                history_manager=self.history
+            )
+            try:
+                self.ui.console.input("[dim]Press Enter to return to menu...[/dim]")
+            except (KeyboardInterrupt, EOFError):
+                pass
+
+        enter_raw_mode_after_input()
 
     def handle_quality_selection(self, selected_anime, selected_ep, server_data, start_time=None):
         current_ep_data = server_data.get('CurrentEpisode', {})
@@ -1067,8 +1049,6 @@ class AniCliArApp:
                 self.ui.render_now_playing(selected_anime.title_en, f"Episode {selected_ep.display_num}{time_hint}", quality.name)
                 
                 self.rpc.update_watching(selected_anime.title_en, str(selected_ep.display_num), selected_anime.thumbnail)
-                provider_name = getattr(self.provider, 'name', getattr(self.provider, 'id', 'Anime3rb'))
-                # monitor.track_video_play(selected_anime.title_en, str(selected_ep.display_num), provider=provider_name)
                 
                 playback_info = self.player.play(
                     direct_url, 
@@ -1121,7 +1101,7 @@ class AniCliArApp:
         
         panel = Panel(
             Text(f"✗ Unexpected error: {e}", justify="center", style="bold #ff6b6b"),
-            title=f"[bold #ff6b6b]Critical Error[/bold #ff6b6b]",
+            title="[bold #ff6b6b]Critical Error[/bold #ff6b6b]",
             box=HEAVY,
             padding=(1, 4),
             border_style="#ff6b6b",
