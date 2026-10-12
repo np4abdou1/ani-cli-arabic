@@ -7,10 +7,12 @@ rich Arabic/English metadata, exact episode titles, and zero external infrastruc
 import json
 import re
 import os
+import socket
+import ssl
 import threading
 import time
-from typing import Dict, List, Optional, Any
-from urllib.parse import urljoin
+from typing import Dict, List, Optional, Any, Tuple
+from urllib.parse import urljoin, urlparse
 from curl_cffi import requests
 from bs4 import BeautifulSoup
 from functools import wraps
@@ -23,6 +25,61 @@ from .logger import logger
 BASE_URL = "https://anime3rb.com"
 DEFAULT_IMPERSONATE = "chrome120"
 DEFAULT_TIMEOUT = 15
+
+
+class CDNHealthManager:
+    """
+    Dynamically tracks, probes, and caches CDN host health to ensure streams
+    never route to dead, stalled, or lagging CDN nodes (such as the 100s-stalling
+    files-5.vid3rb.com node).
+    """
+    def __init__(self):
+        self._lock = threading.Lock()
+        # Seed known problematic hosts with a long expiration
+        self._cache: Dict[str, Tuple[bool, float]] = {
+            "files-5.vid3rb.com": (False, time.time() + 86400 * 7),
+        }
+
+    def is_host_healthy(self, host: str, timeout: float = 1.2) -> bool:
+        if not host:
+            return False
+        host = host.split(":")[0].strip().lower()
+        now = time.time()
+        with self._lock:
+            if host in self._cache:
+                healthy, exp = self._cache[host]
+                if now < exp:
+                    return healthy
+
+        # Fast socket TLS probe to ensure the server responds to TLS ClientHello in <1.2s
+        healthy = False
+        try:
+            ctx = ssl.create_default_context()
+            s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            s.settimeout(timeout)
+            s.connect((host, 443))
+            ss = ctx.wrap_socket(s, server_hostname=host)
+            ss.close()
+            s.close()
+            healthy = True
+        except Exception:
+            healthy = False
+
+        ttl = 600.0 if healthy else 1800.0
+        with self._lock:
+            self._cache[host] = (healthy, now + ttl)
+        return healthy
+
+    def mark_unhealthy(self, host: str, duration: float = 1800.0):
+        if not host:
+            return
+        host = host.split(":")[0].strip().lower()
+        with self._lock:
+            self._cache[host] = (False, time.time() + duration)
+
+
+_cdn_health_manager = CDNHealthManager()
+
 DEFAULT_HEADERS = {
     "User-Agent": "Mozilla/5.0 (X11; Linux x86_64; rv:130.0) Gecko/20100101 Firefox/130.0",
     "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
@@ -431,7 +488,9 @@ class AnimeAPI:
                 title=specific_title or f"الحلقة {ep_num}",
                 duration=duration,
                 thumbnail=thumb,
-                is_last=is_last
+                is_last=is_last,
+                url=f"{BASE_URL}/episode/{slug}/{ep_num}",
+                anime_id=slug
             ))
 
         episodes.sort(key=lambda x: x.display_num)
@@ -476,6 +535,147 @@ class AnimeAPI:
         with self._cache_lock:
             return self._episodes_cache.get(slug, [])
 
+    def get_episode_streams(self, episode: Episode) -> List[QualityOption]:
+        """Extract all direct playable streaming links and resolutions for an episode."""
+        anime_id = getattr(episode, 'anime_id', '')
+        if not anime_id and getattr(episode, 'url', ''):
+            parts = [p for p in episode.url.strip('/').split('/') if p]
+            if len(parts) >= 2 and parts[-2] != 'episode':
+                anime_id = parts[-2]
+            elif len(parts) >= 1:
+                anime_id = parts[-1]
+        if not anime_id:
+            return []
+        server_data = self.get_streaming_servers(anime_id, episode.number)
+        if server_data and "Qualities" in server_data:
+            return server_data["Qualities"]
+        return []
+
+    def _extract_player_url(self, html_text: str) -> Optional[str]:
+        """
+        Multi-tier extraction for Vid3rb player embed URL from Anime3rb episode HTML.
+        Resilient against Livewire upgrades, minification, and DOM layout changes.
+        """
+        if not html_text:
+            return None
+
+        # Tier 1: Parse wire:snapshot (Livewire 3)
+        for m in re.finditer(r'wire:snapshot=(["\'])([^"\']+?)\1', html_text):
+            try:
+                raw_snap = m.group(2).replace('&quot;', '"').replace('&amp;', '&')
+                snap_data = json.loads(raw_snap)
+                data_dict = snap_data.get("data", {})
+                v_url = data_dict.get("video_url")
+                if v_url and "vid3rb" in v_url:
+                    return v_url
+            except Exception:
+                pass
+
+        # Tier 2: Universal URL pattern regex for Vid3rb player embed
+        m_regex = re.search(
+            r'https?://[a-zA-Z0-9\.\-]*vid3rb\.com/player/[a-zA-Z0-9\-_]+(?:\?[^"\'<>\s]+)?',
+            html_text
+        )
+        if m_regex:
+            return m_regex.group(0).replace('&amp;', '&').replace('&quot;', '')
+
+        # Tier 3: BeautifulSoup DOM iframe extraction
+        try:
+            soup = BeautifulSoup(html_text, "html.parser")
+            for iframe in soup.find_all("iframe"):
+                src = iframe.get("src") or iframe.get("data-src") or iframe.get(":src") or ""
+                if "vid3rb.com/player/" in src or ("player" in src and "token=" in src):
+                    return src.replace('&amp;', '&')
+        except Exception:
+            pass
+
+        # Tier 4: Search for any video_url in inline scripts or Livewire 2 wire:initial-data
+        for m in re.finditer(r'["\']video_url["\']\s*:\s*["\'](https?://[^"\']+)["\']', html_text):
+            candidate = m.group(1).replace('\\/', '/').replace('&amp;', '&')
+            if "vid3rb" in candidate:
+                return candidate
+
+        return None
+
+    def _extract_player_sources(self, player_html: str) -> List[Dict[str, Any]]:
+        """
+        Multi-tier extraction for video stream definitions from the Vid3rb player page.
+        Tolerant to minified JS, changed variable names, and varying array placements.
+        """
+        if not player_html:
+            return []
+
+        # Tier 1: video_sources declaration (var/let/const/window.video_sources = [...])
+        for vs in re.findall(r'(?:video_sources\s*=\s*)?(\[\s*\{.*?\}\s*\])', player_html, re.DOTALL):
+            if "src" in vs and ("1080" in vs or "720" in vs or "480" in vs or "video/mp4" in vs):
+                try:
+                    parsed = json.loads(vs.replace('\\/', '/'))
+                    if isinstance(parsed, list):
+                        valid = [x for x in parsed if isinstance(x, dict) and x.get("src")]
+                        if valid:
+                            return parsed
+                except Exception:
+                    pass
+
+        # Tier 2: Broader regex matching any array containing video objects with 'src'
+        for vs in re.findall(r'(\[\s*\{[^{}]*?"src"[^{}]*?\}\s*(?:,\s*\{[^{}]*?\}\s*)*\])', player_html, re.DOTALL):
+            try:
+                parsed = json.loads(vs.replace('\\/', '/'))
+                if isinstance(parsed, list) and any(isinstance(x, dict) and x.get("src") for x in parsed):
+                    return parsed
+            except Exception:
+                pass
+
+        # Tier 3: Direct URL scan for vid3rb stream endpoints in player script
+        stream_urls = re.findall(r'https?://[a-zA-Z0-9\.\-]*vid3rb\.com/video/[a-zA-Z0-9\-_]+(?:\?[^"\'<>\s]+)?', player_html)
+        if stream_urls:
+            discovered = []
+            seen_urls = set()
+            for u in stream_urls:
+                cleaned_u = u.replace('\\/', '/').replace('&amp;', '&')
+                if cleaned_u in seen_urls:
+                    continue
+                seen_urls.add(cleaned_u)
+                discovered.append({
+                    "src": cleaned_u,
+                    "type": "video/mp4",
+                    "label": "Direct Stream",
+                    "res": "",
+                    "premium": False
+                })
+            return discovered
+
+        return []
+
+    def _resolve_direct_stream_url(self, session, raw_url: str, player_url: str, max_retries: int = 10) -> str:
+        """
+        Follows 302 redirects to obtain the direct CDN file URL while validating
+        target CDN host health via _cdn_health_manager. Ensures MPV never stalls
+        on dead or lagging CDN servers.
+        """
+        redir_headers = {
+            "Referer": player_url or "https://video.vid3rb.com/",
+            **DEFAULT_HEADERS
+        }
+        best_candidate = raw_url
+
+        for _ in range(max_retries):
+            try:
+                session.cookies.clear()
+                r_redirect = session.get(raw_url, headers=redir_headers, allow_redirects=False, timeout=3.5)
+                if r_redirect.status_code in [301, 302, 307, 308]:
+                    loc = r_redirect.headers.get("Location") or r_redirect.headers.get("location")
+                    if loc:
+                        parsed = urlparse(loc)
+                        host = parsed.netloc.split(":")[0].strip()
+                        if _cdn_health_manager.is_host_healthy(host):
+                            return loc
+                        best_candidate = loc
+            except Exception:
+                pass
+
+        return best_candidate
+
     @retry_with_backoff()
     def get_streaming_servers(self, anime_id: str, episode_num: str, anime_type: str = 'SERIES') -> Optional[Dict]:
         """
@@ -492,25 +692,7 @@ class AnimeAPI:
             if r.status_code != 200:
                 return None
 
-            # Extract player URL from Livewire snapshot
-            player_url = None
-            for m in re.finditer(r'wire:snapshot=(["\'])([^"\']+?)\1', r.text):
-                decoded = m.group(2).replace('&quot;', '"').replace('&amp;', '&')
-                if 'video_url' in decoded:
-                    try:
-                        data = json.loads(decoded).get("data", {})
-                        player_url = data.get("video_url")
-                        if player_url:
-                            break
-                    except Exception:
-                        pass
-
-            if not player_url:
-                soup = BeautifulSoup(r.text, "html.parser")
-                iframe = soup.find("iframe", src=re.compile(r"vid3rb\.com/player/"))
-                if iframe:
-                    player_url = iframe.get("src")
-
+            player_url = self._extract_player_url(r.text)
             if not player_url:
                 return None
 
@@ -519,39 +701,28 @@ class AnimeAPI:
                 **DEFAULT_HEADERS
             }
             r_player = s.get(player_url, headers=player_headers, timeout=6)
-            if r_player.status_code != 200:
-                return None
+            sources = []
+            if r_player.status_code == 200:
+                sources = self._extract_player_sources(r_player.text)
 
-            sources = None
-            for vs in re.findall(r'var video_sources = (\[.*?\]);', r_player.text, re.DOTALL):
-                if 'src' in vs and 'http' in vs:
-                    try:
-                        sources = json.loads(vs.replace('\\/', '/'))
-                        break
-                    except Exception:
-                        pass
-
-            if not sources:
-                tor_proxy = os.environ.get("TOR_PROXY") or "socks5://127.0.0.1:9050"
+            # Optional proxy fallback (e.g. for datacenter VPS environments where Cloudflare blocks server IPs)
+            custom_proxy = os.environ.get("TOR_PROXY") or os.environ.get("ALL_PROXY") or os.environ.get("HTTPS_PROXY")
+            if not sources and custom_proxy:
                 try:
-                    s_tor = requests.Session(impersonate=DEFAULT_IMPERSONATE)
-                    s_tor.proxies = {"https": tor_proxy, "http": tor_proxy}
-                    r_tor = s_tor.get(player_url, headers=player_headers, timeout=6)
-                    for vs in re.findall(r'var video_sources = (\[.*?\]);', r_tor.text, re.DOTALL):
-                        if 'src' in vs and 'http' in vs:
-                            try:
-                                sources = json.loads(vs.replace('\\/', '/'))
-                                s = s_tor
-                                break
-                            except Exception:
-                                pass
+                    s_proxy = requests.Session(impersonate=DEFAULT_IMPERSONATE)
+                    s_proxy.proxies = {"https": custom_proxy, "http": custom_proxy}
+                    r_proxy = s_proxy.get(player_url, headers=player_headers, timeout=6)
+                    if r_proxy.status_code == 200:
+                        sources = self._extract_player_sources(r_proxy.text)
+                        if sources:
+                            s = s_proxy
                 except Exception:
                     pass
 
             if not sources:
                 return None
 
-            # Resolve 302 redirects for direct MP4 CDN links
+            # Resolve direct CDN links with dynamic health verification
             server_dict = {
                 "CurrentEpisode": {},
                 "Qualities": [],
@@ -567,13 +738,7 @@ class AnimeAPI:
                 if is_premium or not raw_src:
                     continue
 
-                direct_url = raw_src
-                try:
-                    r_redirect = s.get(raw_src, headers=DEFAULT_HEADERS, allow_redirects=False, timeout=5)
-                    if r_redirect.status_code in [301, 302, 307, 308]:
-                        direct_url = r_redirect.headers.get("Location") or r_redirect.headers.get("location") or raw_src
-                except Exception:
-                    direct_url = raw_src
+                direct_url = self._resolve_direct_stream_url(s, raw_src, player_url)
 
                 # Map quality keys
                 key = f"{res}p" if res else label
@@ -601,7 +766,8 @@ class AnimeAPI:
 
             return server_dict
 
-        except Exception:
+        except Exception as e:
+            logger.error("AnimeAPI", f"Error getting streaming servers for {slug} ep {ep_num}: {e}")
             return None
 
     def extract_direct_stream(self, anime_id: str, episode_num: str, quality_key: str = "1080p") -> Optional[str]:

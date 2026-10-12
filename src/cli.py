@@ -744,8 +744,11 @@ class AniCliWrapper:
         else:
             self.console.print(f"  [bold {title_col}]{DEFAULT_HEADER_ART.strip()}[/bold {title_col}]")
         active_prov = getattr(self.api, 'name', 'Anime3rb')
+        from .ui import get_github_stars
+        stars = get_github_stars()
+        star_badge = f" • [bold white]★ {stars}[/bold white]" if stars and stars != "..." else ""
         self.console.print(
-            f"  [dim]{APP_VERSION}[/dim] • [cyan]Provider: {active_prov}[/cyan] • [dim]gh:np4abdou1/ani-cli-arabic[/dim]"
+            f"  [dim]{APP_VERSION}[/dim] • [cyan]Provider: {active_prov}[/cyan]{star_badge} • [dim]gh:np4abdou1/ani-cli-arabic[/dim]"
         )
 
     def run(self, query: Optional[str] = None) -> Optional[str]:

@@ -499,7 +499,7 @@ class PlayerManager:
             '--hr-seek=yes',
             '--hr-seek-framedrop=yes',
             '--stream-buffer-size=16MiB',
-            '--network-timeout=30',
+            '--network-timeout=15',
             '--tls-verify=no',
             '--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36',
             '--hwdec=auto-safe',
@@ -537,10 +537,13 @@ class PlayerManager:
             mpv_args,
             check=False,
             stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL
+            stderr=subprocess.PIPE,
+            text=True
         )
         duration = time.time() - t_start
         logger.log_player("MPV", mpv_args, exit_code=result.returncode, duration=duration)
+        if result.returncode != 0 and result.stderr:
+            logger.error("MPV", f"Player error output: {result.stderr.strip()}")
         
         tracker.stop()
         enter_raw_mode_after_input()
@@ -556,7 +559,7 @@ class PlayerManager:
             if self.console:
                 from rich.text import Text
                 self.console.print(Text("⚠ Stream closed or unreachable. Select another server if playback failed.", style="bold yellow"))
-                time.sleep(0.6)
+                time.sleep(1.0)
 
         return tracker.state
 

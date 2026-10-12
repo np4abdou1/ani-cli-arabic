@@ -45,6 +45,7 @@ class Episode:
     is_last: bool = False
     url: str = ""
     servers: List[Dict[str, Any]] = field(default_factory=list)
+    anime_id: str = ""
 
 @dataclass
 class QualityOption:

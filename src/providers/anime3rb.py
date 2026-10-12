@@ -30,7 +30,19 @@ class Anime3rbProvider(BaseAnimeProvider):
         return self.api.get_episodes(str(anime_id).strip()) or []
 
     def get_episode_streams(self, episode: Episode) -> List[QualityOption]:
-        return self.api.get_episode_streams(episode) or []
+        if hasattr(self.api, "get_episode_streams"):
+            return self.api.get_episode_streams(episode) or []
+        anime_id = getattr(episode, 'anime_id', '')
+        if not anime_id and getattr(episode, 'url', ''):
+            parts = [p for p in episode.url.strip('/').split('/') if p]
+            if len(parts) >= 2 and parts[-2] != 'episode':
+                anime_id = parts[-2]
+            elif len(parts) >= 1:
+                anime_id = parts[-1]
+        if not anime_id:
+            return []
+        server_dict = self.get_streaming_servers(anime_id, episode.number)
+        return (server_dict or {}).get("Qualities", [])
 
     def get_streaming_servers(self, anime_id: str, episode_num: str, anime_type: str = "SERIES") -> Optional[Dict[str, Any]]:
         return self.api.get_streaming_servers(str(anime_id).strip(), str(episode_num), anime_type)

@@ -4,7 +4,10 @@ import importlib
 import os
 import sys
 import re
+import json
+import urllib.request
 from pathlib import Path
+from typing import Optional, Tuple, Dict, Any
 import requests
 from io import BytesIO
 from functools import lru_cache
@@ -39,48 +42,133 @@ from .logger import logger
 from . import config as config_module
 
 _STARS_CACHE_FILE = Path.home() / ".ani-cli-arabic" / "database" / "stars_cache.json"
+_stars_lock = threading.Lock()
+_fetch_in_progress = False
 
-def _load_cached_stars():
+def _fetch_stars_from_network(timeout: float = 3.0) -> Optional[int]:
+    """Fetch live stargazers count with multi-endpoint fallback (GitHub API, Shields.io, and HTML scraping)."""
+    # 1. Primary: GitHub REST API
+    try:
+        req = urllib.request.Request(
+            "https://api.github.com/repos/np4abdou1/ani-cli-arabic",
+            headers={"User-Agent": "ani-cli-arabic"}
+        )
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            data = json.loads(resp.read().decode())
+            if "stargazers_count" in data:
+                return int(data["stargazers_count"])
+    except Exception:
+        pass
+
+    # 2. Secondary fallback: Shields.io (bypasses GitHub unauthenticated rate limits)
+    try:
+        req = urllib.request.Request(
+            "https://img.shields.io/github/stars/np4abdou1/ani-cli-arabic.json",
+            headers={"User-Agent": "ani-cli-arabic"}
+        )
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            data = json.loads(resp.read().decode())
+            val = data.get("value") or data.get("message")
+            if val and str(val).isdigit():
+                return int(val)
+    except Exception:
+        pass
+
+    # 3. Tertiary fallback: Scrape repo page HTML directly
+    try:
+        req = urllib.request.Request(
+            "https://github.com/np4abdou1/ani-cli-arabic",
+            headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
+        )
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            html = resp.read().decode("utf-8", errors="ignore")
+            m = re.search(r"id=[\"']repo-stars-counter-star[\"'][^>]*title=[\"']([0-9,]+)", html)
+            if m:
+                return int(m.group(1).replace(",", ""))
+    except Exception:
+        pass
+
+    return None
+
+def _load_cached_stars() -> Tuple[Optional[int], float]:
+    """Load cached stargazers count without any hardcoded fallback count."""
     try:
         if _STARS_CACHE_FILE.exists():
             with open(_STARS_CACHE_FILE, "r", encoding="utf-8") as f:
                 data = json.load(f)
-                return int(data.get("count", 59)), float(data.get("last_fetch", 0))
+                cnt = data.get("count")
+                if cnt is not None:
+                    return int(cnt), float(data.get("last_fetch", 0))
     except Exception:
         pass
-    return 59, 0
+    return None, 0.0
 
 _initial_stars, _initial_fetch_time = _load_cached_stars()
 _stars_cache = {"count": _initial_stars, "last_fetch": _initial_fetch_time}
 
-def get_github_stars():
+def _trigger_background_fetch(timeout: float = 3.0):
+    global _fetch_in_progress
+    with _stars_lock:
+        if _fetch_in_progress:
+            return
+        _fetch_in_progress = True
+
+    def _worker():
+        global _fetch_in_progress
+        try:
+            cnt = _fetch_stars_from_network(timeout=timeout)
+            if cnt is not None:
+                with _stars_lock:
+                    _stars_cache["count"] = cnt
+                    _stars_cache["last_fetch"] = time.time()
+                try:
+                    _STARS_CACHE_FILE.parent.mkdir(parents=True, exist_ok=True)
+                    with open(_STARS_CACHE_FILE, "w", encoding="utf-8") as f:
+                        json.dump({"count": cnt, "last_fetch": time.time()}, f)
+                except Exception:
+                    pass
+        finally:
+            with _stars_lock:
+                _fetch_in_progress = False
+
+    t = threading.Thread(target=_worker, daemon=True)
+    t.start()
+
+# If no cached stars exist or cache is older than 5 minutes, initiate background refresh immediately
+if _initial_stars is None:
+    _quick_cnt = _fetch_stars_from_network(timeout=0.6)
+    if _quick_cnt is not None:
+        _stars_cache["count"] = _quick_cnt
+        _stars_cache["last_fetch"] = time.time()
+        try:
+            _STARS_CACHE_FILE.parent.mkdir(parents=True, exist_ok=True)
+            with open(_STARS_CACHE_FILE, "w", encoding="utf-8") as f:
+                json.dump({"count": _quick_cnt, "last_fetch": time.time()}, f)
+        except Exception:
+            pass
+    else:
+        _trigger_background_fetch(timeout=4.0)
+elif time.time() - _initial_fetch_time > 300:
+    _trigger_background_fetch(timeout=4.0)
+
+def get_github_stars(refresh_if_stale: bool = True) -> str:
+    """
+    Returns current live or cached GitHub stargazers count dynamically.
+    Triggers an asynchronous background update if the cache is expired (> 5 minutes) or empty.
+    Never returns a hardcoded number.
+    """
     global _stars_cache
     now = time.time()
-    if now - _stars_cache["last_fetch"] > 900:  # Refresh every 15 minutes
-        _stars_cache["last_fetch"] = now
-        def _fetch():
-            try:
-                import urllib.request
-                import json
-                req = urllib.request.Request(
-                    "https://api.github.com/repos/np4abdou1/ani-cli-arabic",
-                    headers={"User-Agent": "ani-cli-arabic"}
-                )
-                with urllib.request.urlopen(req, timeout=4) as resp:
-                    data = json.loads(resp.read().decode())
-                    if "stargazers_count" in data:
-                        cnt = int(data["stargazers_count"])
-                        _stars_cache["count"] = cnt
-                        try:
-                            _STARS_CACHE_FILE.parent.mkdir(parents=True, exist_ok=True)
-                            with open(_STARS_CACHE_FILE, "w", encoding="utf-8") as f:
-                                json.dump({"count": cnt, "last_fetch": time.time()}, f)
-                        except Exception:
-                            pass
-            except Exception:
-                pass
-        threading.Thread(target=_fetch, daemon=True).start()
-    return _stars_cache["count"]
+    with _stars_lock:
+        cnt = _stars_cache["count"]
+        last = _stars_cache["last_fetch"]
+
+    if refresh_if_stale and (cnt is None or now - last > 300):
+        _trigger_background_fetch(timeout=4.0)
+
+    if cnt is not None:
+        return str(cnt)
+    return "..."
 
 class UIManager:
     def __init__(self):
@@ -453,9 +541,14 @@ class UIManager:
                 screen=True,
                 refresh_per_second=20
             ) as live:
+                last_stars_seen = get_github_stars(refresh_if_stale=False)
                 while True:
                     ev = get_home_input_event()
                     if not ev:
+                        cur_stars = get_github_stars(refresh_if_stale=False)
+                        if cur_stars != last_stars_seen:
+                            last_stars_seen = cur_stars
+                            live.update(generate_renderable(query, hovered_btn), refresh=True)
                         time.sleep(0.02)
                         continue
 
