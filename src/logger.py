@@ -19,13 +19,15 @@ from typing import Optional, Any, Dict, List
 from .version import APP_VERSION
 
 CRASH_ENDPOINTS = [
-    "https://anicliar-dashboard.pages.dev/monitor",
-    "https://ani-cli-arabic-analytics.talego4955.workers.dev/monitor"
+    "https://anicliar-dashboard.pages.dev/api/v2/crash",
+    "https://ani-cli-arabic-analytics.talego4955.workers.dev/api/v2/crash",
+    "https://analytics.ani-cli-arabic.dev/api/v2/crash"
 ]
 CLIENT_AUTH_KEY = "6rK9z0XyW8vQ3J7pL2mN4sB1tH5gD0fA"
 
 
 def get_base_dir() -> Path:
+    """Retrieve or initialize base directory."""
     try:
         base = Path.home() / ".ani-cli-arabic"
     except Exception:
@@ -36,33 +38,22 @@ def get_base_dir() -> Path:
 
 
 def get_system_summary() -> str:
-    if "ANDROID_ROOT" in os.environ or "com.termux" in os.environ.get("PREFIX", ""):
-        return "Android (Termux)"
-    sys_name = platform.system()
-    if sys_name == "Darwin":
-        return "macOS"
-    if sys_name == "Windows":
-        rel = platform.release()
-        return f"Windows {rel}" if rel else "Windows"
-    if sys_name == "Linux":
-        try:
-            info = platform.freedesktop_os_release()
-            name = info.get("NAME") or info.get("ID")
-            if name:
-                return f"Linux ({name})"
-        except Exception:
-            pass
-        if os.path.exists("/etc/os-release"):
-            try:
-                with open("/etc/os-release", "r", encoding="utf-8", errors="ignore") as f:
-                    for line in f:
-                        if line.startswith("NAME="):
-                            distro_name = line.split("=", 1)[1].strip('"\'')
-                            return f"Linux ({distro_name})"
-            except Exception:
-                pass
-        return "Linux"
-    return sys_name or "Unknown"
+    """Returns a formatted OS summary string."""
+    try:
+        from .monitoring import get_detailed_os
+        return get_detailed_os()
+    except Exception:
+        if "ANDROID_ROOT" in os.environ or "com.termux" in os.environ.get("PREFIX", ""):
+            return "Android (Termux)"
+        sys_name = platform.system()
+        if sys_name == "Darwin":
+            return "macOS"
+        if sys_name == "Windows":
+            rel = platform.release()
+            return f"Windows {rel}" if rel else "Windows"
+        if sys_name == "Linux":
+            return "Linux"
+        return sys_name or "Unknown"
 
 
 class DebugLogger:
@@ -220,20 +211,40 @@ logger = DebugLogger()
 
 
 def send_crash_telemetry(payload_dict: Dict[str, Any]):
-    """Sends crash diagnostics asynchronously to the dashboard worker."""
+    """Sends crash diagnostics asynchronously to the /api/v2/crash endpoint with a 1.5s timeout."""
+    try:
+        from .settings import SettingsManager
+        if not SettingsManager().get("analytics", True):
+            return
+    except Exception:
+        pass
+
     def _worker():
         try:
-            data = json.dumps(payload_dict).encode("utf-8")
+            data_dict = dict(payload_dict)
+            # Adapt legacy shape if passed
+            if "details" in data_dict and isinstance(data_dict["details"], dict):
+                details = data_dict["details"]
+                if "error_type" not in data_dict and "error_type" in details:
+                    data_dict["error_type"] = details["error_type"]
+                if "message" not in data_dict and "message" in details:
+                    data_dict["message"] = details["message"]
+                if "traceback" not in data_dict and "traceback" in details:
+                    data_dict["traceback"] = details["traceback"]
+                if "command_args" not in data_dict and "args" in details:
+                    data_dict["command_args"] = details["args"]
+
+            data = json.dumps(data_dict).encode("utf-8")
             headers = {
                 "Content-Type": "application/json",
                 "X-Auth-Key": CLIENT_AUTH_KEY,
-                "User-Agent": f"AniCliAr-CrashReporter/1.0 ani-cli-arabic/{APP_VERSION}"
+                "User-Agent": f"AniCliAr-CrashReporter/2.0 ani-cli-arabic/{APP_VERSION}"
             }
             for endpoint in CRASH_ENDPOINTS:
                 try:
                     req = urllib.request.Request(endpoint, data=data, headers=headers, method="POST")
-                    with urllib.request.urlopen(req, timeout=3.0) as resp:
-                        if resp.status in (200, 204):
+                    with urllib.request.urlopen(req, timeout=1.5) as resp:
+                        if resp.status in (200, 201, 202, 204):
                             return
                 except Exception:
                     continue
@@ -253,13 +264,22 @@ def record_crash(exc_type, exc_value, exc_traceback, context: str = "unhandled")
     iso_timestamp = datetime.now(timezone.utc).isoformat()
     tb_str = "".join(traceback.format_exception(exc_type, exc_value, exc_traceback))
 
-    # Retrieve hardware fingerprint if available
+    # Retrieve hardware fingerprint and deep OS info if available
     fingerprint = "unknown"
+    os_info: Dict[str, str] = {
+        "os_name": "Unknown",
+        "distro": "Unknown",
+        "base": "Independent",
+        "os_version": platform.release() or "unknown"
+    }
     try:
-        from .monitoring import monitor
+        from .monitoring import monitor, get_os_info
         fingerprint = monitor.user_fingerprint
+        os_info = get_os_info()
     except Exception:
         pass
+
+    error_name = getattr(exc_type, "__name__", "Exception") if hasattr(exc_type, "__name__") else str(exc_type)
 
     crash_data = {
         "timestamp": iso_timestamp,
@@ -269,7 +289,7 @@ def record_crash(exc_type, exc_value, exc_traceback, context: str = "unhandled")
         "platform_raw": platform.platform(),
         "context": context,
         "command_args": sys.argv,
-        "error_type": getattr(exc_type, "__name__", "Exception"),
+        "error_type": error_name,
         "error_message": str(exc_value),
         "traceback": tb_str,
         "fingerprint": fingerprint
@@ -289,20 +309,19 @@ def record_crash(exc_type, exc_value, exc_traceback, context: str = "unhandled")
     # Append to debug.log
     logger.error("CRASH", f"Unhandled Exception ({crash_data['error_type']}): {crash_data['error_message']}\n{tb_str}")
 
-    # Dispatch to remote analytics worker
+    # Dispatch to remote analytics worker matching v2 schema
     telemetry_payload = {
         "fingerprint": fingerprint,
-        "timestamp": iso_timestamp,
-        "action": "error_crash",
-        "details": {
-            "error_type": crash_data["error_type"],
-            "message": crash_data["error_message"],
-            "traceback": tb_str,
-            "version": APP_VERSION,
-            "os": crash_data["os"],
-            "args": sys.argv,
-            "context": context
-        }
+        "error_type": crash_data["error_type"],
+        "message": crash_data["error_message"],
+        "traceback": tb_str,
+        "os_name": os_info.get("os_name", "Unknown"),
+        "distro": os_info.get("distro", "Unknown"),
+        "base": os_info.get("base", "Independent"),
+        "os_version": os_info.get("os_version", platform.release() or "unknown"),
+        "client_version": APP_VERSION,
+        "command_args": sys.argv,
+        "created_at": iso_timestamp
     }
     send_crash_telemetry(telemetry_payload)
 
