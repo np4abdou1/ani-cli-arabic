@@ -249,6 +249,7 @@ Special thanks to everyone who helped make this project happen:
 **Key Contributors:**
 - [@np4abdou1](https://github.com/np4abdou1) - Creator and main developer
 - [@Anas-Tou](https://github.com/Anas-Tou) - Contributor
+- [@ilyes-pro](https://github.com/ilyes-Pro) - Contributor
 
 Want to contribute? Feel free to open issues or submit pull requests!
 
