@@ -56,6 +56,7 @@ class QualityOption:
     direct_url: str = ""
     res: str = ""
     premium: bool = False
+    headers: Dict[str, str] = field(default_factory=dict)
 
     @property
     def url(self) -> str:

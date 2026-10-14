@@ -6,7 +6,7 @@ import subprocess
 import tempfile
 import threading
 from typing import Optional
-from .utils import is_bundled
+from .utils import is_bundled, get_stream_referer
 from .logger import logger
 
 class MpvTracker:
@@ -379,6 +379,7 @@ class PlayerManager:
         if not vlc_path:
             raise FileNotFoundError("VLC not found")
 
+        referer = get_stream_referer(url)
         vlc_args = [
             vlc_path,
             '--fullscreen',
@@ -387,6 +388,8 @@ class PlayerManager:
         ]
         if start_time and start_time > 0:
             vlc_args.append(f'--start-time={int(start_time)}')
+        if referer:
+            vlc_args.extend(['--http-referrer', referer])
             
         vlc_args.append(url)
         
@@ -406,9 +409,12 @@ class PlayerManager:
         if not celluloid_path:
             raise FileNotFoundError("Celluloid not found")
 
+        referer = get_stream_referer(url)
         args = [celluloid_path]
         if start_time and start_time > 0:
             args.append(f'--mpv-start={start_time}')
+        if referer:
+            args.append(f'--mpv-referrer={referer}')
         args.append(url)
         
         t_start = time.time()
@@ -422,9 +428,12 @@ class PlayerManager:
         if not iina_path:
             raise FileNotFoundError("IINA not found")
 
+        referer = get_stream_referer(url)
         args = [iina_path, '--keep-running']
         if start_time and start_time > 0:
             args.append(f'--mpv-start={start_time}')
+        if referer:
+            args.append(f'--mpv-referrer={referer}')
         args.append(url)
         
         t_start = time.time()
@@ -455,15 +464,7 @@ class PlayerManager:
             raise FileNotFoundError(f"MPV not found at: {mpv_path}")
 
         # Determine dynamic referer per provider
-        referer = None
-        if "vid3rb.com" in url:
-            referer = "https://video.vid3rb.com/"
-        elif "mediafire.com" in url:
-            referer = "https://www.mediafire.com/"
-        elif "ok.ru" in url:
-            referer = "https://ok.ru/"
-        elif "ab-hunter.com" in url or "anslayer.com" in url:
-            referer = "https://anslayer.com/"
+        referer = get_stream_referer(url)
 
         # Setup IPC Socket
         is_win = (os.name == 'nt')

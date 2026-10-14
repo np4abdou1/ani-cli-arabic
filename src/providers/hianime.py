@@ -81,15 +81,10 @@ class HiAnimeProvider(BaseAnimeProvider):
         html = resp.json().get('html')
         eps = []
         for m in re.finditer(r'data-number="([^"]+)"[\s\S]*?data-id="([0-9]+)"', html):
-            eps.append(Episode(number=m.group(1), display_num=m.group(1), url=m.group(2)))
+            eps.append(Episode(number=m.group(1), display_num=m.group(1), url=m.group(2), anime_id=anime_id))
         return eps
 
     def get_streaming_servers(self, anime_id: str, episode_num: str, anime_type: str = "SERIES") -> Optional[Dict[str, Any]]:
-        # In get_episodes, url holds the data-id
-        # We just need to search our episodes for this num to get the data-id, but we are passed episode_num.
-        # Wait, the CLI doesn't pass the episode object url to get_streaming_servers! It passes episode_num.
-        # So we must fetch the episodes again to find the data-id, or we hack it by passing data-id as display_num? No.
-        
         num_id = anime_id.split("-")[-1]
         resp = self._get(f"{self.BASE_URL}/api/theme/episode/list/{num_id}")
         if not resp: return None
@@ -144,12 +139,16 @@ class HiAnimeProvider(BaseAnimeProvider):
         return {
             "CurrentEpisode": {"zoko": m3u8},
             "Qualities": [
-                QualityOption("Auto", "zoko", "info", m3u8)
+                QualityOption("Auto", "zoko", "info", m3u8, headers={"Referer": "https://zokoanime.video/"})
             ]
         }
 
     def get_episode_streams(self, episode: Episode) -> List[QualityOption]:
-        return []
+        anime_id = getattr(episode, "anime_id", "")
+        if not anime_id:
+            return []
+        server_dict = self.get_streaming_servers(anime_id, episode.number)
+        return (server_dict or {}).get("Qualities", [])
 
     def get_latest_episodes(self, limit: int = 20) -> List[AnimeResult]:
         return self._parse_list(self._get(f"{self.BASE_URL}/home").text if self._get(f"{self.BASE_URL}/home") else "")

@@ -25,6 +25,7 @@ from rich.progress import (
 )
 
 from .models import Episode
+from .utils import get_stream_referer
 from .logger import logger
 
 
@@ -189,7 +190,10 @@ class StreamDownloader:
                 progress.update(task_id, total=file_size, completed=file_size)
             return True
 
+        auto_referer = get_stream_referer(url)
         req_headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)", **(headers or {})}
+        if auto_referer and "Referer" not in req_headers:
+            req_headers["Referer"] = auto_referer
 
         resume_byte_pos = 0
         if part_path.exists():

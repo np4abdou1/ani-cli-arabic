@@ -778,3 +778,20 @@ def clean_status(s: Optional[str]) -> str:
         return "Completed"
     s_str = str(s).strip()
     return AR_TO_EN_TYPES.get(s_str, s_str)
+
+def get_stream_referer(url: str) -> Optional[str]:
+    """Return required HTTP Referer header for upstream CDN video streams."""
+    if not url:
+        return None
+    url_lower = url.lower()
+    if "vid3rb.com" in url_lower:
+        return "https://video.vid3rb.com/"
+    elif "mediafire.com" in url_lower:
+        return "https://www.mediafire.com/"
+    elif "ok.ru" in url_lower:
+        return "https://ok.ru/"
+    elif "ab-hunter.com" in url_lower or "anslayer.com" in url_lower:
+        return "https://anslayer.com/"
+    elif "dramahot" in url_lower or "zokoanime" in url_lower or "hianime" in url_lower or "megaplay" in url_lower:
+        return "https://zokoanime.video/"
+    return None
