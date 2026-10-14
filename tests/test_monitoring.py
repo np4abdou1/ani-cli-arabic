@@ -227,6 +227,20 @@ class TestMonitoringSystem:
         assert m1 is m2
         assert m1 is monitor
 
+    def test_dev_branch_filtered_from_telemetry(self):
+        sent_requests = []
+
+        def mock_urlopen(req, timeout=2.0):
+            sent_requests.append(req)
+            return MagicMock(status=200)
+
+        with patch("src.monitoring.is_dev_environment", return_value=True), \
+             patch("urllib.request.urlopen", side_effect=mock_urlopen):
+            monitor.track_app_start()
+            time.sleep(0.1)
+
+        assert len(sent_requests) == 0
+
     def test_track_app_start_dispatches_launch_event(self):
         sent_requests = []
 
@@ -238,7 +252,8 @@ class TestMonitoringSystem:
             resp.__exit__.return_value = False
             return resp
 
-        with patch("urllib.request.urlopen", side_effect=mock_urlopen):
+        with patch("src.monitoring.is_dev_environment", return_value=False), \
+             patch("urllib.request.urlopen", side_effect=mock_urlopen):
             monitor.track_app_start()
             # Give background thread a moment to execute
             time.sleep(0.1)
@@ -258,18 +273,16 @@ class TestMonitoringSystem:
         assert "python_version" in payload
         assert payload["client_version"] == APP_VERSION
 
-    def test_track_video_play_dispatches_watch_event(self):
+    def test_track_video_play_is_noop_for_privacy(self):
         sent_requests = []
 
         def mock_urlopen(req, timeout=2.0):
             sent_requests.append(req)
-            resp = MagicMock()
-            resp.status = 200
-            resp.__enter__.return_value = resp
-            resp.__exit__.return_value = False
-            return resp
+            return MagicMock(status=200)
 
-        with patch("urllib.request.urlopen", side_effect=mock_urlopen):
+        with patch("src.monitoring.is_dev_environment", return_value=False), \
+             patch("urllib.request.urlopen", side_effect=mock_urlopen):
+            # Calling track_video_play must never dispatch any network telemetry
             monitor.track_video_play(
                 anime_title="Sousou no Frieren",
                 episode=28,
@@ -279,20 +292,7 @@ class TestMonitoringSystem:
             )
             time.sleep(0.1)
 
-        assert len(sent_requests) > 0
-        req = sent_requests[0]
-        payload = json.loads(req.data.decode("utf-8"))
-        assert payload["event_type"] == "watch"
-        assert payload["anime_title"] == "Sousou no Frieren"
-        assert payload["episode"] == "28"
-        assert payload["mode"] == "stream"
-        assert payload["provider"] == "anime3rb"
-        assert payload["duration"] == 1420
-        assert "fingerprint" in payload
-        assert "os_name" in payload
-        assert "distro" in payload
-        assert "base" in payload
-        assert "os_version" in payload
+        assert len(sent_requests) == 0
 
     def test_telemetry_respects_opt_out(self):
         sent_requests = []
@@ -305,7 +305,8 @@ class TestMonitoringSystem:
         mock_settings = MagicMock()
         mock_settings.get.side_effect = lambda k, default=None: False if k == "analytics" else default
 
-        with patch("src.settings.SettingsManager", return_value=mock_settings), \
+        with patch("src.monitoring.is_dev_environment", return_value=False), \
+             patch("src.settings.SettingsManager", return_value=mock_settings), \
              patch("urllib.request.urlopen", side_effect=mock_urlopen):
             monitor.track_app_start()
             monitor.track_video_play("Test Anime", 1)
@@ -315,7 +316,8 @@ class TestMonitoringSystem:
 
     def test_fail_fast_handles_network_failure(self):
         # Network errors should never raise exceptions in caller
-        with patch("urllib.request.urlopen", side_effect=urllib.error.URLError("Network unreachable")):
+        with patch("src.monitoring.is_dev_environment", return_value=False), \
+             patch("urllib.request.urlopen", side_effect=urllib.error.URLError("Network unreachable")):
             monitor.track_app_start()
             monitor.track_video_play("Test Anime", 1)
             time.sleep(0.1)

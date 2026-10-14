@@ -27,8 +27,8 @@ class SettingsManager:
             "show_donation": True,
             "theme": "auto",
             "anime_provider": "anime3rb",
-            "analytics": True,  # Allow users to opt-out of analytics
-            "debug_logging": False  # Turned OFF by default
+            "analytics": True,
+            "debug_logging": False
         }
         
         if not self.config_file.exists():

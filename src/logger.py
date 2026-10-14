@@ -1,7 +1,7 @@
 """
 Logging and crash reporting system for ani-cli-arabic.
-Captures local debug logs, records structured crash dumps, and dispatches
-diagnostic crash telemetry to the operational dashboard.
+Captures local debug logs, records structured crash dumps, and submits
+diagnostic error reports to help fix bugs.
 """
 
 import os
@@ -213,6 +213,13 @@ logger = DebugLogger()
 def send_crash_telemetry(payload_dict: Dict[str, Any]):
     """Sends crash diagnostics asynchronously to the /api/v2/crash endpoint with a 1.5s timeout."""
     try:
+        from .monitoring import is_dev_environment
+        if is_dev_environment():
+            return
+    except Exception:
+        pass
+
+    try:
         from .settings import SettingsManager
         if not SettingsManager().get("analytics", True):
             return
@@ -309,8 +316,8 @@ def record_crash(exc_type, exc_value, exc_traceback, context: str = "unhandled")
     # Append to debug.log
     logger.error("CRASH", f"Unhandled Exception ({crash_data['error_type']}): {crash_data['error_message']}\n{tb_str}")
 
-    # Dispatch to remote analytics worker matching v2 schema
-    telemetry_payload = {
+    # Dispatch error diagnostics
+    crash_payload = {
         "fingerprint": fingerprint,
         "error_type": crash_data["error_type"],
         "message": crash_data["error_message"],
@@ -323,7 +330,7 @@ def record_crash(exc_type, exc_value, exc_traceback, context: str = "unhandled")
         "command_args": sys.argv,
         "created_at": iso_timestamp
     }
-    send_crash_telemetry(telemetry_payload)
+    send_crash_telemetry(crash_payload)
 
     # Terminal alert
     print("\n\033[1;31m[!] ani-cli-arabic encountered an unexpected error:\033[0m")

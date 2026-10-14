@@ -256,17 +256,6 @@ class AniCliWrapper:
             poster_url=getattr(anime, 'thumbnail', ''),
             provider=getattr(self.api, 'name', 'Anime3rb')
         )
-        try:
-            from .monitoring import monitor
-            monitor.track_video_play(
-                anime_title=anime.title_en,
-                episode=str(ep.number),
-                mode="stream",
-                provider=getattr(self.api, 'name', 'Anime3rb'),
-                duration=int(dur)
-            )
-        except Exception:
-            pass
         return True
 
     def download_video(self, anime: Any, ep: Any, quality_override: Optional[str] = None) -> bool:
@@ -308,18 +297,6 @@ class AniCliWrapper:
         d_dir = self.settings_manager.get('download_directory', 'downloads') or 'downloads'
 
         res = download_file(direct_url, filename, self.console, mode=mode, download_dir=d_dir)
-        if res:
-            try:
-                from .monitoring import monitor
-                monitor.track_video_play(
-                    anime_title=anime.title_en,
-                    episode=str(ep.display_num),
-                    mode="download",
-                    provider=getattr(self.api, 'name', 'Anime3rb'),
-                    duration=0
-                )
-            except Exception:
-                pass
         return res
 
     def batch_download(self, anime: Any, episodes: List[Any]):
@@ -358,18 +335,6 @@ class AniCliWrapper:
             console=self.console,
             history_manager=self.history
         )
-        try:
-            from .monitoring import monitor
-            for ep in target_eps:
-                monitor.track_video_play(
-                    anime_title=anime.title_en,
-                    episode=str(getattr(ep, 'display_num', ep)),
-                    mode="download",
-                    provider=getattr(self.api, 'name', 'Anime3rb'),
-                    duration=0
-                )
-        except Exception:
-            pass
 
     def _process_anime_list(self, results: List[Any], title: str = "Select Anime"):
         if not results:
@@ -788,7 +753,6 @@ class AniCliWrapper:
             cur_auto = "ON" if self.settings_manager.get('auto_next', False) else "OFF"
             cur_rpc = "ON" if self.settings_manager.get('discord_rpc', True) else "OFF"
             cur_theme = self.settings_manager.get('theme', 'auto')
-            cur_analytics = "ON" if self.settings_manager.get('analytics', True) else "OFF"
 
             options = [
                 f"\033[36m1. Provider:\033[0m           {cur_prov}",
@@ -799,7 +763,6 @@ class AniCliWrapper:
                 f"\033[36m6. Autoplay Next:\033[0m      {cur_auto}",
                 f"\033[36m7. Discord RPC:\033[0m        {cur_rpc}",
                 f"\033[36m8. Theme:\033[0m              {cur_theme}",
-                f"\033[36m9. Anonymous Telemetry:\033[0m {cur_analytics}",
                 "← Back to Main Menu"
             ]
 
@@ -888,13 +851,6 @@ class AniCliWrapper:
                                         setattr(mod, attr_name, getattr(config_mod, attr_name))
                     self.console.print(f"[green]✔ Theme switched to: {chosen_t}[/green]")
                     time.sleep(0.6)
-            elif "Anonymous Telemetry:" in choice:
-                curr_a = bool(self.settings_manager.get('analytics', True))
-                new_a = not curr_a
-                self.settings_manager.set('analytics', new_a)
-                status_str = "[green]Enabled[/green]" if new_a else "[yellow]Disabled[/yellow]"
-                self.console.print(f"\nAnonymous Telemetry is now: {status_str}")
-                time.sleep(0.6)
 
     def _toggle_autoplay(self):
         self.autoplay = not self.autoplay

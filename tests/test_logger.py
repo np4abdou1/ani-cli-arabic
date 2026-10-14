@@ -73,6 +73,19 @@ class TestCrashTelemetry:
         assert isinstance(summary, str)
         assert len(summary) > 0
 
+    def test_dev_branch_filters_crash_telemetry(self):
+        sent_requests = []
+
+        def mock_urlopen(req, timeout=1.5):
+            sent_requests.append(req)
+            return MagicMock(status=200)
+
+        with patch("src.monitoring.is_dev_environment", return_value=True), \
+             patch("urllib.request.urlopen", side_effect=mock_urlopen):
+            send_crash_telemetry({"error_type": "DevCrash"})
+
+        assert len(sent_requests) == 0
+
     def test_send_crash_telemetry_schema(self):
         sent_requests = []
 
@@ -97,7 +110,8 @@ class TestCrashTelemetry:
             "command_args": ["ani-cli-arabic", "-i"]
         }
 
-        with patch("urllib.request.urlopen", side_effect=mock_urlopen):
+        with patch("src.monitoring.is_dev_environment", return_value=False), \
+             patch("urllib.request.urlopen", side_effect=mock_urlopen):
             send_crash_telemetry(payload)
 
         assert len(sent_requests) > 0

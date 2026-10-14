@@ -947,17 +947,6 @@ class AniCliArApp:
 
         if success:
             self.history.mark_watched(selected_anime.id, selected_ep.display_num, selected_anime.title_en)
-            try:
-                from .monitoring import monitor
-                monitor.track_video_play(
-                    anime_title=selected_anime.title_en,
-                    episode=str(selected_ep.display_num),
-                    mode="download",
-                    provider=getattr(self.provider, 'id', 'anime3rb'),
-                    duration=0
-                )
-            except Exception:
-                pass
 
         return success
 
@@ -987,18 +976,6 @@ class AniCliArApp:
                 console=self.ui.console,
                 history_manager=self.history
             )
-            try:
-                from .monitoring import monitor
-                for ep in target_eps:
-                    monitor.track_video_play(
-                        anime_title=selected_anime.title_en,
-                        episode=str(getattr(ep, 'display_num', ep)),
-                        mode="download",
-                        provider=getattr(self.provider, 'id', 'anime3rb'),
-                        duration=0
-                    )
-            except Exception:
-                pass
             try:
                 self.ui.console.input("[dim]Press Enter to return to menu...[/dim]")
             except (KeyboardInterrupt, EOFError):
@@ -1057,17 +1034,6 @@ class AniCliArApp:
                 )
                 if success:
                     self.history.mark_watched(selected_anime.id, selected_ep.display_num, selected_anime.title_en)
-                    try:
-                        from .monitoring import monitor
-                        monitor.track_video_play(
-                            anime_title=selected_anime.title_en,
-                            episode=str(selected_ep.display_num),
-                            mode="download",
-                            provider=getattr(self.provider, 'id', 'anime3rb'),
-                            duration=0
-                        )
-                    except Exception:
-                        pass
                     return "download"
                 return None
             else:
@@ -1111,17 +1077,6 @@ class AniCliArApp:
                     poster_url=getattr(selected_anime, 'thumbnail', ''),
                     provider=getattr(self.provider, 'id', '')
                 )
-                try:
-                    from .monitoring import monitor
-                    monitor.track_video_play(
-                        anime_title=selected_anime.title_en,
-                        episode=str(selected_ep.display_num),
-                        mode="stream",
-                        provider=getattr(self.provider, 'id', 'anime3rb'),
-                        duration=int(dur)
-                    )
-                except Exception:
-                    pass
                 self.rpc.update_selecting_episode(selected_anime.title_en, selected_anime.thumbnail)
                 return "watch"
         else:

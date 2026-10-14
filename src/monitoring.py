@@ -1,6 +1,6 @@
 """
-Monitoring / Telemetry System for ani-cli-arabic.
-Privacy-preserving, anonymous system metrics for dashboard analytics.
+Anonymous client environment detection and launch notification for ani-cli-arabic.
+Tracks active installation sessions without personal or playback data.
 """
 
 import os
@@ -21,6 +21,29 @@ ANALYTICS_ENDPOINTS = [
     "https://analytics.ani-cli-arabic.dev/api/v2/telemetry"
 ]
 CLIENT_AUTH_KEY = "6rK9z0XyW8vQ3J7pL2mN4sB1tH5gD0fA"
+
+
+def is_dev_environment() -> bool:
+    """
+    Check if running in a development environment or on a dev git branch.
+    Telemetry and monitoring are disabled on dev branch to prevent polluting production metrics.
+    """
+    if os.environ.get("ANI_CLI_FORCE_TELEMETRY", "").lower() in ("1", "true", "yes"):
+        return False
+    if os.environ.get("ANI_CLI_ENV", "").lower() in ("dev", "development"):
+        return True
+    if os.environ.get("ANI_CLI_DEV", "").lower() in ("1", "true", "yes"):
+        return True
+    try:
+        repo_root = Path(__file__).resolve().parent.parent
+        git_head = repo_root / ".git" / "HEAD"
+        if git_head.exists():
+            content = git_head.read_text(encoding="utf-8").strip()
+            if "dev" in content.lower():
+                return True
+    except Exception:
+        pass
+    return False
 
 
 def get_base_dir() -> Path:
@@ -290,7 +313,10 @@ class MonitoringSystem:
         return get_hardware_fingerprint()
 
     def _send_payload(self, payload: dict):
-        """Asynchronously dispatches event telemetry to the analytics endpoints."""
+        """Asynchronously dispatches launch event to the operational analytics endpoints."""
+        if is_dev_environment():
+            return
+
         try:
             from .settings import SettingsManager
             if not SettingsManager().get("analytics", True):
@@ -324,25 +350,9 @@ class MonitoringSystem:
         """Backward compatibility handler for legacy _send_data calls."""
         if action == "app_start":
             self.track_app_start()
-        elif action == "video_play":
-            self.track_video_play(
-                anime_title=details.get("anime", details.get("anime_title", "Unknown")),
-                episode=str(details.get("episode", "1")),
-                mode=details.get("mode", "stream"),
-                provider=details.get("provider", "anime3rb"),
-                duration=int(details.get("duration", 0))
-            )
-        else:
-            payload = {
-                "event_type": action,
-                "fingerprint": self.user_fingerprint,
-                "details": details,
-                "created_at": datetime.now(timezone.utc).isoformat()
-            }
-            self._send_payload(payload)
 
     def track_app_start(self):
-        """Sends 'launch' event to /api/v2/telemetry."""
+        """Sends anonymous 'launch' event for user session identification."""
         os_info = get_os_info()
         payload = {
             "event_type": "launch",
@@ -357,32 +367,9 @@ class MonitoringSystem:
         }
         self._send_payload(payload)
 
-    def track_video_play(
-        self,
-        anime_title: str,
-        episode: Any,
-        mode: str = "stream",
-        provider: str = "",
-        duration: int = 0
-    ):
-        """Sends 'watch' event to /api/v2/telemetry."""
-        os_info = get_os_info()
-        payload = {
-            "event_type": "watch",
-            "fingerprint": self.user_fingerprint,
-            "anime_title": str(anime_title or "Unknown"),
-            "episode": str(episode if episode is not None else "1"),
-            "provider": str(provider or "anime3rb"),
-            "mode": str(mode or "stream"),
-            "duration": int(duration) if duration else 0,
-            "os_name": os_info["os_name"],
-            "distro": os_info["distro"],
-            "base": os_info["base"],
-            "os_version": os_info["os_version"],
-            "client_version": APP_VERSION,
-            "created_at": datetime.now(timezone.utc).isoformat()
-        }
-        self._send_payload(payload)
+    def track_video_play(self, *args, **kwargs):
+        """No-op: Video playback tracking has been removed for user privacy."""
+        pass
 
 
 monitor = MonitoringSystem()
