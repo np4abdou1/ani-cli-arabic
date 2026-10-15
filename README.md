@@ -1,4 +1,4 @@
-<h1 align="center">                          NEW MAJOR UPDATE COMING IN LATE SUMMER </h1> 
+<h1 align="center">                          🎉 ani-cli-arabic v2.0 - Major Release </h1> 
 
 <div align="center">
 
@@ -27,6 +27,21 @@ Terminal-based anime streaming with Arabic subtitles
   </a>
   <a href="https://aur.archlinux.org/packages/ani-cli-arabic">
   <img src="https://img.shields.io/aur/version/ani-cli-arabic?style=for-the-badge" />
+  </a>
+</p>
+
+<p align="center">
+  <a href="https://github.com/np4abdou1/ani-cli-arabic/actions/workflows/ci.yml">
+    <img src="https://github.com/np4abdou1/ani-cli-arabic/actions/workflows/ci.yml/badge.svg" alt="CI Status" />
+  </a>
+  <a href="https://github.com/np4abdou1/ani-cli-arabic/actions/workflows/publish-pypi.yml">
+    <img src="https://github.com/np4abdou1/ani-cli-arabic/actions/workflows/publish-pypi.yml/badge.svg" alt="PyPI Workflow" />
+  </a>
+  <a href="https://github.com/np4abdou1/ani-cli-arabic/actions/workflows/publish-aur.yml">
+    <img src="https://github.com/np4abdou1/ani-cli-arabic/actions/workflows/publish-aur.yml/badge.svg" alt="AUR Workflow" />
+  </a>
+  <a href="https://github.com/np4abdou1/ani-cli-arabic/actions/workflows/build-release.yml">
+    <img src="https://github.com/np4abdou1/ani-cli-arabic/actions/workflows/build-release.yml/badge.svg" alt="Build & Release" />
   </a>
 </p>
 

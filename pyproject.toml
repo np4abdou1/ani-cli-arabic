@@ -54,9 +54,9 @@ Changelog = "https://github.com/np4abdou1/ani-cli-arabic/releases"
 ani-cli-arabic = "src.app:main"
 ani-cli-ar = "src.app:main"
 
-[tool.setuptools]
-packages = ["src"]
-include-package-data = true
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["src*"]
 
 [tool.setuptools.dynamic]
 version = {attr = "src.version.__version__"}

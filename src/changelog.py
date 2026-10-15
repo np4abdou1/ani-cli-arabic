@@ -26,46 +26,46 @@ from .utils import get_key, RawTerminal
 
 _CHANGELOG_ITEMS: List[Dict[str, Any]] = [
     {
+        "badge": "V2.0 Core",
+        "badge_style": "bold green",
+        "title": "Major V2.0 Architecture Release",
+        "desc": "Ground-up rewrite with faster startup, smoother scrolling, and zero lag across all terminals."
+    },
+    {
         "badge": "Providers",
         "badge_style": "bold cyan",
-        "title": "Multiple Streaming Providers",
-        "desc": "Search and stream from Anime3rb, Anime Slayer, Animeify, and AniDB (Sub/Dub)."
+        "title": "HiAnime & Multi-Source Streaming",
+        "desc": "Dynamic stream referer resolution, high-speed CDN, and seamless multi-sub/dub provider switching."
     },
     {
-        "badge": "Progress",
+        "badge": "Downloader",
         "badge_style": "bold yellow",
-        "title": "Watch History & Resume",
-        "desc": "Tracks playback time via MPV socket and resumes automatically from where you left off."
+        "title": "Native Chunked Batch Downloader",
+        "desc": "Built-in multithreaded downloader with resume support, zero external tools, and real-time progress."
     },
     {
-        "badge": "Interface",
+        "badge": "CLI Mode",
         "badge_style": "bold magenta",
-        "title": "Terminal Interface",
-        "desc": "Navigation shortcuts, favorite management, and quick provider switching."
+        "title": "Native FZF Flow & Action Menu",
+        "desc": "Clean search interface, mouse click support, no Arabic RTL glitches, and intuitive episode action menus."
     },
     {
-        "badge": "Players",
-        "badge_style": "bold green",
-        "title": "External Media Players",
-        "desc": "Playback support for MPV, VLC, Celluloid, IINA, and Syncplay."
-    },
-    {
-        "badge": "Announcements",
+        "badge": "Infrastructure",
         "badge_style": "bold blue",
-        "title": "Remote Announcements",
-        "desc": "Displays maintenance notices and updates configured on Cloudflare."
+        "title": "Resilient 3-Tier Fallback Engine",
+        "desc": "Zero downtime with automatic domain fallbacks across custom domain, Cloudflare Pages, and Workers."
     },
     {
-        "badge": "Search",
-        "badge_style": "bold cyan",
-        "title": "Arabic Search Normalization",
-        "desc": "Normalizes Arabic characters and provides typo-tolerant query fallbacks."
+        "badge": "Privacy",
+        "badge_style": "bold green",
+        "title": "Enhanced Privacy & Hardening",
+        "desc": "Removed playback telemetry and strictly isolated development builds to protect user privacy."
     },
     {
         "badge": "Updater",
-        "badge_style": "bold green",
-        "title": "Platform Auto-Updater",
-        "desc": "Direct updates for pip, pipx, AUR (yay/paru), Homebrew, and standalone binaries."
+        "badge_style": "bold yellow",
+        "title": "Seamless Cross-Platform Updates",
+        "desc": "One-click upgrades for pip, pipx, AUR (yay/paru), Homebrew, and standalone binaries."
     }
 ]
 

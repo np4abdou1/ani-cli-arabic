@@ -3,11 +3,14 @@ name: Publish to AUR
 on:
   release:
     types: [published]
+  push:
+    tags:
+      - 'v*'
   workflow_dispatch:
     inputs:
       version:
-        description: 'Version to publish (e.g., 1.2.0)'
-        required: true
+        description: 'Version to publish (e.g., 2.0.0)'
+        required: false
         type: string
 
 jobs:
@@ -22,12 +25,17 @@ jobs:
         run: |
           if [ "${{ github.event_name }}" == "release" ]; then
             VERSION="${{ github.event.release.tag_name }}"
+          elif [ -n "${{ inputs.version }}" ]; then
+            VERSION="${{ inputs.version }}"
+          elif [ -n "${{ github.ref_name }}" ] && [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            VERSION="${{ github.ref_name }}"
           else
-            VERSION="v${{ inputs.version }}"
+            VERSION=$(python3 -c "from src.version import __version__; print(__version__)")
           fi
           # Ensure VERSION starts with v
           if [[ $VERSION != v* ]]; then VERSION="v$VERSION"; fi
           echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+          echo "Target AUR version tag: $VERSION"
 
       - name: Calculate Checksum
         id: checksum
@@ -36,12 +44,25 @@ jobs:
           CLEAN_VER=${VERSION#v}
           URL="https://github.com/np4abdou1/ani-cli-arabic/archive/refs/tags/${VERSION}.tar.gz"
           
-          echo "Downloading $URL"
-          wget -q $URL -O source.tar.gz
-          SHA256=$(sha256sum source.tar.gz | cut -d ' ' -f 1)
+          echo "Downloading $URL with retries..."
+          for i in {1..5}; do
+            if wget -q "$URL" -O source.tar.gz && [ -s source.tar.gz ]; then
+              echo "Downloaded archive successfully."
+              break
+            fi
+            echo "Attempt $i failed, waiting 3s..."
+            sleep 3
+          done
           
+          if [ ! -s source.tar.gz ]; then
+            echo "Error: Failed to download release archive from $URL"
+            exit 1
+          fi
+
+          SHA256=$(sha256sum source.tar.gz | cut -d ' ' -f 1)
           echo "SHA256=$SHA256" >> $GITHUB_OUTPUT
           echo "CLEAN_VER=$CLEAN_VER" >> $GITHUB_OUTPUT
+          echo "Computed SHA256: $SHA256"
 
       - name: Generate PKGBUILD
         run: |

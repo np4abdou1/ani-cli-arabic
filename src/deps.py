@@ -31,9 +31,26 @@ FFMPEG_WIN_MIRRORS = [
     "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip"
 ]
 MPV_WIN_MIRRORS = [
-    "https://github.com/shinchiro/mpv-winbuild-cmake/releases/download/20260307/mpv-x86_64-v3-20260307-git-f9190e5.7z",
-    "https://sourceforge.net/projects/mpv-player-windows/files/64bit/mpv-x86_64-20240128-git-c95e1e1.7z/download"
+    "https://sourceforge.net/projects/mpv-player-windows/files/64bit/mpv-x86_64-20261011-git-accb7b2821.7z/download",
+    "https://github.com/shinchiro/mpv-winbuild-cmake/releases/download/20261015/mpv-x86_64-20261015-git-492bae0768.7z"
 ]
+
+
+def get_mpv_mirrors() -> List[str]:
+    mirrors = []
+    try:
+        r = requests.get("https://api.github.com/repos/shinchiro/mpv-winbuild-cmake/releases/latest", timeout=5)
+        if r.status_code == 200:
+            for asset in r.json().get("assets", []):
+                name = asset.get("name", "")
+                if name.startswith("mpv-x86_64-") and not name.startswith("mpv-x86_64-v3-") and name.endswith(".7z"):
+                    mirrors.append(asset.get("browser_download_url"))
+    except Exception:
+        pass
+    for m in MPV_WIN_MIRRORS:
+        if m not in mirrors:
+            mirrors.append(m)
+    return mirrors
 
 
 def is_installed(tool: str) -> bool:
@@ -188,7 +205,7 @@ def install_mpv_windows() -> bool:
         return False
 
     archive_path = DEPS_DIR / "mpv.7z"
-    if not download_file_with_progress(MPV_WIN_MIRRORS, archive_path, "MPV"):
+    if not download_file_with_progress(get_mpv_mirrors(), archive_path, "MPV"):
         return False
 
     try:
