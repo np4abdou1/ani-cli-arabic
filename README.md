@@ -40,9 +40,6 @@ Terminal-based anime streaming with Arabic subtitles
   <a href="https://github.com/np4abdou1/ani-cli-arabic/actions/workflows/publish-aur.yml">
     <img src="https://github.com/np4abdou1/ani-cli-arabic/actions/workflows/publish-aur.yml/badge.svg" alt="AUR Workflow" />
   </a>
-  <a href="https://github.com/np4abdou1/ani-cli-arabic/actions/workflows/build-release.yml">
-    <img src="https://github.com/np4abdou1/ani-cli-arabic/actions/workflows/build-release.yml/badge.svg" alt="Build & Release" />
-  </a>
 </p>
 
 <p align="center">

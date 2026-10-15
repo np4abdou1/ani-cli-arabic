@@ -65,7 +65,7 @@ _CHANGELOG_ITEMS: List[Dict[str, Any]] = [
         "badge": "Updater",
         "badge_style": "bold yellow",
         "title": "Seamless Cross-Platform Updates",
-        "desc": "One-click upgrades for pip, pipx, AUR (yay/paru), Homebrew, and standalone binaries."
+        "desc": "One-click upgrades for pip, pipx, AUR (yay/paru), and Homebrew."
     }
 ]
 
