@@ -292,18 +292,6 @@ This project is licensed under the **GNU General Public License v3.0**. See the 
 
 <div align="center">
 
-### ⚠️ Disclaimer
-
-</div>
-
-> [!CAUTION]
-> - `ani-cli-arabic` does not host any video streams; it acts strictly as a terminal scraper and client for publicly accessible third-party providers.
-> - Anonymous telemetry collects basic operational statistics (can be toggled in settings). No playback history or personal queries are ever stored or transmitted.
-
----
-
-<div align="center">
-
 Made with ❤️ by the anime community
 
 [⭐ Star this repo](https://github.com/np4abdou1/ani-cli-arabic) • [🐛 Report bugs](https://github.com/np4abdou1/ani-cli-arabic/issues) • [💬 Discussions](https://github.com/np4abdou1/ani-cli-arabic/discussions)

@@ -298,22 +298,6 @@ ani-cli-ar "Detective Conan"
 
 <div align="center">
 
-### ⚠️ إخلاء مسؤولية
-
-</div>
-
-<div dir="rtl">
-
-> [!CAUTION]
-> - أداة `ani-cli-arabic` لا تستضيف أي ملفات وسائط إطلاقاً، بل تعمل كأداة استخراج وعرض للمحتوى المتاح عمومياً عبر مزودي البث الخارجيين.
-> - تُجمع فقط إحصائيات مجهولة حول تشغيل النظام للتأكد من استقرار الخوادم (يمكن تعطيلها بالكامل من الإعدادات). لا يتم تسجيل أو إرسال أي سجلات تخص المشاهدة أو الكلمات المبحوث عنها.
-
----
-
-</div>
-
-<div align="center">
-
 صُنع بـ ❤️ من مجتمع الأنمي
 
 [⭐ ضع نجمة للمستودع](https://github.com/np4abdou1/ani-cli-arabic) • [🐛 أبلغ عن مشكلة](https://github.com/np4abdou1/ani-cli-arabic/issues) • [💬 النقاشات](https://github.com/np4abdou1/ani-cli-arabic/discussions)
