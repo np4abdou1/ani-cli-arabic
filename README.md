@@ -1,6 +1,6 @@
-<h1 align="center">                          🎉 ani-cli-arabic v2.0 - Major Release </h1>
+<h1 align="center">                          ani-cli-ar v2.0 - Major Release </h1>
 
-<div align="center">
+<div align="center"> 
 
 <h2>💖 Support This Open Source Project</h2>
 <p>Your support helps maintain the project and keeps the updates coming!</p>
