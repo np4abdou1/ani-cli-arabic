@@ -9,7 +9,7 @@
 </a>
 <br><br><br>
 
-Terminal-based anime streaming with Arabic subtitles
+Terminal-based anime streaming & batch downloading with Arabic and English subtitles
 
 <p align="center">
   <a href="https://github.com/np4abdou1/ani-cli-arabic/stargazers">
@@ -26,7 +26,7 @@ Terminal-based anime streaming with Arabic subtitles
     <img src="https://img.shields.io/pypi/v/ani-cli-arabic?style=for-the-badge" />
   </a>
   <a href="https://aur.archlinux.org/packages/ani-cli-arabic">
-  <img src="https://img.shields.io/aur/version/ani-cli-arabic?style=for-the-badge" />
+    <img src="https://img.shields.io/aur/version/ani-cli-arabic?style=for-the-badge" />
   </a>
 </p>
 
@@ -43,7 +43,7 @@ Terminal-based anime streaming with Arabic subtitles
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Python-3.8+-3776AB?style=for-the-badge&logo=python&logoColor=white" />
+  <img src="https://img.shields.io/badge/Python-3.9+-3776AB?style=for-the-badge&logo=python&logoColor=white" />
   <img src="https://img.shields.io/badge/License-GPL--3.0-green?style=for-the-badge" />
 </p>
 
@@ -51,7 +51,7 @@ Terminal-based anime streaming with Arabic subtitles
 
 ## 📑 Navigation
 
-[Installation](#-installation) • [Features](#-what-can-you-do) • [How to Use](#-how-to-use) • [Keyboard Shortcuts](#️-keyboard-shortcuts) • [Configuration](#%EF%B8%8F-configuration) • [Contributors](#-contributors) • [License](#-license)
+[What's New in v2.0](#-whats-new-in-v20) • [Installation](#-installation) • [How to Use](#-how-to-use) • [Key Features](#-key-features) • [Keyboard Shortcuts](#️-keyboard-shortcuts) • [Configuration](#%EF%B8%8F-configuration) • [Contributors](#-contributors) • [License](#-license)
 
 <br><br>
 
@@ -60,8 +60,7 @@ Terminal-based anime streaming with Arabic subtitles
   <img src="https://img.shields.io/badge/Language-Arabic-green?style=for-the-badge&logo=google-translate&logoColor=white" alt="Arabic">
 </a>
 
-<br>
-<br>
+<br><br>
 
 https://github.com/user-attachments/assets/a6c6882a-7c50-4a8d-aa9c-e56a6d4ff7eb
 
@@ -69,40 +68,55 @@ https://github.com/user-attachments/assets/a6c6882a-7c50-4a8d-aa9c-e56a6d4ff7eb
 
 ---
 
+## 🚀 What's New in v2.0?
+
+Version 2.0 is the largest architectural overhaul in the project's history:
+
+* 🌐 **Multi-Provider Ecosystem**: Stream seamlessly from 4 independent sources: **Anime3rb**, **Anime Slayer**, **Animeify**, and **HiAnime** (English Sub & Dub).
+* 📥 **Native Chunked Batch Downloader**: Built from scratch with parallel chunked streaming, automatic resume, and real-time speed indicators — with **zero external tools required** (no aria2c or yt-dlp).
+* ⚡ **Rebuilt Interactive CLI Mode (`-i`)**: Clean organic `fzf` flow, mouse navigation, no Arabic RTL clipping, and an interactive episode action menu (`Play`, `Download`, `Batch Download`, `Quality`).
+* 🎬 **Universal Player Support & Real-Time IPC**: Full playback support for **MPV**, **VLC**, **Celluloid**, **IINA**, and **Syncplay**. MPV integration monitors JSON-IPC sockets in real-time for seamless exact-second timestamp resume.
+* 🛡️ **Zero-Downtime Edge Infrastructure**: Automatic 3-tier domain fallback chains across custom domains, Cloudflare Pages, and Cloudflare Workers.
+* 🔒 **Hardened Privacy**: Completely removed playback tracking and isolated development branches from telemetry.
+* 🔄 **Seamless Platform Auto-Updater**: Instant automated updates across PyPI (`pip`), Arch Linux (`yay` / `paru`), and Homebrew.
+
+---
+
 ## 📦 Installation
 
-### Requirements
-Before installing, make sure you have: 
-- **Python 3.8 or newer** (Python 3.12 recommended, avoid 3.13+ due to numpy compilation issues)
-- **MPV media player** (for streaming)
-- **ffmpeg** (for video processing)
-- **fzf** (for fuzzing results)
+### Prerequisites
+- **Python 3.9 or newer** (Python 3.10 - 3.12 recommended)
+- **MPV media player** (recommended default player)
+- **ffmpeg** (for multimedia streams)
+- **fzf** (for interactive search and selection)
 
-> **⚠️ Important Note:** if you are using mac os, build from source.
+---
 
 ### Method 1: Install via pip (Recommended)
 
-The easiest way to get started: 
+The quickest way to get started on Linux, macOS, and Windows:
 
 ```bash
 pip install ani-cli-arabic
 ```
 
-Launch the app:
+Launch the application:
 ```bash
 ani-cli-arabic
-# or use the shorter command
+# or use the short alias
 ani-cli-ar
 ```
 
-To update to the latest version:
+Upgrade anytime:
 ```bash
 pip install --upgrade ani-cli-arabic
 ```
 
+---
+
 ### Method 2: Arch Linux (AUR)
 
-For Arch Linux users, install from the AUR: 
+For Arch Linux and derivative distributions (Manjaro, EndeavourOS, etc.):
 
 ```bash
 # Using yay
@@ -112,145 +126,144 @@ yay -S ani-cli-arabic
 paru -S ani-cli-arabic
 ```
 
+---
+
 ### Method 3: From Source
 
-Want to run the development version?
+Run the latest development code directly:
 
-**On Windows:**
-```powershell
-# Install MPV first
-scoop install mpv
-
-# Clone the repo and install dependencies
-git clone https://github.com/np4abdou1/ani-cli-arabic.git
-cd ani-cli-arabic
-pip install -r requirements.txt
-python main.py
-```
-
-**On Linux (Debian/Ubuntu):**
 ```bash
-# Get the dependencies
-sudo apt update && sudo apt install mpv git python3-pip ffmpeg
-
-# Clone and run
+# Clone the repository
 git clone https://github.com/np4abdou1/ani-cli-arabic.git
 cd ani-cli-arabic
+
+# Install dependencies
 pip install -r requirements.txt
+
+# Run
 python3 main.py
 ```
 
 ---
 
-## 🎯 What Can You Do?
+## 🎮 How to Use
 
-Here's everything this tool offers:
+### 1. Full TUI Mode (Default)
+Launch the application and navigate with your arrow keys:
+```bash
+ani-cli-arabic
+```
 
-### Streaming & Playback
-- **Multiple Quality Options**: Watch in 1080p, 720p, or 480p depending on your internet speed
-- **Batch Download**: Download multiple episodes at once to watch offline
-- **Trailer Support**: Watch YouTube trailers before committing to an anime
-- **Resume from History**: Pick up exactly where you left off ( buggy )
+### 2. Interactive CLI Mode (`-i`)
+Quickly search and play from the terminal using native `fzf` menus:
+```bash
+# Search and choose interactively
+ani-cli-ar -i "One Piece"
 
-### Discovery & Browsing
-- **Search Anime**: Find any anime and anime movie by name (supports both English and Japanese titles and arabic titles)
-- **Trending Now**: See what's currently popular
-- **Top Rated**: Browse the highest-rated anime of all time
-- **Browse by Genre**: Filter by Action, Romance, Isekai, and 12 other genres
-- **Browse by Studio**: Find anime from Toei Animation, MAPPA, Ufotable, and 20+ more studios
-- **Latest Releases**: Stay updated with the newest anime
+# Search in Arabic
+ani-cli-ar -i "ون بيس"
+```
 
-### Personal Library
-- **Watch History**: Keep track of everything you've watched with timestamps
-- **Favorites System**: Bookmark your favorite anime for quick access
-- **Episode Tracking**: The app remembers which episode you're on
+### 3. Provider Switching via CLI
+Specify your streaming provider directly on startup:
+```bash
+# Stream from Anime3rb (Arabic Sub)
+ani-cli-ar -p anime3rb "Naruto"
 
-### Interface & Experience
-- **Rich TUI (Terminal User Interface)**: Beautiful terminal interface built with Rich library
-- **17 Color Themes**: Choose from blue, red, purple, sunset, mint, lavender, and more 
-- **Discord Rich Presence**: Show off what you're watching on Discord with anime posters 
-<img width="864" height="372" alt="image" src="https://github.com/user-attachments/assets/eb8c5bc1-84dc-46a0-9b06-7efc5a5fee6d" />
+# Stream from HiAnime (English Sub/Dub)
+ani-cli-ar -p hianime "Attack on Titan"
 
-- **Smooth Navigation**: Intuitive keyboard controls
+# Stream from Anime Slayer
+ani-cli-ar -p anime_slayer "Bleach"
 
-### Technical Features
-- **Zero Ads**: Clean streaming experience
-- **Automatic Updates**: Built-in version checker notifies you of new releases, and yes this can be turned off.
-- **MPV/VLC Support**: Choose your preferred media player
-- **Dependency Auto-installer**: Automatically checks and installs missing dependencies, too lazy...
-- **CLI Mode**: Simple command-line mode for quick searches (`ani-cli-ar -i "Naruto"`) _interactive mode also runs if the terminal is too narrow_
-- **Cross-platform**: Works on Windows and Linux
+# Stream from Animeify
+ani-cli-ar -p animeify "Jujutsu Kaisen"
+```
+
+### 4. Direct Query Search
+```bash
+ani-cli-ar "Hunter x Hunter"
+```
 
 ---
 
-## 🎮 How to Use
+## 🎯 Key Features
 
-1. **Launch the app**:  Run `ani-cli-arabic` or `ani-cli-ar`
-2. **Browse or Search**: Use the main menu to search, view trending, or browse genres
-3. **Select an Anime**: Navigate with arrow keys and press Enter
-4. **Pick an Episode**: Choose which episode to watch
-5. **Select Quality**: Pick your preferred video quality
-6. **Enjoy**: MPV will launch and start streaming
+### 📺 Multi-Source Streaming & Providers
+- **Anime3rb**: High-speed direct CDN streams with Arabic subtitles.
+- **Anime Slayer**: Official API endpoints with episode servers.
+- **Animeify**: Mirror servers with multiple resolution choices.
+- **HiAnime**: Fast English subbed and dubbed streams with dynamic referer resolution.
 
-You can also use interactive mode for quick searches:
-```bash
-ani-cli-ar -i "One Piece"
-```
+### 📥 Built-in Chunked Batch Downloader
+- Download full seasons or specific episodes (e.g. `1-12`, `1,3,5`, or `all`).
+- Multi-threaded chunked downloads with pause/resume support.
+- Real-time download metrics: speed (MB/s), ETA, and visual percentage bar.
+- Standalone execution: No external CLI download managers needed.
+
+### 🎬 Universal Players & Smart History
+- **Supported Players**: MPV, VLC, Celluloid, IINA (macOS), and Syncplay (watch together with friends).
+- **Exact Resume**: Real-time MPV IPC socket stream saves exact watch progress; resumes right where you left off.
+- **Favorites & History**: Dedicated tabs to bookmark titles and revisit previous watches.
+
+### 🎨 Modern Terminal UI & Themes
+- **17 Custom Themes**: blue, red, green, purple, cyan, yellow, pink, orange, teal, magenta, lime, coral, lavender, gold, mint, rose, sunset.
+- **Discord Rich Presence**: Live status showing current anime poster, title, and episode.
+- **Arabic Search Normalization**: Typo-tolerant query normalization handling hamza, taa marbuta, and latinized names.
 
 ---
 
 ## ⌨️ Keyboard Shortcuts
 
-| Key | What it Does |
-|-----|--------------|
-| **↑ / ↓** | Navigate through lists |
-| **Enter** | Select/Confirm choice |
-| **G** | Jump directly to an episode number |
+### Main Menu & Navigation
+| Key | Action |
+| :---: | :--- |
+| **↑ / ↓** or **j / k** | Navigate through lists and menus |
+| **Enter** | Select / Confirm choice |
+| **G** | Jump directly to episode number |
 | **B** | Go back to previous screen |
-| **Q / Esc** | Quit the application |
-| **Space** | Pause/Resume video (in player) |
-| **← / →** | Rewind/Forward 5 seconds |
+| **Q** / **Esc** | Quit application |
+| **S** | Open Search prompt |
+| **T** | View Trending anime |
+| **R** | View Top Rated anime |
+| **F** | Open Favorites |
+| **H** | Open Watch History |
+| **O** | Open Settings menu |
+| **D** | Support project (Donate) |
+
+### In Video Player (MPV)
+| Key | Action |
+| :---: | :--- |
+| **Space** | Pause / Resume playback |
+| **← / →** | Seek 5 seconds backward / forward |
+| **[ / ]** | Decrease / Increase playback speed |
 | **F** | Toggle fullscreen |
+| **9 / 0** | Volume down / up |
+| **Q** | Stop and save resume timestamp |
 
 ---
 
 ## ⚙️ Configuration
 
-Settings are stored locally in `~/.ani-cli-arabic/database/config.json`
+Settings are saved locally in `~/.ani-cli-arabic/database/config.json`.
 
-### Available Settings
+### Settings Menu Options
+Access the settings menu (`[O]`) from the main screen to configure:
 
-Access the settings menu from the main screen to customize:
-
-- **Default Quality**: Set your preferred quality (1080p, 720p, or 480p)
-- **Media Player**: Choose between MPV or VLC
-- **Auto-next Episode**: Toggle automatic episode continuation
-- **Discord Rich Presence**:  Show or hide Discord activity
-- **Theme Color**: Pick from 17 beautiful color schemes: 
-  - blue, red, green, purple, cyan, yellow, pink, orange, teal, magenta
-  - lime, coral, lavender, gold, mint, rose, sunset
-- **Analytics**:  Opt-in/out of anonymous usage stats - this is auto enabled by default.
-- **Update Checking**: Toggle automatic update notifications
-
-You can also manually edit the config file if you prefer. 
-
----
-
-## Star History
-
-<a href="https://www.star-history.com/#np4abdou1/ani-cli-arabic&type=date&legend=top-left">
- <picture>
-   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=np4abdou1/ani-cli-arabic&type=date&theme=dark&legend=top-left" />
-   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=np4abdou1/ani-cli-arabic&type=date&legend=top-left" />
-   <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=np4abdou1/ani-cli-arabic&type=date&legend=top-left" />
- </picture>
-</a>
+- **Active Provider**: Switch between `anime3rb`, `anime_slayer`, `animeify`, and `hianime`.
+- **Default Quality**: Set default resolution (`1080p`, `720p`, `480p`, or `Ask`).
+- **Media Player**: Choose between `mpv`, `vlc`, `celluloid`, `iina`, or `syncplay`.
+- **Auto-next Episode**: Automatically play the next episode upon completion.
+- **Discord Rich Presence**: Toggle Discord profile activity on or off.
+- **Theme Color**: Switch instantly across 17 color palettes.
+- **Download Directory**: Customize your default anime downloads folder.
+- **Analytics & Updates**: Toggle anonymous health telemetry or auto-update notifications.
 
 ---
 
 ## 👥 Contributors
 
-Special thanks to everyone who helped make this project happen: 
+Special thanks to everyone who helped build, test, and maintain this project:
 
 <div align="center">
 
@@ -269,39 +282,30 @@ Want to contribute? Feel free to open issues or submit pull requests!
 
 ## 📄 License
 
-This project is licensed under the **GNU General Public License v3.0**. 
+This project is licensed under the **GNU General Public License v3.0**. See the [LICENSE](LICENSE) file for details.
 
-You're free to use, modify, and distribute this software under the terms of the GPL-3.0 license.  See the [LICENSE](LICENSE) file for the full legal text.
-
-**In simple terms:**
-- ✅ Use it for personal or commercial purposes
-- ✅ Modify the source code
-- ✅ Distribute it to others
-- ⚠️ Any modifications must also be open source under GPL-3.0
-- ⚠️ Include the original copyright notice
+- ✅ Free for personal and educational use
+- ✅ Open source and community-driven
+- ⚠️ Any modifications or forks must remain open source under GPL-3.0
 
 ---
 
 <div align="center">
 
-### ⚠️ Important Notice
+### ⚠️ Disclaimer
 
 </div>
 
-> [! CAUTION]
-> **By using this software you understand:**
-> 
-> - Anonymous usage statistics are collected for the GitHub page stats banner (can be disabled in settings)
-> - The project is licensed under GPL-3.0 - see [LICENSE](LICENSE) for details
-> - We do not host any content; all streams are from third-party sources
-> - This tool is for personal use and educational purposes only
+> [!CAUTION]
+> - `ani-cli-arabic` does not host any video streams; it acts strictly as a terminal scraper and client for publicly accessible third-party providers.
+> - Anonymous telemetry collects basic operational statistics (can be toggled in settings). No playback history or personal queries are ever stored or transmitted.
 
 ---
 
-<br>
+<div align="center">
 
 Made with ❤️ by the anime community
 
-[⭐ Star this repo](https://github.com/np4abdou1/ani-cli-arabic) | [🐛 Report bugs](https://github.com/np4abdou1/ani-cli-arabic/issues) | [💬 Discussions](https://github.com/np4abdou1/ani-cli-arabic/discussions)
+[⭐ Star this repo](https://github.com/np4abdou1/ani-cli-arabic) • [🐛 Report bugs](https://github.com/np4abdou1/ani-cli-arabic/issues) • [💬 Discussions](https://github.com/np4abdou1/ani-cli-arabic/discussions)
 
 </div>
