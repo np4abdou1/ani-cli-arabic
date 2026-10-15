@@ -5,6 +5,7 @@ Tests provider contracts, scrapers, CLI/TUI logic, settings, history, and player
 
 import sys
 import tempfile
+import pytest
 from pathlib import Path
 
 # Ensure root directory is on PYTHONPATH
