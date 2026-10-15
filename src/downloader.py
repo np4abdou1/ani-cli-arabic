@@ -8,8 +8,8 @@ import re
 import time
 from pathlib import Path
 from dataclasses import dataclass
-from typing import Optional, List, Dict, Any
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from typing import Optional, List, Dict, Any, Tuple
+from concurrent.futures import ThreadPoolExecutor, wait, FIRST_COMPLETED
 import threading
 
 import requests
@@ -143,7 +143,7 @@ def prompt_download_options(
         if batch_mode:
             p_prompt = console.input("  [cyan]Parallel Downloads[/cyan] [dim](1-5, default 2)[/dim]: ").strip()
             if p_prompt.isdigit():
-                parallel = max(1, min(6, int(p_prompt)))
+                parallel = max(1, min(5, int(p_prompt)))
 
         # 4. Speed Limit
         s_prompt = console.input("  [cyan]Speed Limit[/cyan] [dim](0=Unlimited, or e.g. 2M, 500K)[/dim]: ").strip()
@@ -278,6 +278,30 @@ def resolve_episode_download_url(
     preferred_quality: str = "1080p"
 ) -> Optional[str]:
     """Extract direct download stream URL for an episode with multi-provider fallback."""
+    target = resolve_episode_download_target(api, anime, ep, preferred_quality)
+    return target[0] if target else None
+
+
+def is_hls_url(url: str) -> bool:
+    return url.split("?", 1)[0].lower().endswith(".m3u8")
+
+
+def episode_filename(anime: Any, ep: Episode, quality: str) -> str:
+    return sanitize_filename(f"{anime.title_en} - Ep {ep.display_num} [{quality}].mp4")
+
+
+def is_already_downloaded(dest_path: Path) -> bool:
+    part_path = dest_path.with_suffix(dest_path.suffix + ".part")
+    return dest_path.exists() and dest_path.stat().st_size > 0 and not part_path.exists()
+
+
+def resolve_episode_download_target(
+    api: Any,
+    anime: Any,
+    ep: Episode,
+    preferred_quality: str = "1080p"
+) -> Optional[Tuple[str, Dict[str, str]]]:
+    """Extract (direct stream URL, required request headers) for an episode with multi-provider fallback."""
     try:
         ep_num = getattr(ep, "number", "1")
         anime_id = getattr(anime, "id", "")
@@ -305,18 +329,18 @@ def resolve_episode_download_url(
                 current_ep = s_data.get("CurrentEpisode", {})
                 direct_url = current_ep.get(getattr(target, "server_key", ""))
             if direct_url and direct_url.startswith("http"):
-                return direct_url
+                return direct_url, dict(getattr(target, "headers", None) or {})
 
         # 2. Fallback to DirectStreams dict
         if isinstance(s_data, dict) and "DirectStreams" in s_data:
             direct_streams = s_data["DirectStreams"]
             if preferred_quality in direct_streams:
-                return direct_streams[preferred_quality]
+                return direct_streams[preferred_quality], {}
             for k in [f"{clean_pref}p", "1080p", "720p", "480p"]:
                 if k in direct_streams:
-                    return direct_streams[k]
+                    return direct_streams[k], {}
             if direct_streams:
-                return next(iter(direct_streams.values()))
+                return next(iter(direct_streams.values())), {}
 
         # 3. Fallback to CurrentEpisode dict keys (legacy keys)
         if isinstance(s_data, dict) and "CurrentEpisode" in s_data:
@@ -324,10 +348,10 @@ def resolve_episode_download_url(
             key_map = {"1080": "FRFhdQ", "720": "FRLink", "480": "FRLowQ"}
             target_key = key_map.get(clean_pref, "FRFhdQ")
             if target_key in cur_ep and cur_ep[target_key]:
-                return cur_ep[target_key]
+                return cur_ep[target_key], {}
             for fallback_key in ["FRFhdQ", "FRLink", "FRLowQ"]:
                 if fallback_key in cur_ep and cur_ep[fallback_key]:
-                    return cur_ep[fallback_key]
+                    return cur_ep[fallback_key], {}
 
         return None
     except Exception as e:
@@ -344,27 +368,38 @@ def execute_batch_download(
     console: Console,
     history_manager: Optional[Any] = None
 ) -> Dict[str, int]:
-    """Resolves links and runs concurrent downloads with Rich progress dashboard."""
-    console.print(f"\n[cyan]Resolving stream links for {len(episodes)} episodes...[/cyan]")
+    """Downloads episodes concurrently with a Rich progress dashboard.
 
-    targets = []
-    with console.status("[bold blue]Fetching direct download URLs...[/bold blue]"):
-        for ep in episodes:
-            url = resolve_episode_download_url(api, anime, ep, config.quality)
-            if url:
-                fn = sanitize_filename(f"{anime.title_en} - Ep {ep.display_num} [{config.quality}].mp4")
-                targets.append((ep, url, config.save_dir / fn))
-            else:
-                console.print(f"  [yellow]⚠ Warning: Could not resolve link for Episode {ep.display_num}[/yellow]")
+    Episodes already on disk are skipped before any link is resolved. Links are
+    resolved just before each download so signed URLs don't expire in the queue.
+    A failed episode never stops the batch; failures are listed at the end.
+    """
+    pending: List[Tuple[Episode, Path]] = []
+    skipped = 0
+    for ep in episodes:
+        dest_path = config.save_dir / episode_filename(anime, ep, config.quality)
+        if is_already_downloaded(dest_path):
+            skipped += 1
+        else:
+            pending.append((ep, dest_path))
 
-    if not targets:
-        console.print("[bold red]✖ No playable stream links could be resolved.[/bold red]\n")
-        return {"success": 0, "failed": len(episodes)}
+    if skipped:
+        console.print(f"\n[dim]Skipping {skipped} episode(s) already downloaded.[/dim]")
+    if not pending:
+        console.print("[bold green]✓ All selected episodes are already downloaded.[/bold green]")
+        console.print(f"[dim]Saved to: {config.save_dir}[/dim]\n")
+        return {"success": 0, "failed": 0, "skipped": skipped}
 
-    console.print(f"[green]✓ Successfully resolved {len(targets)}/{len(episodes)} stream links.[/green]\n")
+    total = len(pending)
+    console.print(f"\n[cyan]Downloading {total} episode(s) of {anime.title_en}...[/cyan]")
 
     downloader = StreamDownloader(speed_limit_bytes=config.speed_limit_bytes)
-    results = {"success": 0, "failed": len(episodes) - len(targets)}
+    # Providers are scraped one request at a time, as before; only file transfers run in parallel.
+    resolve_lock = threading.Lock()
+    failures: List[Tuple[Episode, str]] = []
+    succeeded = 0
+    done = 0
+    cancelled = False
 
     with Progress(
         SpinnerColumn(),
@@ -377,42 +412,73 @@ def execute_batch_download(
         console=console,
         transient=False
     ) as progress:
-        overall_task = progress.add_task(
-            f"[bold green]Overall Progress ({len(targets)} eps)",
-            total=len(targets)
-        )
+        overall_task = progress.add_task(f"[bold green]Downloading 0/{total}", total=total)
 
-        def _worker(ep, url, dest_path):
-            task_id = progress.add_task(f"Ep {ep.display_num}", total=None)
-            ok = downloader.download(url, dest_path, progress, task_id)
-            progress.remove_task(task_id)
-            progress.advance(overall_task, 1)
-            return ep, ok
+        def _worker(ep: Episode, dest_path: Path) -> Tuple[Episode, Optional[str]]:
+            if downloader.stop_requested.is_set():
+                return ep, "cancelled"
+            task_id = progress.add_task(f"Ep {ep.display_num} (resolving)", total=None)
+            try:
+                with resolve_lock:
+                    target = resolve_episode_download_target(api, anime, ep, config.quality)
+                if not target:
+                    return ep, "could not resolve a download link"
+                url, headers = target
+                if is_hls_url(url):
+                    return ep, "stream is HLS (.m3u8), which the downloader does not support"
+                progress.update(task_id, description=f"Ep {ep.display_num}")
+                if downloader.download(url, dest_path, progress, task_id, headers=headers):
+                    return ep, None
+                return ep, "cancelled" if downloader.stop_requested.is_set() else "download failed (see log)"
+            except Exception as e:
+                return ep, str(e) or e.__class__.__name__
+            finally:
+                progress.remove_task(task_id)
 
+        executor = ThreadPoolExecutor(max_workers=config.max_parallel)
+        futures = {executor.submit(_worker, ep, dest_path) for ep, dest_path in pending}
         try:
-            with ThreadPoolExecutor(max_workers=config.max_parallel) as executor:
-                futures = [executor.submit(_worker, ep, url, path) for ep, url, path in targets]
-                for fut in as_completed(futures):
-                    ep, ok = fut.result()
-                    if ok:
-                        results["success"] += 1
+            while futures:
+                # Poll with a timeout so Ctrl+C is handled promptly (blocking waits ignore it on Windows).
+                finished, futures = wait(futures, timeout=0.5, return_when=FIRST_COMPLETED)
+                for fut in finished:
+                    ep, error = fut.result()
+                    done += 1
+                    if error is None:
+                        succeeded += 1
                         if history_manager:
                             try:
                                 history_manager.mark_watched(anime.id, ep.display_num, anime.title_en)
                             except Exception:
                                 pass
                     else:
-                        results["failed"] += 1
+                        failures.append((ep, error))
+                        logger.error("DOWNLOAD", f"Batch: {anime.title_en} ep {ep.display_num} failed: {error}")
+                    progress.update(overall_task, advance=1, description=f"[bold green]Downloading {done}/{total}")
+            executor.shutdown(wait=True)
         except KeyboardInterrupt:
+            cancelled = True
             downloader.stop_requested.set()
-            try:
-                executor.shutdown(wait=False, cancel_futures=True)
-            except Exception:
-                pass
-            console.print("\n[yellow]Batch download cancelled by user.[/yellow]")
+            executor.shutdown(wait=False, cancel_futures=True)
 
-    console.print(
-        f"\n[bold green]Download finished:[/bold green] {results['success']} succeeded, {results['failed']} failed."
-    )
+    if cancelled:
+        console.print("\n[yellow]Batch download cancelled by user. Partial files are kept and resume next time.[/yellow]")
+
+    failures = [(ep, err) for ep, err in failures if err != "cancelled"]
+    summary = f"\n[bold green]Download finished:[/bold green] {succeeded} succeeded, {len(failures)} failed"
+    if skipped:
+        summary += f", {skipped} skipped (already downloaded)"
+    console.print(summary + ".")
+    if failures:
+        console.print("[bold red]Failed episodes:[/bold red]")
+        for ep, err in sorted(failures, key=lambda f: _episode_sort_key(f[0])):
+            console.print(f"  [red]✖ Ep {ep.display_num}[/red] [dim]— {err}[/dim]")
     console.print(f"[dim]Saved to: {config.save_dir}[/dim]\n")
-    return results
+    return {"success": succeeded, "failed": len(failures), "skipped": skipped}
+
+
+def _episode_sort_key(ep: Episode) -> float:
+    try:
+        return float(ep.display_num)
+    except (TypeError, ValueError):
+        return float("inf")

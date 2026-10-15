@@ -258,6 +258,58 @@ class TestNativeDownloader:
                 assert ok is False
                 mock_get.assert_not_called()
 
+    def _run_batch(self, tmpdir, episodes, servers_by_ep, download_ok=lambda url: True):
+        from unittest.mock import MagicMock, patch
+        from rich.console import Console
+        from src.downloader import DownloadConfig, execute_batch_download, StreamDownloader
+
+        api = MagicMock()
+        api.get_streaming_servers.side_effect = lambda anime_id, ep_num, anime_type: servers_by_ep.get(ep_num)
+        anime = AnimeResult(id="show", title_en="Show")
+        config = DownloadConfig(save_dir=Path(tmpdir), max_parallel=2, quality="1080p")
+        console = Console(file=open(Path(tmpdir) / "console.log", "w", encoding="utf-8"), width=120)
+        calls = []
+
+        def fake_download(self, url, dest_path, progress, task_id, headers=None):
+            calls.append((url, headers))
+            return download_ok(url)
+
+        with patch.object(StreamDownloader, "download", fake_download):
+            results = execute_batch_download(api, anime, episodes, config, console)
+        console.file.close()
+        return results, api, calls, (Path(tmpdir) / "console.log").read_text(encoding="utf-8")
+
+    def test_batch_skips_existing_before_resolving(self):
+        from src.models import Episode
+        episodes = [Episode(number=str(n), display_num=n) for n in (1, 2)]
+        servers = {str(n): {"Qualities": [QualityOption("1080p", "1080p", direct_url=f"http://cdn/{n}.mp4")]} for n in (1, 2)}
+        with tempfile.TemporaryDirectory() as tmpdir:
+            (Path(tmpdir) / "Show - Ep 1 [1080p].mp4").write_bytes(b"done")
+            results, api, calls, _ = self._run_batch(tmpdir, episodes, servers)
+            assert results == {"success": 1, "failed": 0, "skipped": 1}
+            resolved_eps = [c.args[1] for c in api.get_streaming_servers.call_args_list]
+            assert resolved_eps == ["2"]
+
+    def test_batch_continues_after_failures_and_lists_them(self):
+        from src.models import Episode
+        episodes = [Episode(number=str(n), display_num=n) for n in (1, 2, 3, 4)]
+        servers = {
+            "1": {"Qualities": [QualityOption("1080p", "1080p", direct_url="http://cdn/1.mp4", headers={"Referer": "https://x/"})]},
+            "2": None,
+            "3": {"Qualities": [QualityOption("Auto", "zoko", direct_url="http://cdn/3.m3u8")]},
+            "4": {"Qualities": [QualityOption("1080p", "1080p", direct_url="http://cdn/4.mp4")]},
+        }
+        with tempfile.TemporaryDirectory() as tmpdir:
+            results, _, calls, output = self._run_batch(
+                tmpdir, episodes, servers, download_ok=lambda url: not url.endswith("4.mp4")
+            )
+            assert results == {"success": 1, "failed": 3, "skipped": 0}
+            assert ("http://cdn/1.mp4", {"Referer": "https://x/"}) in calls
+            assert all(not url.endswith(".m3u8") for url, _ in calls)
+            assert "Downloading 4/4" in output
+            for ep_num in ("2", "3", "4"):
+                assert f"Ep {ep_num}" in output.split("Failed episodes:")[1]
+
     def test_parse_batch_ranges_comprehensive(self):
         from src.downloader import parse_batch_ranges
         assert parse_batch_ranges("1-5") == [1, 2, 3, 4, 5]
