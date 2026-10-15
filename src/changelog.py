@@ -115,9 +115,9 @@ _CHANGELOG_CACHE_FILE = Path.home() / ".ani-cli-arabic" / "database" / "changelo
 def fetch_remote_changelog(timeout: float = 0.8) -> Optional[Dict[str, Any]]:
     """Fetches remote changelog if configured in Cloudflare KV."""
     urls = [
-        "https://ani-cli-broadcast.talego4955.workers.dev/changelog.json",
+        "https://broadcast.ani-cli-arabic.dev/changelog.json",
         "https://anicliar-dashboard.pages.dev/changelog.json",
-        "https://broadcast.ani-cli-arabic.dev/changelog.json"
+        "https://ani-cli-broadcast.talego4955.workers.dev/changelog.json"
     ]
     for u in urls:
         try:

@@ -13,11 +13,11 @@ from typing import Optional, Dict, Any
 
 from .version import __version__
 
-# Remote Broadcast JSON Endpoints (Primary: Deployed Cloudflare Worker, Secondary: Custom Domain, Fallback: Raw GitHub)
+# Remote Broadcast JSON Endpoints (Primary: Custom Domain, Secondary: Cloudflare Pages, Tertiary: Cloudflare Worker, Fallback: Raw GitHub)
 BROADCAST_URLS = [
-    "https://ani-cli-broadcast.talego4955.workers.dev/broadcast.json",
-    "https://anicliar-dashboard.pages.dev/broadcast.json",
     "https://broadcast.ani-cli-arabic.dev/broadcast.json",
+    "https://anicliar-dashboard.pages.dev/broadcast.json",
+    "https://ani-cli-broadcast.talego4955.workers.dev/broadcast.json",
     "https://raw.githubusercontent.com/np4abdou1/ani-cli-arabic/main/broadcast.json"
 ]
 

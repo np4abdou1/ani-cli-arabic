@@ -16,9 +16,9 @@ from typing import Dict, Any, Optional
 from .version import APP_VERSION
 
 ANALYTICS_ENDPOINTS = [
+    "https://analytics.ani-cli-arabic.dev/api/v2/telemetry",
     "https://anicliar-dashboard.pages.dev/api/v2/telemetry",
-    "https://ani-cli-arabic-analytics.talego4955.workers.dev/api/v2/telemetry",
-    "https://analytics.ani-cli-arabic.dev/api/v2/telemetry"
+    "https://ani-cli-arabic-analytics.talego4955.workers.dev/api/v2/telemetry"
 ]
 CLIENT_AUTH_KEY = "6rK9z0XyW8vQ3J7pL2mN4sB1tH5gD0fA"
 

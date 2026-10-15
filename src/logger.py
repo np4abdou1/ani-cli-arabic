@@ -19,9 +19,9 @@ from typing import Optional, Any, Dict, List
 from .version import APP_VERSION
 
 CRASH_ENDPOINTS = [
+    "https://analytics.ani-cli-arabic.dev/api/v2/crash",
     "https://anicliar-dashboard.pages.dev/api/v2/crash",
-    "https://ani-cli-arabic-analytics.talego4955.workers.dev/api/v2/crash",
-    "https://analytics.ani-cli-arabic.dev/api/v2/crash"
+    "https://ani-cli-arabic-analytics.talego4955.workers.dev/api/v2/crash"
 ]
 CLIENT_AUTH_KEY = "6rK9z0XyW8vQ3J7pL2mN4sB1tH5gD0fA"
 
