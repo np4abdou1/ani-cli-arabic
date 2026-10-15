@@ -1,0 +1,85 @@
+"""
+Provider Manager for ani-cli-arabic
+Handles provider registry, discovery, dynamic switching, and lifecycle management.
+"""
+
+from typing import Dict, List, Type, Optional
+from .base import BaseAnimeProvider
+from .anime3rb import Anime3rbProvider
+from .anime_slayer import AnimeSlayerProvider
+from .hianime import HiAnimeProvider
+from .animeify import AnimeifyProvider
+
+
+class ProviderManager:
+    """Registry and factory for all available anime providers."""
+
+    _PROVIDERS: Dict[str, Type[BaseAnimeProvider]] = {
+        "anime3rb": Anime3rbProvider,
+        "anime_slayer": AnimeSlayerProvider,
+        "animeify": AnimeifyProvider,
+        "animefy": AnimeifyProvider,
+        "anidb": HiAnimeProvider,
+        "ani-cli": HiAnimeProvider,
+        "hianime": HiAnimeProvider,
+    }
+
+    _INSTANCES: Dict[str, BaseAnimeProvider] = {}
+    _ACTIVE_ID: str = "anime3rb"
+
+    @classmethod
+    def register_provider(cls, provider_id: str, provider_cls: Type[BaseAnimeProvider]):
+        """Register a new anime provider."""
+        cls._PROVIDERS[provider_id.lower()] = provider_cls
+
+    @classmethod
+    def get_provider(cls, provider_id: Optional[str] = None) -> BaseAnimeProvider:
+        """Get an instantiated provider instance by ID (or currently active provider)."""
+        pid = (provider_id or cls._ACTIVE_ID).lower()
+        
+        if pid not in cls._PROVIDERS:
+            pid = "anime3rb"
+
+        if pid not in cls._INSTANCES:
+            provider_cls = cls._PROVIDERS[pid]
+            cls._INSTANCES[pid] = provider_cls()
+
+        return cls._INSTANCES[pid]
+
+    @classmethod
+    def set_active_provider(cls, provider_id: str):
+        """Set the active default provider."""
+        pid = provider_id.lower()
+        if pid in cls._PROVIDERS:
+            cls._ACTIVE_ID = pid
+
+    @classmethod
+    def get_active_provider_id(cls) -> str:
+        """Get current active provider ID."""
+        return cls._ACTIVE_ID
+
+    @classmethod
+    def list_providers(cls) -> List[Dict[str, str]]:
+        """List all available providers with their metadata."""
+        seen = set()
+        providers = []
+        for pid, p_cls in cls._PROVIDERS.items():
+            if p_cls in seen:
+                continue
+            seen.add(p_cls)
+            providers.append({
+                "id": getattr(p_cls, "id", pid),
+                "name": getattr(p_cls, "name", pid.title()),
+                "description": getattr(p_cls, "description", "")
+            })
+        return providers
+
+    @classmethod
+    def get_available_providers(cls) -> List[Dict[str, str]]:
+        """Alias for list_providers for backward compatibility."""
+        return cls.list_providers()
+
+    @classmethod
+    def get_provider_choices(cls) -> List[str]:
+        """Get list of valid provider IDs."""
+        return list(cls._PROVIDERS.keys())

@@ -4,8 +4,174 @@ import time
 import shutil
 import subprocess
 import tempfile
+import threading
 from typing import Optional
-from .utils import is_bundled
+from .utils import is_bundled, get_stream_referer
+from .logger import logger
+
+class MpvTracker:
+    """
+    High-performance real-time MPV IPC state tracker.
+    Continuously queries and observes playback position, duration, percentage,
+    paused state, and completion status.
+    """
+    def __init__(self, sock_path: str):
+        self.sock_path = sock_path
+        self.state = {
+            'time_pos': 0.0,
+            'duration': 0.0,
+            'percent': 0.0,
+            'paused': False,
+            'completed': False
+        }
+        self._stop_event = threading.Event()
+        self._thread = None
+
+    def start(self):
+        self._thread = threading.Thread(target=self._run, daemon=True)
+        self._thread.start()
+
+    def stop(self):
+        self._stop_event.set()
+        if self._thread:
+            self._thread.join(timeout=1.0)
+
+    def _run(self):
+        s = None
+        is_windows = (os.name == 'nt')
+        
+        # Connect to MPV IPC socket (retry up to 30 times / 3 seconds)
+        for _ in range(30):
+            if self._stop_event.is_set():
+                return
+            try:
+                if is_windows:
+                    s = open(self.sock_path, 'r+b', buffering=0)
+                    break
+                else:
+                    if os.path.exists(self.sock_path):
+                        import socket
+                        s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+                        s.settimeout(0.5)
+                        s.connect(self.sock_path)
+                        break
+            except Exception:
+                pass
+            time.sleep(0.1)
+
+        if not s:
+            return
+
+        import json
+
+        def send_data(payload: dict):
+            try:
+                raw = (json.dumps(payload) + "\n").encode('utf-8')
+                if is_windows:
+                    s.write(raw)
+                    s.flush()
+                else:
+                    s.sendall(raw)
+            except Exception:
+                pass
+
+        # Register observe_property subscriptions
+        for sub_id, prop_name in [
+            (1, "time-pos"),
+            (2, "duration"),
+            (3, "percent-pos"),
+            (4, "pause"),
+            (5, "eof-reached"),
+        ]:
+            send_data({"command": ["observe_property", sub_id, prop_name]})
+
+        buffer = ""
+
+        try:
+            while not self._stop_event.is_set():
+                # 1. Query properties via heartbeat request IDs
+                send_data({"command": ["get_property", "time-pos"], "request_id": 101})
+                send_data({"command": ["get_property", "duration"], "request_id": 102})
+                send_data({"command": ["get_property", "percent-pos"], "request_id": 103})
+                send_data({"command": ["get_property", "pause"], "request_id": 104})
+                send_data({"command": ["get_property", "eof-reached"], "request_id": 105})
+
+                # 2. Read available incoming responses
+                try:
+                    if is_windows:
+                        chunk = s.read(2048)
+                        if not chunk:
+                            break
+                        chunk_str = chunk.decode('utf-8', errors='ignore')
+                    else:
+                        chunk = s.recv(4096)
+                        if not chunk:
+                            break
+                        chunk_str = chunk.decode('utf-8', errors='ignore')
+
+                    buffer += chunk_str
+                    while "\n" in buffer:
+                        line, buffer = buffer.split("\n", 1)
+                        line = line.strip()
+                        if not line:
+                            continue
+                        try:
+                            msg = json.loads(line)
+                        except Exception:
+                            continue
+
+                        req_id = msg.get("request_id")
+                        name = msg.get("name")
+                        val = msg.get("data")
+
+                        if val is not None:
+                            if req_id == 101 or name == "time-pos":
+                                try:
+                                    self.state["time_pos"] = round(float(val), 1)
+                                except (ValueError, TypeError):
+                                    pass
+                            elif req_id == 102 or name == "duration":
+                                try:
+                                    self.state["duration"] = round(float(val), 1)
+                                except (ValueError, TypeError):
+                                    pass
+                            elif req_id == 103 or name == "percent-pos":
+                                try:
+                                    self.state["percent"] = round(float(val), 1)
+                                except (ValueError, TypeError):
+                                    pass
+                            elif req_id == 104 or name == "pause":
+                                self.state["paused"] = bool(val)
+                            elif req_id == 105 or name == "eof-reached":
+                                if bool(val):
+                                    self.state["completed"] = True
+
+                        if msg.get("event") == "end-file" and msg.get("reason") == "eof":
+                            self.state["completed"] = True
+
+                except (socket.timeout, TimeoutError):
+                    pass
+                except Exception:
+                    break
+
+                # 3. Calculate derived percentage and completion
+                t_pos = self.state["time_pos"]
+                t_dur = self.state["duration"]
+                t_pct = self.state["percent"]
+
+                if t_pct <= 0 and t_dur > 0 and t_pos > 0:
+                    self.state["percent"] = round((t_pos / t_dur) * 100, 1)
+
+                if self.state["percent"] >= 85 or (t_dur > 0 and t_dur - t_pos < 35):
+                    self.state["completed"] = True
+
+                time.sleep(0.4)
+
+        finally:
+            try:
+                s.close()
+            except Exception:
+                pass
 
 class PlayerManager:
     def __init__(self, rpc_manager=None, console=None):
@@ -23,7 +189,6 @@ class PlayerManager:
                     self.temp_mpv_path = os.path.join(temp_dir, exe_name)
                     shutil.copy2(bundled_mpv, self.temp_mpv_path)
                     
-                    # Ensure executable permissions on Linux/macOS
                     if os.name != 'nt':
                         st = os.stat(self.temp_mpv_path)
                         os.chmod(self.temp_mpv_path, st.st_mode | 0o111)
@@ -41,7 +206,6 @@ class PlayerManager:
             if os.path.exists(local_mpv):
                 return local_mpv
 
-            # Check system PATH
             if shutil.which('mpv'):
                 return 'mpv'
             
@@ -60,6 +224,38 @@ class PlayerManager:
     def get_available_players(self) -> dict:
         players = {}
         
+        # Check MPV
+        mpv_path = self.get_mpv_path()
+        if mpv_path == 'mpv':
+            if shutil.which('mpv'):
+                 players['MPV'] = 'mpv'
+        elif os.path.exists(mpv_path):
+            players['MPV'] = mpv_path
+
+        # Check Celluloid (Linux GTK MPV frontend)
+        celluloid_path = shutil.which('celluloid') or shutil.which('io.github.celluloid_player.Celluloid')
+        if celluloid_path:
+            players['Celluloid'] = celluloid_path
+
+        # Check IINA (macOS MPV frontend)
+        iina_path = shutil.which('iina-cli') or shutil.which('iina')
+        if not iina_path and sys.platform == 'darwin':
+            mac_paths = [
+                "/Applications/IINA.app/Contents/MacOS/iina-cli",
+                os.path.expanduser("~/Applications/IINA.app/Contents/MacOS/iina-cli")
+            ]
+            for p in mac_paths:
+                if os.path.exists(p):
+                    iina_path = p
+                    break
+        if iina_path:
+            players['IINA'] = iina_path
+
+        # Check Syncplay (Multi-user sync)
+        syncplay_path = shutil.which('syncplay')
+        if syncplay_path:
+            players['Syncplay'] = syncplay_path
+
         # Check VLC
         vlc_path = shutil.which('vlc')
         if not vlc_path:
@@ -84,14 +280,6 @@ class PlayerManager:
         if vlc_path:
             players['VLC'] = vlc_path
 
-        # Check MPV
-        mpv_path = self.get_mpv_path()
-        if mpv_path == 'mpv':
-            if shutil.which('mpv'):
-                 players['MPV'] = 'mpv'
-        elif os.path.exists(mpv_path):
-            players['MPV'] = mpv_path
-
         # Check MPC-HC
         mpc_path = shutil.which('mpc-hc64') or shutil.which('mpc-hc')
         if not mpc_path and os.name == 'nt':
@@ -110,11 +298,12 @@ class PlayerManager:
 
         return players
 
-    def play(self, url: str, title: str, player_type: str = 'ask'):
+    def play(self, url: str, title: str, player_type: str = 'ask', start_time: float = 0.0) -> dict:
         available_players = self.get_available_players()
+        default_result = {'time_pos': 0.0, 'duration': 0.0, 'percent': 0.0, 'completed': False}
         
         if not available_players:
-            msg = "No video players found on your computer. Please download and install VLC Media Player from https://www.videolan.org/vlc/"
+            msg = "No video players found on your computer. Please download and install MPV or VLC Media Player."
             if self.console:
                 from rich.text import Text
                 self.console.print(Text(msg, style="bold red"))
@@ -122,15 +311,24 @@ class PlayerManager:
             else:
                 print(msg, file=sys.stderr)
                 input("Press Enter to continue...")
-            return
+            return default_result
 
         player_names = list(available_players.keys())
         selected_player = None
 
-        if len(player_names) == 1:
-            selected_player = player_names[0]
-        else:
-            if self.console:
+        req_p = (player_type or "").lower()
+        if req_p in ('mpv', 'celluloid', 'iina', 'syncplay', 'vlc', 'mpc-hc', 'mpc'):
+            for p_name in player_names:
+                if req_p in p_name.lower():
+                    selected_player = p_name
+                    break
+
+        if not selected_player:
+            if len(player_names) == 1:
+                selected_player = player_names[0]
+            elif 'MPV' in available_players:
+                selected_player = 'MPV'
+            elif self.console:
                 from rich.prompt import Prompt
                 from rich.panel import Panel
                 from rich.text import Text
@@ -149,30 +347,21 @@ class PlayerManager:
                 )
                 selected_player = player_names[int(choice)-1]
             else:
-                print("\nAvailable Video Players:")
-                for i, name in enumerate(player_names):
-                    print(f"{i+1}. {name}")
-                
-                while True:
-                    try:
-                        choice = input(f"Choose a video player (1-{len(player_names)}) [1]: ")
-                        if not choice.strip():
-                            choice = "1"
-                        choice_idx = int(choice) - 1
-                        if 0 <= choice_idx < len(player_names):
-                            selected_player = player_names[choice_idx]
-                            break
-                        print("Invalid choice.")
-                    except ValueError:
-                        print("Invalid input.")
+                selected_player = player_names[0]
 
         try:
-            if selected_player == 'VLC':
-                self._play_vlc(url, title, available_players['VLC'])
-            elif selected_player == 'MPV':
-                self._play_mpv(url, title, available_players['MPV'])
+            if selected_player == 'MPV':
+                return self._play_mpv(url, title, available_players['MPV'], start_time=start_time)
+            elif selected_player == 'Celluloid':
+                return self._play_celluloid(url, title, available_players['Celluloid'], start_time=start_time)
+            elif selected_player == 'IINA':
+                return self._play_iina(url, title, available_players['IINA'], start_time=start_time)
+            elif selected_player == 'Syncplay':
+                return self._play_syncplay(url, title, available_players['Syncplay'], start_time=start_time)
+            elif selected_player == 'VLC':
+                return self._play_vlc(url, title, available_players['VLC'], start_time=start_time)
             elif selected_player == 'MPC-HC':
-                self._play_mpc(url, title, available_players['MPC-HC'])
+                return self._play_mpc(url, title, available_players['MPC-HC'])
         except Exception as e:
             if self.console:
                 from rich.text import Text
@@ -181,78 +370,197 @@ class PlayerManager:
             else:
                 print(f"Error launching player: {str(e)}", file=sys.stderr)
                 input("Press Enter to continue...")
+        return default_result
 
-    def _play_vlc(self, url: str, title: str, vlc_path: str = None):
+    def _play_vlc(self, url: str, title: str, vlc_path: str = None, start_time: float = 0.0) -> dict:
         if not vlc_path:
             vlc_path = self.get_available_players().get('VLC')
         
         if not vlc_path:
             raise FileNotFoundError("VLC not found")
 
+        referer = get_stream_referer(url)
         vlc_args = [
             vlc_path,
             '--fullscreen',
             '--play-and-exit',
             '--meta-title', title,
-            url
         ]
+        if start_time and start_time > 0:
+            vlc_args.append(f'--start-time={int(start_time)}')
+        if referer:
+            vlc_args.extend(['--http-referrer', referer])
+            
+        vlc_args.append(url)
         
+        t_start = time.time()
         subprocess.run(
             vlc_args,
             check=False,
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL
         )
+        elapsed = time.time() - t_start
+        return {'time_pos': start_time + elapsed, 'duration': 0.0, 'percent': 0.0, 'completed': False}
 
-    def _play_mpv(self, url: str, title: str, mpv_path: str = None):
+    def _play_celluloid(self, url: str, title: str, celluloid_path: str = None, start_time: float = 0.0) -> dict:
+        if not celluloid_path:
+            celluloid_path = self.get_available_players().get('Celluloid')
+        if not celluloid_path:
+            raise FileNotFoundError("Celluloid not found")
+
+        referer = get_stream_referer(url)
+        args = [celluloid_path]
+        if start_time and start_time > 0:
+            args.append(f'--mpv-start={start_time}')
+        if referer:
+            args.append(f'--mpv-referrer={referer}')
+        args.append(url)
+        
+        t_start = time.time()
+        subprocess.run(args, check=False, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        elapsed = time.time() - t_start
+        return {'time_pos': start_time + elapsed, 'duration': 0.0, 'percent': 0.0, 'completed': False}
+
+    def _play_iina(self, url: str, title: str, iina_path: str = None, start_time: float = 0.0) -> dict:
+        if not iina_path:
+            iina_path = self.get_available_players().get('IINA')
+        if not iina_path:
+            raise FileNotFoundError("IINA not found")
+
+        referer = get_stream_referer(url)
+        args = [iina_path, '--keep-running']
+        if start_time and start_time > 0:
+            args.append(f'--mpv-start={start_time}')
+        if referer:
+            args.append(f'--mpv-referrer={referer}')
+        args.append(url)
+        
+        t_start = time.time()
+        subprocess.run(args, check=False, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        elapsed = time.time() - t_start
+        return {'time_pos': start_time + elapsed, 'duration': 0.0, 'percent': 0.0, 'completed': False}
+
+    def _play_syncplay(self, url: str, title: str, syncplay_path: str = None, start_time: float = 0.0) -> dict:
+        if not syncplay_path:
+            syncplay_path = self.get_available_players().get('Syncplay')
+        if not syncplay_path:
+            raise FileNotFoundError("Syncplay not found")
+
+        args = [syncplay_path, url]
+        if start_time and start_time > 0:
+            args.extend(['--', f'--start={start_time}'])
+
+        t_start = time.time()
+        subprocess.run(args, check=False, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        elapsed = time.time() - t_start
+        return {'time_pos': start_time + elapsed, 'duration': 0.0, 'percent': 0.0, 'completed': False}
+
+    def _play_mpv(self, url: str, title: str, mpv_path: str = None, start_time: float = 0.0) -> dict:
         if not mpv_path:
             mpv_path = self.get_available_players().get('MPV')
         
         if not mpv_path or (mpv_path != 'mpv' and not os.path.exists(mpv_path)):
             raise FileNotFoundError(f"MPV not found at: {mpv_path}")
 
+        # Determine dynamic referer per provider
+        referer = get_stream_referer(url)
+
+        # Setup IPC Socket
+        is_win = (os.name == 'nt')
+        ipc_id = f"ani_mpv_{os.getpid()}_{int(time.time()*1000)}"
+        if is_win:
+            sock_path = f"\\\\.\\pipe\\{ipc_id}"
+        else:
+            sock_path = os.path.join(tempfile.gettempdir(), f"{ipc_id}.sock")
+            if os.path.exists(sock_path):
+                try:
+                    os.remove(sock_path)
+                except Exception:
+                    pass
+
+        # High-performance stream caching & hardware decoding for MPV
         mpv_args = [
             mpv_path,
             '--fullscreen',
-            '--fs-screen=0',
+            '--force-window=yes',
             '--keep-open=yes',
             '--ontop',
             '--cache=yes',
+            '--demuxer-max-bytes=300MiB',
+            '--demuxer-max-back-bytes=100MiB',
+            '--demuxer-readahead-secs=600',
+            '--cache-secs=600',
             '--cache-pause=yes',
-            '--cache-pause-initial=yes',
             '--cache-pause-wait=3',
-            '--demuxer-max-bytes=256M',
-            '--demuxer-max-back-bytes=128M',
-            '--cache-secs=30',
+            '--cache-pause-initial=no',
+            f'--input-ipc-server={sock_path}',
+            '--hr-seek=yes',
+            '--hr-seek-framedrop=yes',
+            '--stream-buffer-size=16MiB',
+            '--network-timeout=15',
+            '--tls-verify=no',
+            '--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36',
             '--hwdec=auto-safe',
             '--vo=gpu',
-            '--profile=gpu-hq',
-            '--ytdl',
-            '--ytdl-format=bestvideo[height<=?1080]+bestaudio/best',
-            '--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+            '--profile=fast',
             '--sub-auto=fuzzy',
-            '--sub-file-paths=subs',
             '--slang=ara,ar,eng,en',
             '--alang=jpn,ja,eng,en',
-            '--title=' + title,
-            url
+            '--really-quiet',
+            '--terminal=no',
+            '--msg-level=all=no',
+            f'--force-media-title={title}',
         ]
         
-        mpv_args.append('--force-window=yes')
+        if start_time and start_time > 0:
+            mpv_args.append(f'--start={start_time}')
+        else:
+            mpv_args.append('--start=0')
 
+        if referer:
+            mpv_args.append(f'--referrer={referer}')
+
+        mpv_args.append(url)
+
+        from .utils import restore_terminal_for_input, enter_raw_mode_after_input, show_cursor, hide_cursor
+        restore_terminal_for_input()
+        show_cursor()
+
+        tracker = MpvTracker(sock_path)
+        tracker.start()
+
+        logger.log_player("MPV", mpv_args)
+        t_start = time.time()
         result = subprocess.run(
             mpv_args,
             check=False,
             stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-            stdin=subprocess.DEVNULL
+            stderr=subprocess.PIPE,
+            text=True
         )
+        duration = time.time() - t_start
+        logger.log_player("MPV", mpv_args, exit_code=result.returncode, duration=duration)
+        if result.returncode != 0 and result.stderr:
+            logger.error("MPV", f"Player error output: {result.stderr.strip()}")
         
+        tracker.stop()
+        enter_raw_mode_after_input()
+        hide_cursor()
+
+        if not is_win and os.path.exists(sock_path):
+            try:
+                os.remove(sock_path)
+            except Exception:
+                pass
+
         if result.returncode != 0:
             if self.console:
                 from rich.text import Text
-                self.console.print(Text(f"MPV exited with error code {result.returncode}", style="bold red"))
-                input("Press Enter to continue...")
+                self.console.print(Text("⚠ Stream closed or unreachable. Select another server if playback failed.", style="bold yellow"))
+                time.sleep(1.0)
+
+        return tracker.state
 
     def _play_mpc(self, url: str, title: str, mpc_path: str = None):
         if not mpc_path:
@@ -274,4 +582,4 @@ class PlayerManager:
             check=False,
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL
-        )
+        )

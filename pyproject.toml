@@ -20,7 +20,6 @@ classifiers = [
     "Intended Audience :: End Users/Desktop",
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.8",
     "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
@@ -28,14 +27,18 @@ classifiers = [
     "Topic :: Multimedia :: Video",
     "Environment :: Console",
 ]
-requires-python = ">=3.8"
+requires-python = ">=3.9"
 dependencies = [
     "rich>=13.0.0",          # Terminal UI framework
     "requests>=2.31.0",      # HTTP client for API communication
     "pypresence>=4.5.0",     # Discord Rich Presence integration
-    "yt-dlp",                # Extract anime trailers from YouTube
     "Pillow>=10.0.0",        # Image processing for anime posters
     "numpy>=1.24.0",         # Array operations for image display
+    "curl-cffi>=0.7.0",      # Browserless TLS impersonation client
+    "beautifulsoup4>=4.12.0",# HTML parsing
+    "arabic-reshaper>=3.0.0",# Arabic character shaping
+    "python-bidi>=0.6.0",    # BiDi right-to-left layout
+    "pycryptodome>=3.18.0",  # Crypto operations for stream decryption
 ]
 # External tools (auto-installed by deps.py):
 # - mpv: Media player for streaming episodes
@@ -51,9 +54,9 @@ Changelog = "https://github.com/np4abdou1/ani-cli-arabic/releases"
 ani-cli-arabic = "src.app:main"
 ani-cli-ar = "src.app:main"
 
-[tool.setuptools]
-packages = ["src"]
-include-package-data = true
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["src*"]
 
 [tool.setuptools.dynamic]
 version = {attr = "src.version.__version__"}

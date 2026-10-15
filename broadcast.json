@@ -1,0 +1,12 @@
+{
+  "id": "",
+  "active": false,
+  "type": "banner",
+  "title": "",
+  "message": "",
+  "link": "",
+  "min_version": "",
+  "max_version": "",
+  "dismissable": true,
+  "style": "cyan"
+}

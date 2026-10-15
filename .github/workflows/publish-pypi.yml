@@ -3,11 +3,14 @@ name: Publish to PyPI
 on:
   release:
     types: [published]
+  push:
+    tags:
+      - 'v*'
   workflow_dispatch:
     inputs:
       version:
-        description: 'Version to publish (e.g., 1.2.0)'
-        required: true
+        description: 'Version to publish (e.g., 2.0.0)'
+        required: false
         type: string
 
 jobs:
@@ -33,35 +36,28 @@ jobs:
           python -m pip install --upgrade pip
           pip install build twine wheel setuptools
       
-      - name: Extract version from release or input
+      - name: Extract version from release, tag, or input
         id: get_version
         run: |
           if [ "${{ github.event_name }}" == "release" ]; then
             VERSION="${{ github.event.release.tag_name }}"
-            VERSION="${VERSION#v}"
-          else
+          elif [ -n "${{ inputs.version }}" ]; then
             VERSION="${{ inputs.version }}"
+          elif [ -n "${{ github.ref_name }}" ] && [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            VERSION="${{ github.ref_name }}"
+          else
+            VERSION=$(python3 -c "from src.version import __version__; print(__version__)")
           fi
+          VERSION="${VERSION#v}"
           echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
           echo "Publishing version: $VERSION"
       
       - name: Update version in version.py
         run: |
           VERSION="${{ steps.get_version.outputs.VERSION }}"
-          cat > src/version.py << EOF
-          # Version info for ani-cli-arabic
-          # THIS IS THE SINGLE SOURCE OF TRUTH FOR VERSION
-          # All other files (pyproject.toml, workflows, etc.) read from here
-
-          __version__ = "$VERSION"
-
-          APP_VERSION = f"v{__version__}"
-          APP_NAME = "ani-cli-arabic"
-          GITHUB_REPO = "np4abdou1/ani-cli-arabic"
-          RELEASES_URL = f"https://github.com/{GITHUB_REPO}/releases"
-          API_RELEASES_URL = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
-          EOF
+          sed -i "s/__version__ = .*/__version__ = \"$VERSION\"/" src/version.py
           cat src/version.py
+          python -c "from src.version import __version__, parse_version; print('Validated version:', __version__)"
       
       - name: Build package
         run: |
