@@ -62,7 +62,8 @@ Terminal-based anime streaming & batch downloading with Arabic and English subti
 
 <br><br>
 
-https://github.com/user-attachments/assets/a6c6882a-7c50-4a8d-aa9c-e56a6d4ff7eb
+
+https://github.com/user-attachments/assets/e74d4443-20b0-4683-b346-bf168a720025
 
 </div>
 
