@@ -1543,6 +1543,7 @@ class UIManager:
                 if is_selected:
                     content.append(" ▶ ", style=f"bold {COLOR_HIGHLIGHT_FG} on {COLOR_BORDER}")
                     content.append(f"{mark} {ep_num_fmt}\n", style=f"bold {COLOR_HIGHLIGHT_FG} on {COLOR_BORDER}")
+                else:
                     bolt_color = getattr(config_module, "COLOR_BOLT", COLOR_BOLT)
                     style = f"bold {bolt_color}" if is_marked else "white"
                     content.append(f"   {mark} {ep_num_fmt}\n", style=style)

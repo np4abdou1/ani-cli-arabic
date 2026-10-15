@@ -301,7 +301,10 @@ class AniCliWrapper:
 
     def batch_download(self, anime: Any, episodes: List[Any]):
         self.console.print(f"\n[bold cyan]Batch Download: {anime.title_en}[/bold cyan]")
-        self.console.print(f"[dim]Total available episodes: 1 to {len(episodes)}[/dim]")
+        ep_values = [int(e.display_num) for e in episodes if str(e.display_num).isdigit()]
+        first_ep = min(ep_values, default=1)
+        last_ep = max(ep_values, default=len(episodes))
+        self.console.print(f"[dim]Total available episodes: {first_ep} to {last_ep}[/dim]")
         try:
             prompt = self.console.input("Enter range (e.g. 1-12, 1 3 5) or 'all': ").strip().lower()
         except (KeyboardInterrupt, EOFError):
@@ -313,8 +316,9 @@ class AniCliWrapper:
         if prompt in ('all', '*'):
             target_eps = episodes
         else:
-            nums = set(parse_batch_ranges(prompt, max_eps=len(episodes)))
-            target_eps = [e for e in episodes if e.display_num in nums]
+            # Bound by the highest episode number, not the count: a season can start at ep 13.
+            nums = set(parse_batch_ranges(prompt, max_eps=last_ep))
+            target_eps = [e for e in episodes if str(e.display_num).isdigit() and int(e.display_num) in nums]
 
         if not target_eps:
             self.console.print("[yellow]No matching episodes specified.[/yellow]")
