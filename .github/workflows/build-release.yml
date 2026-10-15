@@ -31,7 +31,7 @@ jobs:
       
       - name: Determine Version and Create Release if needed
         env:
-          GH_TOKEN: ${{ secrets.GH_PAT || secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NOTES: ${{ inputs.changelogs || 'Major changes please read changelogs' }}
         run: |
           if [ "${{ github.event_name }}" == "release" ]; then
@@ -174,7 +174,7 @@ jobs:
 
       - name: Upload to release
         env:
-          GH_TOKEN: ${{ secrets.GH_PAT || secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           $version = "${{ steps.ver.outputs.VERSION }}"
           gh release upload "$version" "ani-cli-arabic-windows-x64-$version.exe" "ani-cli-arabic-windows-x64-$version-with-mpv.exe" --clobber
@@ -234,7 +234,7 @@ jobs:
 
       - name: Upload to release
         env:
-          GH_TOKEN: ${{ secrets.GH_PAT || secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           VERSION="${{ steps.ver.outputs.VERSION }}"
           gh release upload "$VERSION" "ani-cli-arabic-linux-x64-$VERSION" "ani-cli-arabic-linux-x64-$VERSION-with-mpv" --clobber
