@@ -1,280 +1,279 @@
+"""
+Auto-updater for ani-cli-arabic across platforms and package managers.
+Supports PyPI (pip/pipx), Arch Linux (AUR yay/paru), macOS (Homebrew),
+Windows (winget/scoop/standalone binary), and direct GitHub releases.
+"""
+
 import sys
-import re
+import shutil
 import platform
 import subprocess
 import requests
 from pathlib import Path
+from typing import Optional, Dict, Any
 
-from .version import __version__, APP_VERSION, API_RELEASES_URL
-from .config import COLOR_PROMPT
+from .version import __version__, parse_version, API_RELEASES_URL
 from .utils import is_bundled
-
-
 from rich.console import Console
+
 console = Console()
 
-def _print_header(title):
-    console.print(f"\n[bold magenta]{title}[/bold magenta]\n")
 
-def _print_info(text):
-    console.print(f"  {text}")
-
-def _print_success(text):
-    console.print(f"  [green]✓[/green] {text}")
-
-def _print_error(text):
-    console.print(f"  [red]✗[/red] {text}")
-
-def parse_version(ver_string):
-    ver_string = ver_string.strip().lower()
-    if ver_string.startswith('v'):
-        ver_string = ver_string[1:]
-    
-    parts = ver_string.split('.')
-    result = []
-    for p in parts:
-        digits = re.match(r'(\d+)', p)
-        if digits:
-            result.append(int(digits.group(1)))
-    
-    while len(result) < 3:
-        result.append(0)
-    
-    return tuple(result[:3])
-
-
-def get_latest_release():
+def get_latest_pypi_version() -> Optional[str]:
     try:
-        resp = requests.get(API_RELEASES_URL, timeout=10)
+        resp = requests.get("https://pypi.org/pypi/ani-cli-arabic/json", timeout=6)
+        if resp.status_code == 200:
+            return resp.json().get("info", {}).get("version")
+    except Exception:
+        pass
+    return None
+
+
+def get_latest_github_release() -> Optional[Dict[str, Any]]:
+    try:
+        resp = requests.get(API_RELEASES_URL, timeout=6)
         if resp.status_code == 200:
             return resp.json()
     except Exception:
         pass
     return None
 
-def get_installation_type():
+
+def detect_install_method() -> str:
+    """
+    Detects how the application was installed on the user's system:
+    - 'aur': Arch Linux package (managed by pacman/yay/paru)
+    - 'brew': Homebrew package
+    - 'pipx': Isolated pipx installation
+    - 'pip': Standard pip installation
+    - 'executable': Bundled standalone binary (PyInstaller)
+    - 'source': Running from local git/source checkout
+    """
     if is_bundled():
-        return 'executable'
-    
-    # Check for AUR/System installation
+        return "executable"
+
     try:
         path_str = Path(__file__).resolve().as_posix()
-        
-        # System-managed check
-        if '/usr/lib/python' in path_str and ('site-packages' in path_str or 'dist-packages' in path_str):
-             return 'pkged'
-        
+
+        # Check if managed by Arch pacman / AUR
+        if platform.system() == "Linux" and "/usr/lib/python" in path_str:
+            try:
+                res = subprocess.run(["pacman", "-Q", "ani-cli-arabic"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                if res.returncode == 0:
+                    return "aur"
+            except Exception:
+                pass
+            return "system_package"
+
+        # Check Homebrew
+        if "Cellar/ani-cli-arabic" in path_str or "homebrew" in path_str:
+            return "brew"
+
         # Check pipx
-        if 'pipx' in path_str:
-            return 'pip'
-        
-        if '/.local/lib/python' in path_str or 'site-packages' in path_str or 'dist-packages' in path_str:
-            return 'pip'
-            
+        if "pipx" in path_str or "pipx" in sys.prefix:
+            return "pipx"
+
+        # Check standard pip
+        if "site-packages" in path_str or "dist-packages" in path_str:
+            return "pip"
+
+        # Check local source tree
+        if Path(__file__).resolve().parent.name == "src":
+            if (Path(__file__).resolve().parent.parent / "main.py").exists():
+                return "source"
     except Exception:
         pass
-    
+
+    return "pip"
+
+
+def update_aur(latest_ver: str) -> bool:
+    console.print(f"\n[cyan]Update available: v{__version__} → v{latest_ver}[/cyan]")
+    console.print("[dim]Detected Arch Linux package (AUR).[/dim]\n")
+
+    # AUR helpers do NOT use sudo to invoke; they build as user and prompt for sudo internally
+    helpers = [
+        ("yay", ["yay", "-S", "--noconfirm", "ani-cli-arabic"]),
+        ("paru", ["paru", "-S", "--noconfirm", "ani-cli-arabic"]),
+        ("pamac", ["pamac", "upgrade", "--no-confirm", "ani-cli-arabic"])
+    ]
+
+    for name, cmd in helpers:
+        if shutil.which(name):
+            console.print(f"[cyan]Executing: {' '.join(cmd)}[/cyan]")
+            try:
+                res = subprocess.run(cmd)
+                if res.returncode == 0:
+                    console.print("[green]✓ Updated successfully via " + name + ".[/green]")
+                    console.print("Please restart the application.")
+                    sys.exit(0)
+            except Exception as e:
+                console.print(f"[yellow]Warning: {name} failed: {e}[/yellow]")
+
+    console.print("[yellow]No supported AUR helper found (yay/paru/pamac).[/yellow]")
+    console.print("Please update using your preferred AUR tool:")
+    console.print("  yay -S ani-cli-arabic")
+    console.print("  paru -S ani-cli-arabic\n")
+    return False
+
+
+def update_brew(latest_ver: str) -> bool:
+    console.print(f"\n[cyan]Update available: v{__version__} → v{latest_ver}[/cyan]")
+    console.print("[dim]Updating via Homebrew...[/dim]\n")
     try:
-        if Path(__file__).resolve().parent.name == 'src':
-            if (Path(__file__).resolve().parent.parent / 'main.py').exists():
-                return 'source'
-    except Exception:
-        pass
-    
-    return 'source'
+        res = subprocess.run(["brew", "upgrade", "ani-cli-arabic"])
+        if res.returncode == 0:
+            console.print("[green]✓ Updated successfully via Homebrew.[/green]")
+            sys.exit(0)
+    except Exception as e:
+        console.print(f"[red]Homebrew upgrade error: {e}[/red]")
+    return False
 
 
-def get_pypi_latest_version():
+def update_pipx(latest_ver: str) -> bool:
+    console.print(f"\n[cyan]Update available: v{__version__} → v{latest_ver}[/cyan]")
+    console.print("[dim]Updating via pipx...[/dim]\n")
     try:
-        resp = requests.get('https://pypi.org/pypi/ani-cli-arabic/json', timeout=10)
-        if resp.status_code == 200:
-            data = resp.json()
-            return data['info']['version']
-    except Exception:
-        pass
-    return None
+        res = subprocess.run(["pipx", "upgrade", "ani-cli-arabic"])
+        if res.returncode == 0:
+            console.print("[green]✓ Updated successfully via pipx.[/green]")
+            sys.exit(0)
+    except Exception as e:
+        console.print(f"[red]pipx upgrade error: {e}[/red]")
+    return False
 
 
-def check_pip_update():
+def update_pip(latest_ver: str) -> bool:
+    console.print(f"\n[cyan]Update available: v{__version__} → v{latest_ver}[/cyan]")
+    console.print("[dim]Downloading update from PyPI...[/dim]\n")
+
+    cmd = [sys.executable, "-m", "pip", "install", "--upgrade", "--no-cache-dir", "ani-cli-arabic"]
+    is_venv = sys.prefix != getattr(sys, "base_prefix", sys.prefix)
+    if platform.system() != "Windows" and not is_venv:
+        cmd.append("--user")
+
+    res = subprocess.run(cmd, capture_output=True, text=True)
+
+    # Handle PEP 668 (externally-managed-environment)
+    if res.returncode != 0 and "externally-managed-environment" in res.stderr:
+        console.print("[dim]System-managed Python environment detected; retrying with override...[/dim]")
+        if "--user" in cmd:
+            cmd.remove("--user")
+        cmd.append("--break-system-packages")
+        res = subprocess.run(cmd, capture_output=True, text=True)
+
+    if res.returncode == 0:
+        console.print(f"[green]✓ Successfully updated to v{latest_ver}.[/green]")
+        console.print("Please restart the application.")
+        sys.exit(0)
+
+    console.print(f"[red]Update failed: {res.stderr.strip() or 'Unknown error'}[/red]")
+    console.print("Try running manually: pip install --upgrade ani-cli-arabic")
+    return False
+
+
+def update_binary(latest_ver: str, release_data: Dict[str, Any]) -> bool:
+    console.print(f"\n[cyan]Update available: v{__version__} → v{latest_ver}[/cyan]")
+    console.print("[dim]Downloading executable update from GitHub...[/dim]\n")
+
+    sys_name = platform.system()
+    target_name = "windows" if sys_name == "Windows" else "linux"
+    download_url = None
+
+    for asset in release_data.get("assets", []):
+        name = asset.get("name", "").lower()
+        if target_name in name and name.endswith((".exe" if sys_name == "Windows" else "")):
+            download_url = asset.get("browser_download_url")
+            break
+
+    if not download_url:
+        console.print("[yellow]Please download the latest release manually from:[/yellow]")
+        console.print(f"  {release_data.get('html_url', 'https://github.com/np4abdou1/ani-cli-arabic/releases')}")
+        return False
+
     try:
-        latest_version = get_pypi_latest_version()
+        current_exe = Path(sys.executable).resolve()
+        temp_exe = current_exe.with_suffix(".new")
+        old_exe = current_exe.with_suffix(".old")
+
+        resp = requests.get(download_url, stream=True, timeout=60)
+        resp.raise_for_status()
+        with open(temp_exe, "wb") as f:
+            for chunk in resp.iter_content(chunk_size=32768):
+                f.write(chunk)
+
+        if sys_name != "Windows":
+            temp_exe.chmod(0o755)
+
+        # In-place executable replacement
+        if old_exe.exists():
+            old_exe.unlink(missing_ok=True)
+        current_exe.rename(old_exe)
+        temp_exe.rename(current_exe)
+
+        console.print(f"[green]✓ Successfully replaced binary with v{latest_ver}.[/green]")
+        console.print("Please restart the application.")
+        sys.exit(0)
+    except Exception as e:
+        console.print(f"[red]Binary update failed: {e}[/red]")
+        console.print(f"Download manually: {download_url}")
+    return False
+
+
+def check_for_updates(auto_update: bool = True) -> bool:
+    """Checks for newer releases and updates via the appropriate platform package manager."""
+    try:
+        latest_version = get_latest_pypi_version()
+        release_data = None
+
+        if not latest_version:
+            release_data = get_latest_github_release()
+            if release_data:
+                latest_version = release_data.get("tag_name", "").lstrip("v")
+
         if not latest_version:
             return False
-        
-        current = parse_version(__version__)
-        latest = parse_version(latest_version)
-        
-        if latest > current:
-            sys.stdout.write("\033[2J\033[H")  # Clear screen for better UI
-            sys.stdout.flush()
-            _print_header("Update Required")
-            _print_info(f"Current version: {__version__}  →  Latest version: {latest_version}")
-            print()
-            _print_info("A mandatory update is available. Please update to continue using the application.")
-            print()
-            
-            # Auto-update without asking
-            try:
-                pip_cmd = [sys.executable, '-m', 'pip', 'install', '--upgrade', 'ani-cli-arabic']
-                
-                # Safely handle pipx and user installs
-                path_str = str(Path(__file__).resolve())
-                if 'pipx' in path_str:
-                    _print_error("Cannot automatically update a pipx-managed installation.")
-                    _print_info("Please execute the following command to update:")
-                    _print_info("  pipx upgrade ani-cli-arabic")
-                    print()
-                    sys.exit(1)
-                
-                is_venv = sys.prefix != getattr(sys, "base_prefix", sys.prefix)
-                if platform.system() != 'Windows' and not is_venv:
-                    # System python on Linux/Mac, try using --user first 
-                    pip_cmd.append('--user')
-                
-                _print_info("Downloading and installing the update...")
-                result = subprocess.run(
-                    pip_cmd,
-                    capture_output=True,
-                    text=True
-                )
-                
-                # If it fails with PEP 668 internally managed error, retry aggressively with break-system-packages
-                if result.returncode != 0 and 'externally-managed-environment' in result.stderr:
-                    _print_info("Restricted package environment detected. Re-attempting installation...")
-                    # Remove --user if appending break-system-packages for cleaner retry, though both can work.
-                    if '--user' in pip_cmd:
-                        pip_cmd.remove('--user')
-                    pip_cmd.append('--break-system-packages')
-                    
-                    result = subprocess.run(
-                        pip_cmd,
-                        capture_output=True,
-                        text=True
-                    )
 
-                if result.returncode == 0:
-                    _print_success("Update installed successfully.")
-                    print()
-                    _print_info("The application will now safely terminate.")
-                    _print_info("Please restart the application to apply the changes.")
-                    print()
-                    sys.exit(0)
-                else:
-                    _print_error(f"Automated update failed. (Exit code: {result.returncode})")
-                    if "externally-managed-environment" in result.stderr:
-                        _print_info("Your system utilizes a restricted Python environment.")
-                        _print_info("Please run: pipx upgrade ani-cli-arabic")
-                    else:
-                        _print_info("Please try installing the update manually: pip install --upgrade ani-cli-arabic")
-                    print()
-                    _print_error("Error details:")
-                    print(result.stderr.strip()[:500])  # print up to 500 chars of error
-                    print()
-                    sys.exit(1)
-            except Exception as e:
-                _print_error(f"An unexpected error occurred during the update process: {e}")
-                _print_info("Please try installing the update manually: pip install --upgrade ani-cli-arabic")
-                print()
-                sys.exit(1)
-            
+        if parse_version(latest_version) <= parse_version(__version__):
+            return False
+
+        if not auto_update:
             return True
-    except Exception:
-        pass
-    
-    return False
 
-
-def check_executable_update():
-    # Handling legacy executable installations
-    try:
-        release_data = get_latest_release()
-        if not release_data:
-            return False
-        
-        latest_tag = release_data.get('tag_name')
-        if not latest_tag:
-            return False
-        
-        current = parse_version(APP_VERSION)
-        latest = parse_version(latest_tag)
-        
-        if latest > current:
-            sys.stdout.write("\033[2J\033[H")
-            sys.stdout.flush()
-            _print_header("Update Required")
-            _print_info(f"Current version: {__version__}  →  Latest version: {latest_tag.lstrip('v')}")
-            print()
-            _print_error("Standalone executables are no longer supported and cannot be automatically updated.")
-            _print_info("Please uninstall this version and reinstall using one of the following methods:")
-            _print_info("  - Pip: pip install ani-cli-arabic")
-            _print_info("  - AUR: yay -S ani-cli-arabic")
-            print()
-            sys.exit(1)
-        
-    except Exception:
-        pass
-    
-    return False
-
-
-def get_version_status():
-    install_type = get_installation_type()
-    if install_type != 'source':
-        return None
-    
-    try:
-        release_data = get_latest_release()
-        pypi_version = get_pypi_latest_version()
-        
-        if release_data or pypi_version:
-            latest_exe_tag = release_data.get('tag_name', 'N/A') if release_data else 'N/A'
-            latest_pip_version = pypi_version or 'N/A'
-            
-            current = parse_version(__version__)
-            latest_exe = parse_version(latest_exe_tag) if latest_exe_tag != 'N/A' else (0, 0, 0)
-            latest_pip = parse_version(latest_pip_version) if latest_pip_version != 'N/A' else (0, 0, 0)
-            
-            is_outdated = (latest_exe > current) or (latest_pip > current)
-            
-            return {
-                'current': __version__,
-                'latest_exe': latest_exe_tag.lstrip('v') if latest_exe_tag != 'N/A' else 'N/A',
-                'latest_pip': latest_pip_version if latest_pip_version != 'N/A' else 'N/A',
-                'is_outdated': is_outdated
-            }
-    except Exception:
-        pass
-    
-    return None
-
-
-def check_for_updates(console=None, auto_update=True):
-    install_type = get_installation_type()
-    
-    try:
-        if install_type == 'pip':
-            return check_pip_update()
-        elif install_type == 'executable':
-            return check_executable_update()
-        elif install_type == 'pkged':
-            release_data = get_latest_release()
+        method = detect_install_method()
+        if method == "aur":
+            return update_aur(latest_version)
+        elif method == "brew":
+            return update_brew(latest_version)
+        elif method == "pipx":
+            return update_pipx(latest_version)
+        elif method == "executable":
+            if not release_data:
+                release_data = get_latest_github_release()
             if release_data:
-                latest_tag = release_data.get('tag_name', '').lstrip('v')
-                current = __version__
-                if parse_version(latest_tag) > parse_version(current):
-                    sys.stdout.write("\033[2J\033[H")
-                    sys.stdout.flush()
-                    _print_header("Update Required")
-                    _print_info(f"Current version: {current}  →  Latest version: {latest_tag}")
-                    print()
-                    _print_info("Your installation is managed by a system package manager (e.g., AUR, APT).")
-                    _print_info("A mandatory update is available. Please update to continue using the application.")
-                    _print_error("Kindly update using your package manager (e.g., yay -Syu ani-cli-arabic).")
-                    print()
-                    sys.exit(1)
-        elif install_type == 'source':
-            pass
+                return update_binary(latest_version, release_data)
+        elif method == "source":
+            return False
+        else:
+            return update_pip(latest_version)
     except Exception:
         pass
-    
+
     return False
+
+
+def get_version_status() -> Optional[Dict[str, Any]]:
+    try:
+        latest_pip = get_latest_pypi_version() or "N/A"
+        is_outdated = False
+        if latest_pip != "N/A" and parse_version(latest_pip) > parse_version(__version__):
+            is_outdated = True
+
+        return {
+            "current": __version__,
+            "latest": latest_pip,
+            "is_outdated": is_outdated,
+            "install_method": detect_install_method()
+        }
+    except Exception:
+        return None

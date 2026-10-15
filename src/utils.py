@@ -1,8 +1,7 @@
 import os
 import sys
 import time
-import shutil
-import subprocess
+from typing import Optional
 import threading
 import platform
 import re
@@ -12,8 +11,8 @@ from rich.live import Live
 from rich.align import Align
 from rich.panel import Panel
 from rich.text import Text
-from rich.spinner import Spinner
 from rich.box import HEAVY
+from .config import COLOR_BORDER, COLOR_TITLE, COLOR_SUBTITLE, COLOR_BOLT
 
 if os.name == 'nt':
     import msvcrt
@@ -37,9 +36,26 @@ _WINDOWS_RESERVED_FILENAMES = {
 def is_bundled():
     return getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS')
 
+def hide_cursor():
+    """Hide terminal cursor across Linux, macOS, and Windows ANSI."""
+    try:
+        sys.stdout.write("\033[?25l")
+        sys.stdout.flush()
+    except Exception:
+        pass
+
+def show_cursor():
+    """Show terminal cursor across Linux, macOS, and Windows ANSI."""
+    try:
+        sys.stdout.write("\033[?25h")
+        sys.stdout.flush()
+    except Exception:
+        pass
+
 def _enter_raw_mode():
     """Enter raw mode for the terminal (Linux/macOS only). Called once at start of menu."""
     global _linux_terminal_fd, _linux_old_settings, _linux_raw_mode
+    hide_cursor()
     if os.name == 'nt' or _linux_raw_mode:
         return
     try:
@@ -53,6 +69,7 @@ def _enter_raw_mode():
 def _exit_raw_mode():
     """Exit raw mode and restore terminal settings."""
     global _linux_terminal_fd, _linux_old_settings, _linux_raw_mode
+    show_cursor()
     if os.name == 'nt' or not _linux_raw_mode:
         return
     try:
@@ -125,109 +142,110 @@ def get_key():
                 return key.decode('utf-8', errors='ignore')
         return None
     else:
-        # Linux/macOS implementation - optimized for responsiveness
+        # Linux/macOS implementation - high responsiveness & zero input queue lag
         fd = sys.stdin.fileno()
         
-        # Use a longer timeout (0.05s) for better CPU usage while still being responsive
-        if not select.select([fd], [], [], 0.05)[0]:
+        # Non-blocking poll (5ms timeout gives instant responsiveness with low CPU)
+        if not select.select([fd], [], [], 0.005)[0]:
             return None
         
-        # Read available data
         try:
-            ch_bytes = os.read(fd, 1)
-        except (OSError, IOError):
+            raw = os.read(fd, 64)
+        except OSError:
             return None
             
-        if not ch_bytes:
+        if not raw:
             return None
             
-        ch = ch_bytes.decode('utf-8', errors='ignore')
-        
-        if ch == '\x03':  # Ctrl+C
+        if raw == b'\x03':  # Ctrl+C
             raise KeyboardInterrupt
-        
-        if ch == '\x1b':
-            # Escape sequence - read the rest quickly
-            seq = ch
-            # Give a short window to read the rest of the escape sequence
-            # Arrow keys send sequences like: ESC [ A
-            end_time = time.time() + 0.02  # 20ms window for escape sequences
             
-            while time.time() < end_time:
-                if select.select([fd], [], [], 0.005)[0]:
-                    try:
-                        next_byte = os.read(fd, 1)
-                        if next_byte:
-                            seq += next_byte.decode('utf-8', errors='ignore')
-                            # Check if we have a complete sequence
-                            if len(seq) >= 3:
-                                last = seq[-1]
-                                # Standard arrow keys: ESC [ A/B/C/D or ESC O A/B/C/D
-                                if (seq.startswith('\x1b[') or seq.startswith('\x1bO')) and last in 'ABCD':
-                                    if last == 'A':
-                                        return 'UP'
-                                    if last == 'B':
-                                        return 'DOWN'
-                                    if last == 'C':
-                                        return 'RIGHT'
-                                    if last == 'D':
-                                        return 'LEFT'
-                                # Extended sequences like ESC [ 1 ; 5 A (Ctrl+Arrow)
-                                if len(seq) >= 6 and seq.startswith('\x1b[1;'):
-                                    if last == 'A':
-                                        return 'UP'
-                                    if last == 'B':
-                                        return 'DOWN'
-                                    if last == 'C':
-                                        return 'RIGHT'
-                                    if last == 'D':
-                                        return 'LEFT'
-                    except (OSError, IOError):
-                        break
-                else:
-                    # No more data, check what we have
-                    break
-            
-            # If only ESC was pressed (no following chars)
-            if seq == '\x1b':
-                return 'ESC'
-            
-            # Check final sequence
-            if len(seq) >= 3:
-                last = seq[-1]
-                if (seq.startswith('\x1b[') or seq.startswith('\x1bO')) and last in 'ABCD':
-                    if last == 'A':
-                        return 'UP'
-                    if last == 'B':
-                        return 'DOWN'
-                    if last == 'C':
-                        return 'RIGHT'
-                    if last == 'D':
-                        return 'LEFT'
-            
-            # Unknown escape sequence, ignore
-            return None
-        
-        elif ch == '\r' or ch == '\n':
+        if raw in (b'\r', b'\n'):
             return 'ENTER'
-        elif ch in 'qQ':
-            return 'q'
-        elif ch in 'gG':
-            return 'g'
-        elif ch in 'bB':
-            return 'b'
-        elif ch in 'dD':
-            return 'd'
-        elif ch in 'lL':
-            return 'l'
-        elif ch in 'fF':
-            return 'f'
-        elif ch in 'mM':
-            return 'm'
-        elif ch == '/' or ch == '?':
-            return '/'
-        
-        return ch
+            
+        if raw in (b'\x7f', b'\x08'):
+            return 'BACKSPACE'
+            
+        if raw.startswith(b'\x1b'):
+            # If isolated ESC byte, wait briefly to distinguish from escape sequence
+            if len(raw) == 1:
+                if select.select([fd], [], [], 0.02)[0]:
+                    try:
+                        raw += os.read(fd, 32)
+                    except OSError:
+                        pass
+                else:
+                    return 'ESC'
+                    
+            # Parse arrow keys (handles single keypress and rapid hold-down bursts)
+            if raw.startswith((b'\x1b[A', b'\x1bOA')):
+                return 'UP'
+            if raw.startswith((b'\x1b[B', b'\x1bOB')):
+                return 'DOWN'
+            if raw.startswith((b'\x1b[C', b'\x1bOC')):
+                return 'RIGHT'
+            if raw.startswith((b'\x1b[D', b'\x1bOD')):
+                return 'LEFT'
+            if raw.startswith(b'\x1b[5~'):
+                return 'PAGE_UP'
+            if raw.startswith(b'\x1b[6~'):
+                return 'PAGE_DOWN'
+            if raw.startswith((b'\x1b[H', b'\x1b[1~')):
+                return 'HOME'
+            if raw.startswith((b'\x1b[F', b'\x1b[4~')):
+                return 'END'
+            if raw.startswith(b'\x1b[3~'):
+                return 'BACKSPACE'
+            # Mouse wheel in SGR mode: 64 = wheel up, 65 = wheel down
+            if raw.startswith(b'\x1b[<64;'):
+                return 'UP'
+            if raw.startswith(b'\x1b[<65;'):
+                return 'DOWN'
+                
+            # Extended arrow combinations (Ctrl+Arrows)
+            if len(raw) >= 6 and raw.startswith(b'\x1b[1;'):
+                last = chr(raw[-1])
+                if last == 'A':
+                    return 'UP'
+                if last == 'B':
+                    return 'DOWN'
+                if last == 'C':
+                    return 'RIGHT'
+                if last == 'D':
+                    return 'LEFT'
+                
+            return None
+
+        try:
+            ch = raw.decode('utf-8', errors='ignore')
+            if not ch:
+                return None
+            first = ch[0]
+            if first in 'qQ':
+                return 'q'
+            if first in 'gG':
+                return 'g'
+            if first in 'bB':
+                return 'b'
+            if first in 'dD':
+                return 'd'
+            if first in 'lL':
+                return 'l'
+            if first in 'fF':
+                return 'f'
+            if first in 'mM':
+                return 'm'
+            if first in 'sS':
+                return 's'
+            if first in 'jJ':
+                return 'j'
+            if first in 'kK':
+                return 'k'
+            if first in '/?':
+                return '/'
+            return first
+        except Exception:
+            return None
 
 class RawTerminal:
     """Context manager to set terminal to cbreak mode (POSIX only).
@@ -243,6 +261,7 @@ class RawTerminal:
         self.old_settings = None
 
     def __enter__(self):
+        hide_cursor()
         if platform.system() != 'Windows':
             try:
                 self.fd = sys.stdin.fileno()
@@ -258,6 +277,7 @@ class RawTerminal:
         return self
 
     def __exit__(self, exc_type, exc_value, traceback):
+        show_cursor()
         if RawTerminal._lock:
             with RawTerminal._lock:
                 RawTerminal._active_instance = None
@@ -271,12 +291,129 @@ class RawTerminal:
                 pass
 
 
+class MouseTerminal(RawTerminal):
+    """Context manager for Raw Terminal with SGR Mouse tracking enabled."""
+    def __enter__(self):
+        res = super().__enter__()
+        try:
+            sys.stdout.write("\033[?1000h\033[?1002h\033[?1006h")
+            sys.stdout.flush()
+        except Exception:
+            pass
+        return res
+        
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        try:
+            sys.stdout.write("\033[?1000l\033[?1002l\033[?1006l")
+            sys.stdout.flush()
+        except Exception:
+            pass
+        super().__exit__(exc_type, exc_val, exc_tb)
+
+
+def get_home_input_event():
+    """
+    Read keyboard and mouse events for interactive home search.
+    Returns:
+      ('CHAR', ch)
+      ('BACKSPACE', None)
+      ('ENTER', None)
+      ('ESC', None)
+      ('MOUSE_CLICK', x, y)
+      ('MOUSE_MOVE', x, y)
+      None
+    """
+    if platform.system() == 'Windows':
+        if msvcrt.kbhit():
+            ch = msvcrt.getch()
+            if ch in [b'\r', b'\n']:
+                return ('ENTER', None)
+            elif ch in [b'\x08', b'\x7f']:
+                return ('BACKSPACE', None)
+            elif ch == b'\x1b':
+                return ('ESC', None)
+            elif ch in [b'\xe0', b'\x00']:
+                ch2 = msvcrt.getch()
+                if ch2 == b'S':
+                    return ('BACKSPACE', None)
+                if ch2 == b'H':
+                    return ('UP', None)
+                if ch2 == b'P':
+                    return ('DOWN', None)
+                return None
+            else:
+                try:
+                    return ('CHAR', ch.decode('utf-8'))
+                except Exception:
+                    return None
+        return None
+    else:
+        fd = sys.stdin.fileno()
+        if not select.select([fd], [], [], 0.005)[0]:
+            return None
+        try:
+            raw = os.read(fd, 64)
+        except OSError:
+            return None
+        if not raw:
+            return None
+            
+        if raw == b'\x03':  # Ctrl+C
+            raise KeyboardInterrupt
+        if raw in (b'\r', b'\n'):
+            return ('ENTER', None)
+        if raw in (b'\x7f', b'\x08'):
+            return ('BACKSPACE', None)
+            
+        if raw.startswith(b'\x1b'):
+            if len(raw) == 1:
+                if select.select([fd], [], [], 0.02)[0]:
+                    try:
+                        raw += os.read(fd, 32)
+                    except OSError:
+                        pass
+                else:
+                    return ('ESC', None)
+                    
+            seq = raw.decode('utf-8', errors='ignore')
+            if seq.startswith('\x1b[<') and (seq.endswith('M') or seq.endswith('m')):
+                m = re.match(r'\x1b\[<(\d+);(\d+);(\d+);([Mm])', seq)
+                if m:
+                    btn, x, y, act = int(m.group(1)), int(m.group(2)), int(m.group(3)), m.group(4)
+                    if act == 'M' and btn == 0:
+                        return ('MOUSE_CLICK', x, y)
+                    elif btn == 35:
+                        return ('MOUSE_MOVE', x, y)
+                    elif btn == 64:
+                        return ('UP', None)
+                    elif btn == 65:
+                        return ('DOWN', None)
+            if seq == '\x1b[3~':
+                return ('BACKSPACE', None)
+            if seq.startswith(('\x1b[A', '\x1bOA')):
+                return ('UP', None)
+            if seq.startswith(('\x1b[B', '\x1bOB')):
+                return ('DOWN', None)
+            if seq == '\x1b':
+                return ('ESC', None)
+            return None
+            
+        try:
+            char_str = raw.decode('utf-8')
+            if char_str and (char_str.isprintable() or char_str == ' '):
+                return ('CHAR', char_str[0])
+        except Exception:
+            pass
+        return None
+
+
 def restore_terminal_for_input():
     """Temporarily restore normal terminal mode for user input (like Prompt.ask).
     
     Call this before using Rich's Prompt.ask() or similar input functions
     while inside a RawTerminal context. Call enter_raw_mode_after_input() after.
     """
+    show_cursor()
     if platform.system() == 'Windows':
         return  # Not needed on Windows
     
@@ -293,6 +430,7 @@ def enter_raw_mode_after_input():
     
     Call this after using Rich's Prompt.ask() or similar input functions.
     """
+    hide_cursor()
     if platform.system() == 'Windows':
         return  # Not needed on Windows
     
@@ -319,20 +457,6 @@ def flush_stdin():
             pass
 
 
-def get_idm_path():
-    """Check for Internet Download Manager executable on Windows."""
-    if platform.system() != 'Windows':
-        return None
-    
-    paths = [
-        r"C:\Program Files (x86)\Internet Download Manager\IDMan.exe",
-        r"C:\Program Files\Internet Download Manager\IDMan.exe"
-    ]
-    
-    for path in paths:
-        if os.path.exists(path):
-            return path
-    return None
 
 
 def sanitize_download_filename(filename):
@@ -373,15 +497,15 @@ def sanitize_download_filename(filename):
 
 
 def _show_centered_download_message(console, title, message, is_error=False, duration=1.3):
-    border_style = "red" if is_error else "panel.border"
-    body = Text(message, justify="center", style="info")
+    border_style = "#ff6b6b" if is_error else COLOR_BORDER
+    body = Text(message, justify="center", style=f"bold {COLOR_SUBTITLE}" if not is_error else "bold white")
     panel = Panel(
         Align.center(body, vertical="middle"),
-        title=Text(title, style="title"),
+        title=f"[bold {COLOR_TITLE}]{title}[/bold {COLOR_TITLE}]",
         box=HEAVY,
         border_style=border_style,
-        padding=(2, 4),
-        width=72,
+        padding=(1, 4),
+        width=min(72, console.width - 4),
     )
 
     with Live(
@@ -393,91 +517,50 @@ def _show_centered_download_message(console, title, message, is_error=False, dur
         time.sleep(max(0.5, duration))
 
 
-def _download_with_idm(url, filename, download_dir):
-    idm_path = get_idm_path()
-    if not idm_path:
-        return False
-
-    try:
-        subprocess.Popen([
-            idm_path,
-            '/d', url,
-            '/p', download_dir,
-            '/f', filename,
-            '/n',
-            '/a',
-            '/s'
-        ])
-        return True
-    except Exception:
-        return False
-
-
-def _download_with_aria2(url, filename, download_dir, filepath, console):
-    aria2_path = shutil.which("aria2c")
-    if not aria2_path:
-        return False
-
-    spinner = Spinner("dots", text=Text("Downloading with aria2c...", style="loading"))
-    panel = Panel(
-        Align.center(spinner, vertical="middle"),
-        title=Text("DOWNLOAD", style="title"),
-        box=HEAVY,
-        border_style="panel.border",
-        padding=(2, 4),
-        width=72,
-    )
-
-    cmd = [
-        aria2_path,
-        url,
-        "--dir", download_dir,
-        "--out", filename,
-        "--file-allocation=none",
-        "--split=16",
-        "--max-connection-per-server=16",
-        "--min-split-size=1M",
-        "--console-log-level=error",
-        "--summary-interval=0",
-        "--download-result=hide",
-        "--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
-    ]
-
-    try:
-        with Live(
-            Align.center(panel, vertical="middle", height=console.height),
-            console=console,
-            refresh_per_second=12,
-            screen=True,
-        ):
-            subprocess.run(
-                cmd,
-                check=True,
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-                stdin=subprocess.DEVNULL,
-            )
-    except Exception:
-        return False
-
-    _show_centered_download_message(console, "Download Complete", filepath, is_error=False, duration=1.0)
-    return True
-
-
 def _download_with_builtin(url, filename, filepath, console):
+    """Resumable chunked single-file downloader with Rich centered progress modal."""
     headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
-    last_error = None
+    part_path = f"{filepath}.part"
 
+    if os.path.exists(filepath) and os.path.getsize(filepath) > 0 and not os.path.exists(part_path):
+        _show_centered_download_message(console, "Already Downloaded", filepath, is_error=False, duration=1.0)
+        return True
+
+    resume_pos = 0
+    if os.path.exists(part_path):
+        resume_pos = os.path.getsize(part_path)
+        if resume_pos > 0:
+            headers['Range'] = f"bytes={resume_pos}-"
+
+    last_error = None
     for _ in range(2):
         try:
             with requests.get(url, stream=True, headers=headers, timeout=(10, 45)) as response:
-                response.raise_for_status()
-                total_size = int(response.headers.get('content-length', 0))
+                if response.status_code == 416:
+                    os.replace(part_path, filepath)
+                    _show_centered_download_message(console, "Download Complete", filepath, is_error=False, duration=1.0)
+                    return True
+
+                if response.status_code not in (200, 206):
+                    headers.pop('Range', None)
+                    with requests.get(url, stream=True, headers=headers, timeout=(10, 45)) as r_retry:
+                        r_retry.raise_for_status()
+                        response = r_retry
+                        resume_pos = 0
+
+                content_len = int(response.headers.get('content-length', 0))
+                if response.status_code == 206:
+                    total_size = content_len + resume_pos if content_len > 0 else 0
+                    mode = 'ab'
+                else:
+                    resume_pos = 0
+                    total_size = content_len
+                    mode = 'wb'
 
                 progress = Progress(
-                    TextColumn("[bold blue]{task.fields[filename]}", justify="center"),
-                    BarColumn(bar_width=36),
-                    "[progress.percentage]{task.percentage:>3.1f}%",
+                    TextColumn(f"[bold {COLOR_TITLE}]{{task.fields[filename]}}", justify="center"),
+                    BarColumn(bar_width=32, complete_style=f"bold {COLOR_BORDER}", finished_style=f"bold {COLOR_BOLT}"),
+                    "[bold white]{task.percentage:>3.1f}%",
                     "•",
                     DownloadColumn(binary_units=True),
                     "•",
@@ -490,12 +573,12 @@ def _download_with_builtin(url, filename, filepath, console):
 
                 panel = Panel(
                     Align.center(progress, vertical="middle"),
-                    title=Text("DOWNLOADING", style="title"),
-                    subtitle=Text("Please wait...", style="secondary"),
+                    title=f"[bold {COLOR_TITLE}]Downloading Episode[/bold {COLOR_TITLE}]",
+                    subtitle=Text("saving to downloads directory", style=f"bold {COLOR_SUBTITLE}"),
                     box=HEAVY,
-                    border_style="panel.border",
-                    padding=(2, 2),
-                    width=92,
+                    border_style=COLOR_BORDER,
+                    padding=(1, 3),
+                    width=min(88, console.width - 4),
                 )
 
                 with Live(
@@ -506,9 +589,14 @@ def _download_with_builtin(url, filename, filepath, console):
                 ):
                     progress.start()
                     try:
-                        task_id = progress.add_task("download", filename=filename, total=total_size if total_size > 0 else None)
-                        with open(filepath, 'wb') as file_handle:
-                            for chunk in response.iter_content(chunk_size=32768):
+                        task_id = progress.add_task(
+                            "download",
+                            filename=filename,
+                            total=total_size if total_size > 0 else None,
+                            completed=resume_pos
+                        )
+                        with open(part_path, mode) as file_handle:
+                            for chunk in response.iter_content(chunk_size=65536):
                                 if not chunk:
                                     continue
                                 file_handle.write(chunk)
@@ -516,6 +604,7 @@ def _download_with_builtin(url, filename, filepath, console):
                     finally:
                         progress.stop()
 
+            os.replace(part_path, filepath)
             _show_centered_download_message(console, "Download Complete", filepath, is_error=False, duration=1.0)
             return True
         except requests.RequestException as error:
@@ -526,89 +615,31 @@ def _download_with_builtin(url, filename, filepath, console):
 
     raise RuntimeError("Download failed")
 
+
 def download_file(url, filename, console, mode="internal", download_dir=None):
+    from .logger import logger
     filename = sanitize_download_filename(filename)
 
-    # Use absolute path for compatibility with external tools (IDM/aria2)
     resolved_dir = os.path.abspath((download_dir or "downloads").strip() or "downloads")
     download_dir = resolved_dir
     os.makedirs(download_dir, exist_ok=True)
     filepath = os.path.join(download_dir, filename)
 
-    selected_mode = (mode or "internal").lower()
-    valid_modes = {"internal", "aria2c", "idm", "auto"}
-    if selected_mode not in valid_modes:
-        selected_mode = "internal"
-
-    if selected_mode == "auto":
-        if get_idm_path():
-            selected_mode = "idm"
-        elif shutil.which("aria2c"):
-            selected_mode = "aria2c"
-        else:
-            selected_mode = "internal"
-
+    logger.debug("DOWNLOAD", f"Starting download of '{filename}' from {url[:60]}...")
+    success = False
     try:
-        if selected_mode == "idm":
-            if _download_with_idm(url, filename, download_dir):
-                _show_centered_download_message(
-                    console,
-                    "Queued in IDM",
-                    f"{filename}\nQueued successfully in Internet Download Manager.",
-                    is_error=False,
-                    duration=1.2,
-                )
-                return True
-
-            _show_centered_download_message(
-                console,
-                "IDM Not Found",
-                "IDM is not installed. Falling back to built-in downloader.",
-                is_error=False,
-                duration=1.0,
-            )
-            selected_mode = "internal"
-
-        if selected_mode == "aria2c":
-            if _download_with_aria2(url, filename, download_dir, filepath, console):
-                return True
-
-            _show_centered_download_message(
-                console,
-                "aria2c Fallback",
-                "aria2c is unavailable or failed. Falling back to built-in downloader.",
-                is_error=False,
-                duration=1.0,
-            )
-            selected_mode = "internal"
-
-        if selected_mode == "internal":
-            return _download_with_builtin(url, filename, filepath, console)
-
-        return False
-
+        success = _download_with_builtin(url, filename, filepath, console)
+        return success
     except KeyboardInterrupt:
-        try:
-            if os.path.exists(filepath):
-                os.remove(filepath)
-        except OSError:
-            pass
-
         _show_centered_download_message(
             console,
             "Download Cancelled",
-            "The download was cancelled by user.",
+            "Download cancelled. Progress saved for resumption.",
             is_error=True,
             duration=1.0,
         )
         return False
     except Exception as error:
-        try:
-            if os.path.exists(filepath):
-                os.remove(filepath)
-        except OSError:
-            pass
-
         _show_centered_download_message(
             console,
             "Download Failed",
@@ -617,3 +648,150 @@ def download_file(url, filename, console, mode="internal", download_dir=None):
             duration=1.8,
         )
         return False
+    finally:
+        logger.log_downloader("native", url, filename, success)
+
+try:
+    import arabic_reshaper
+    from bidi.algorithm import get_display
+    HAS_ARABIC_SUPPORT = True
+except ImportError:
+    HAS_ARABIC_SUPPORT = False
+
+def ar(text: Optional[str]) -> str:
+    """Proper Arabic shaping and BiDi reordering for terminal display."""
+    if not text or not HAS_ARABIC_SUPPORT:
+        return str(text or "").strip()
+    try:
+        raw_str = str(text).strip()
+        if any("\u0600" <= c <= "\u06FF" or "\u0750" <= c <= "\u077F" or "\u08A0" <= c <= "\u08FF" or "\uFB50" <= c <= "\uFDFF" or "\uFE70" <= c <= "\uFEFF" for c in raw_str):
+            reshaper = arabic_reshaper.ArabicReshaper(
+                configuration={
+                    'delete_harakat': True,
+                    'support_ligatures': True,
+                    'shift_harakat_position': False,
+                    'language': 'Arabic'
+                }
+            )
+            reshaped = reshaper.reshape(raw_str)
+            return get_display(reshaped)
+    except Exception:
+        pass
+    return str(text or "").strip()
+
+
+def ar_wrap(text: Optional[str], width: int = 34) -> str:
+    """Wrap Arabic text on word boundaries and shape each line with BiDi without double-wrap overflow."""
+    if not text:
+        return ""
+    import textwrap
+    clean_text = " ".join(str(text).split())
+    safe_width = max(16, width)
+    lines = textwrap.wrap(clean_text, width=safe_width)
+    return "\n".join(ar(line) for line in lines)
+
+
+AR_TO_EN_GENRES = {
+    "أكشن": "Action",
+    "اكشن": "Action",
+    "مغامرات": "Adventure",
+    "مغامرة": "Adventure",
+    "كوميديا": "Comedy",
+    "كوميدي": "Comedy",
+    "دراما": "Drama",
+    "خيال": "Fantasy",
+    "خارق للطبيعة": "Supernatural",
+    "سحر": "Magic",
+    "غموض": "Mystery",
+    "رعب": "Horror",
+    "نفسي": "Psychological",
+    "رومانسي": "Romance",
+    "خيال علمي": "Sci-Fi",
+    "شريحة من الحياة": "Slice of Life",
+    "رياضي": "Sports",
+    "إثارة": "Suspense",
+    "اثارة": "Suspense",
+    "تشويق": "Thriller",
+    "شونين": "Shounen",
+    "شوجو": "Shoujo",
+    "شوچو": "Shoujo",
+    "سينين": "Seinen",
+    "جوسي": "Josei",
+    "ميكا": "Mecha",
+    "موسيقى": "Music",
+    "عسكري": "Military",
+    "مدرسي": "School",
+    "تاريخي": "Historical",
+    "فضاء": "Space",
+    "حريم": "Harem",
+    "إيسيكاي": "Isekai",
+    "ايسيكاي": "Isekai",
+    "ألعاب": "Game",
+    "العاب": "Game",
+    "فنون قتالية": "Martial Arts",
+    "مصاصو دماء": "Vampires",
+    "مصاص دماء": "Vampires",
+    "مصاصي دماء": "Vampires",
+    "شياطين": "Demons",
+    "ساموراي": "Samurai",
+    "قوى خارقة": "Super Power",
+    "محاكاة ساخرة": "Parody",
+    "بوليسي": "Police",
+    "أنثروبولوجي": "Anthropology",
+    "إياشيكي": "Iyashikei",
+    "الحياة اليومية": "Daily Life",
+    "ايتشي": "Ecchi",
+    "إيتشي": "Ecchi",
+    "أطفال": "Kids",
+    "اطفال": "Kids",
+}
+
+AR_TO_EN_TYPES = {
+    "مسلسل": "TV",
+    "فيلم": "Movie",
+    "أوفا": "OVA",
+    "أونا": "ONA",
+    "خاصة": "Special",
+    "حلقة خاصة": "Special",
+    "حلقة خاصة تلفزيونية": "TV Special",
+    "مستمر": "Airing",
+    "مكتمل": "Completed",
+}
+
+def clean_genre(g: Optional[str]) -> str:
+    """Return clean standard English/Latin genre label to avoid terminal font spacing bugs."""
+    if not g:
+        return ""
+    g_str = str(g).strip()
+    return AR_TO_EN_GENRES.get(g_str, g_str)
+
+def clean_type(t: Optional[str]) -> str:
+    """Return clean standard type label (TV, Movie, OVA, Special, etc.)."""
+    if not t:
+        return "TV"
+    t_str = str(t).strip()
+    return AR_TO_EN_TYPES.get(t_str, t_str)
+
+def clean_status(s: Optional[str]) -> str:
+    """Return clean standard status label (Completed, Airing, etc.)."""
+    if not s:
+        return "Completed"
+    s_str = str(s).strip()
+    return AR_TO_EN_TYPES.get(s_str, s_str)
+
+def get_stream_referer(url: str) -> Optional[str]:
+    """Return required HTTP Referer header for upstream CDN video streams."""
+    if not url:
+        return None
+    url_lower = url.lower()
+    if "vid3rb.com" in url_lower:
+        return "https://video.vid3rb.com/"
+    elif "mediafire.com" in url_lower:
+        return "https://www.mediafire.com/"
+    elif "ok.ru" in url_lower:
+        return "https://ok.ru/"
+    elif "ab-hunter.com" in url_lower or "anslayer.com" in url_lower:
+        return "https://anslayer.com/"
+    elif "dramahot" in url_lower or "zokoanime" in url_lower or "hianime" in url_lower or "megaplay" in url_lower:
+        return "https://zokoanime.video/"
+    return None

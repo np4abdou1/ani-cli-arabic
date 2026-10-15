@@ -4,7 +4,7 @@ __pycache__/
 *$py.class
 *.so
 .Python
-/dashboard
+.wrangler/
 build/
 /api docs
 develop-eggs/
@@ -26,6 +26,10 @@ share/python-wheels/
 .installed.cfg
 *.egg
 MANIFEST
+
+# Private Internal Monitoring & Infrastructure (Never track in public git)
+dashboard/
+workers/
 
 # Virtual Environment
 venv/
@@ -58,7 +62,6 @@ bin/
 *.app
 *.dmg
 
-
 # User config backups
 user_config_backup.py
 config.json.bak
@@ -70,4 +73,4 @@ tmp/
 
 # Dev folders; used for api, github pages.
 deps
-
+.agents/

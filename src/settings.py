@@ -19,12 +19,16 @@ class SettingsManager:
             "default_download_quality": "1080p",
             "download_mode": "internal",
             "download_directory": "downloads",
+            "download_parallel": 2,
+            "download_speed_limit": "unlimited",
             "player": "mpv",
             "auto_next": False,
             "discord_rpc": True,
             "show_donation": True,
-            "theme": "blue",
-            "analytics": True  # Allow users to opt-out of analytics
+            "theme": "auto",
+            "anime_provider": "anime3rb",
+            "analytics": True,
+            "debug_logging": False
         }
         
         if not self.config_file.exists():
@@ -46,8 +50,8 @@ class SettingsManager:
             import sys
             print(f"Warning: Failed to save settings: {e}", file=sys.stderr)
 
-    def get(self, key):
-        return self.settings.get(key)
+    def get(self, key, default=None):
+        return self.settings.get(key, default)
 
     def set(self, key, value):
         self.settings[key] = value
