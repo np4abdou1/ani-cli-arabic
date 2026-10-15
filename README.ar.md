@@ -1,305 +1,361 @@
-<div align="center" dir="rtl">
+<div dir="rtl">
 
-# 🎉 ani-cli-arabic v2.0 - الإصدار الرئيسي
+<div align="center">
 
-<h2>💖 ادعم هذا المشروع المفتوح المصدر</h2>
-<p>دعمك يساعدنا في صيانة الخوادم واستمرار تطوير التحديثات!</p>
-<a href="https://paypal.me/np4abdou">
-  <img src="https://img.shields.io/badge/Donate_with_PayPal-00457C?style=for-the-badge&logo=paypal&logoColor=white" alt="Donate with PayPal">
-</a>
-<br><br><br>
+  <p>
+    <strong>أداة بث وتحميل الأنمي مباشرة من  (Terminal)</strong><br>
+    شاهد وحمّل الأنمي بجودة عالية مع ترجمة عربية وإنجليزية مباشرة من سطر الأوامر.
+  </p>
 
-بث وتنزيل الأنمي مباشرة من الطرفية بترجمة عربية وإنجليزية
+  <p>
+    <a href="https://paypal.me/np4abdou"><img src="https://img.shields.io/badge/Sponsor-PayPal-00457C?style=flat-square&logo=paypal&logoColor=white" alt="Donate with PayPal" /></a>
+  </p>
 
-<p align="center">
-  <a href="https://github.com/np4abdou1/ani-cli-arabic/stargazers">
-    <img src="https://img.shields.io/github/stars/np4abdou1/ani-cli-arabic?style=for-the-badge" />
-  </a>
-  <a href="https://github.com/np4abdou1/ani-cli-arabic/network">
-    <img src="https://img.shields.io/github/forks/np4abdou1/ani-cli-arabic?style=for-the-badge" />
-  </a>
-  <br>
-  <a href="https://github.com/np4abdou1/ani-cli-arabic/releases">
-    <img src="https://img.shields.io/github/v/release/np4abdou1/ani-cli-arabic?style=for-the-badge" />
-  </a>
-  <a href="https://pypi.org/project/ani-cli-arabic">
-    <img src="https://img.shields.io/pypi/v/ani-cli-arabic?style=for-the-badge" />
-  </a>
-  <a href="https://aur.archlinux.org/packages/ani-cli-arabic">
-    <img src="https://img.shields.io/aur/version/ani-cli-arabic?style=for-the-badge" />
-  </a>
-</p>
+  <!-- Primary Release & Package Badges -->
+  <p>
+    <a href="https://github.com/np4abdou1/ani-cli-arabic/releases"><img src="https://img.shields.io/github/v/release/np4abdou1/ani-cli-arabic?style=flat-square&logo=github&label=Release&color=6366f1" alt="GitHub Release" /></a>
+    <a href="https://pypi.org/project/ani-cli-arabic"><img src="https://img.shields.io/pypi/v/ani-cli-arabic?style=flat-square&logo=pypi&logoColor=white&label=PyPI&color=3776AB" alt="PyPI Version" /></a>
+    <a href="https://aur.archlinux.org/packages/ani-cli-arabic"><img src="https://img.shields.io/aur/version/ani-cli-arabic?style=flat-square&logo=archlinux&logoColor=white&label=AUR&color=1793D1" alt="AUR Version" /></a>
+    <img src="https://img.shields.io/badge/Python-3.9%2B-3776AB?style=flat-square&logo=python&logoColor=white" alt="Python 3.9+" />
+    <a href="LICENSE"><img src="https://img.shields.io/badge/License-GPL--3.0-22c55e?style=flat-square" alt="License" /></a>
+  </p>
 
-<p align="center">
-  <a href="https://github.com/np4abdou1/ani-cli-arabic/actions/workflows/ci.yml">
-    <img src="https://github.com/np4abdou1/ani-cli-arabic/actions/workflows/ci.yml/badge.svg" alt="CI Status" />
-  </a>
-  <a href="https://github.com/np4abdou1/ani-cli-arabic/actions/workflows/publish-pypi.yml">
-    <img src="https://github.com/np4abdou1/ani-cli-arabic/actions/workflows/publish-pypi.yml/badge.svg" alt="PyPI Workflow" />
-  </a>
-  <a href="https://github.com/np4abdou1/ani-cli-arabic/actions/workflows/publish-aur.yml">
-    <img src="https://github.com/np4abdou1/ani-cli-arabic/actions/workflows/publish-aur.yml/badge.svg" alt="AUR Workflow" />
-  </a>
-</p>
+  <!-- CI/CD & Repo Activity Badges -->
+  <p>
+    <a href="https://github.com/np4abdou1/ani-cli-arabic/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/np4abdou1/ani-cli-arabic/ci.yml?style=flat-square&logo=githubactions&logoColor=white&label=CI%20Tests" alt="CI Status" /></a>
+    <a href="https://github.com/np4abdou1/ani-cli-arabic/actions/workflows/publish-pypi.yml"><img src="https://img.shields.io/github/actions/workflow/status/np4abdou1/ani-cli-arabic/publish-pypi.yml?style=flat-square&logo=pypi&logoColor=white&label=PyPI%20Build" alt="PyPI Workflow" /></a>
+    <a href="https://github.com/np4abdou1/ani-cli-arabic/actions/workflows/publish-aur.yml"><img src="https://img.shields.io/github/actions/workflow/status/np4abdou1/ani-cli-arabic/publish-aur.yml?style=flat-square&logo=archlinux&logoColor=white&label=AUR%20Build" alt="AUR Workflow" /></a>
+    <a href="https://github.com/np4abdou1/ani-cli-arabic/stargazers"><img src="https://img.shields.io/github/stars/np4abdou1/ani-cli-arabic?style=flat-square&logo=github&label=Stars&color=eab308" alt="GitHub Stars" /></a>
+    <a href="https://github.com/np4abdou1/ani-cli-arabic/network"><img src="https://img.shields.io/github/forks/np4abdou1/ani-cli-arabic?style=flat-square&logo=github&label=Forks&color=8b5cf6" alt="GitHub Forks" /></a>
+  </p>
 
-<p align="center">
-  <img src="https://img.shields.io/badge/Python-3.9+-3776AB?style=for-the-badge&logo=python&logoColor=white" />
-  <img src="https://img.shields.io/badge/License-GPL--3.0-green?style=for-the-badge" />
-</p>
+  <p>
+    🌍 <strong><a href="README.md">Click here for the English README</a></strong>
+  </p>
 
-<br>
+  <hr />
 
-<p>To view English documentation click here: </p>
-<a href="README.md">
-  <img src="https://img.shields.io/badge/Language-English-blue?style=for-the-badge&logo=google-translate&logoColor=white" alt="English">
-</a>
+  <!-- Quick Navigation Bar -->
+  <p>
+    <a href="#-ما-الجديد-في-الإصدار-v20">🚀 ما الجديد</a> &nbsp;•&nbsp;
+    <a href="#-المصادر-والسيرفرات">🌐 المصادر</a> &nbsp;•&nbsp;
+    <a href="#-التثبيت">📦 التثبيت</a> &nbsp;•&nbsp;
+    <a href="#-طريقة-الاستخدام">🎮 الاستخدام</a> &nbsp;•&nbsp;
+    <a href="#️-اختصارات-لوحة-المفاتيح">⌨️ الاختصارات</a> &nbsp;•&nbsp;
+    <a href="#️-الإعدادات">⚙️ الإعدادات</a> &nbsp;•&nbsp;
+    <a href="#-المساهمون">👥 المساهمون</a>
+  </p>
 
-<br><br>
+</div>
 
-https://github.com/user-attachments/assets/a6c6882a-7c50-4a8d-aa9c-e56a6d4ff7eb
+<br />
+
+<div align="center">
+
+https://github.com/user-attachments/assets/e74d4443-20b0-4683-b346-bf168a720025
 
 </div>
 
 ---
 
-<div dir="rtl">
+## 🚀 ما الجديد في الإصدار v2.0؟
 
-## 📑 التنقل السريع
+يُعد الإصدار **2.0** أكبر تحديث معماري في تاريخ المشروع، حيث تمت إعادة بنائه بالكامل لضمان أقصى سرعة، استقرار، وعدم الاعتماد على أدوات تحميل خارجية:
 
-[ما الجديد في الإصدار 2.0](#-ما-الجديد-في-الإصدار-20) • [التثبيت](#-التثبيت) • [كيفية الاستخدام](#-كيفية-الاستخدام) • [الميزات الرئيسية](#-الميزات-الرئيسية) • [اختصارات لوحة المفاتيح](#️-اختصارات-لوحة-المفاتيح) • [الإعدادات](#️-الإعدادات) • [المساهمون](#-المساهمون) • [الرخصة](#-الرخصة)
+| الميزة | التفاصيل |
+| :--- | :--- |
+| 🌐 **محرك متعدد المصادر** | بث مباشر وسلس من **4 مصادر مستقلة**: `Anime3rb`، `Anime Slayer`، `Animeify`، و `HiAnime` (ترجمة ودبلجة إنجليزية). |
+| 📥 **محمّل دفعات مدمج (Chunked)** | مبني من الصفر مع دعم التحميل المتوازي، الإيقاف/الاستئناف، وعرض السرعة والوقت المتبقي لحظياً — **دون الحاجة لأي أدوات خارجية** (لا يتطلب `aria2c` أو `yt-dlp`). |
+| ⚡ **الوضع التفاعلي السريع (`-i`)** | واجهة `fzf` متطورة تدعم الماوس، عرض سليم للنصوص العربية دون اقتطاع، وقائمة إجراءات سريعة للحلقة (`Play`, `Download`, `Batch`, `Quality`). |
+| 🎬 **دعم شامل للمشغلات و IPC** | دعم كامل لمشغلات **MPV**، **VLC**، **Celluloid**، **IINA**، و **Syncplay**. مراقبة لحظية عبر MPV JSON-IPC لحفظ ثانية التوقف بدقة واستئناف المشاهدة لاحقاً. |
+| 🛡️ **بنية سحابية بدون توقف** | نظام توجيه احتياطي تلقائي ثلاثي الطبقات عبر النطاقات المخصصة، Cloudflare Pages، و Cloudflare Workers. |
+| 🔒 **خصوصية مشددة** | إزالة تتبع المشاهدة بالكامل وعزل فروع التطوير عن إحصائيات فحص الحالة. |
+| 🔄 **محدّث تلقائي متعدد المنصات** | تحديث فوري بخطوة واحدة عبر PyPI (`pip`)، توزيعة Arch Linux (`yay` / `paru`)، و Homebrew. |
 
 ---
 
-## 🚀 ما الجديد في الإصدار 2.0؟
+## 🌐 المصادر والسيرفرات
 
-الإصدار 2.0 يمثل أضخم تحديث وإعادة هيكلة في تاريخ المشروع:
+يمكنك التبديل بين المصادر بسهولة من قائمة الإعدادات (`[O]` أو `[c]`) أو مباشرة عبر خيار `-p` في سطر الأوامر:
 
-* 🌐 **دعم خوادم ومصادر متعددة**: إمكانية المشاهدة والبحث عبر 4 مصادر مستقلة: **أنمي بالراحة (Anime3rb)**، **أنمي سلاير (Anime Slayer)**، **أنمي فاي (Animeify)**، و **HiAnime** (للبث المترجم والمدبلج بالإنجليزية).
-* 📥 **أداة تنزيل جماعي مدمجة (Native Batch Downloader)**: بُنيت بالكامل من الصفر لتنزيل الحلقات مجزأة وبشكل متوازي مع دعم الاستئناف التلقائي وعرض السرعة والوقت المتبقي، **دون الحاجة لأي أدوات خارجية** (لا حاجة لـ aria2c أو yt-dlp).
-* ⚡ **إعادة بناء الوضع التفاعلي السريع (`-i`)**: دعم كامل وسلس لـ `fzf`، التنقل بالماوس، حل مشاكل المحاذاة للنصوص العربية (RTL)، وقائمة إجراءات تفاعلية لكل حلقة (`مشاهدة`، `تنزيل فردي`، `تنزيل جماعي`، `تحديد الجودة`).
-* 🎬 **دعم شامل لمشغلات الوسائط واستئناف ذكي**: دعم تشغيل عبر **MPV**، **VLC**، **Celluloid**، **IINA**، و **Syncplay** (للمشاهدة المتزامنة مع أصدقائك). التكامل مع MPV عبر JSON-IPC يضمن استئناف المشاهدة بدقة الثانية ونسبة المشاهدة المئوية.
-* 🛡️ **بنية تحتية سحابية بثلاثة مستويات**: سلسلة انتقال تلقائي عند تعطل النطاق عبر النطاق المخصص، Cloudflare Pages، و Cloudflare Workers.
-* 🔒 **تعزيز الخصوصية**: حذف تتبع سجلات المشاهدة وعزل النسخ التطويرية تماماً عن القياسات.
-* 🔄 **ترقية تلقائية سلسة**: دعم التحديث التلقائي عبر PyPI (`pip`) و Arch Linux (`yay` / `paru`) و Homebrew.
+| المصدر | مفتاح CLI | اللغة | مميزات البث |
+| :--- | :---: | :---: | :--- |
+| **Anime3rb** | `anime3rb` | 🇸🇦 ترجمة عربية | بث مباشر فائق السرعة عبر CDN مع خيارات متعددة للجودة |
+| **Anime Slayer** | `anime_slayer` | 🇸🇦 ترجمة عربية | نقاط اتصال API رسمية مع سيرفرات احتياطية متعددة لكل حلقة |
+| **Animeify** | `animeify` | 🇸🇦 ترجمة عربية | سيرفرات متعددة مع تبديل سريع بين الجودات |
+| **HiAnime** | `hianime` | 🇬🇧 ترجمة / دبلجة إنجليزية | بث سريع باللغة الإنجليزية (مترجم ومدبلج) مع معالجة تلقائية للروابط |
 
 ---
 
 ## 📦 التثبيت
 
-### المتطلبات الأساسية
-- **بايثون 3.9 أو أحدث** (يُنصح ببايثون 3.10 - 3.12)
-- **مشغل الوسائط MPV** (المشغل الافتراضي الموصى به)
-- **ffmpeg** (لمعالجة وسائط الفيديو)
-- **fzf** (للبحث والخيارات التفاعلية)
+### 🔧 المتطلبات الأساسية
+
+تأكد من تثبيت البرامج الأساسية التالية على نظامك قبل التشغيل:
+
+* **Python 3.9+** (يُنصح بإصدار `3.10` إلى `3.12`)
+* **MPV** (المشغل الافتراضي الموصى به لدعم الحفظ التلقائي لوقت التوقف)
+* **FFmpeg** (مطلوب لمعالجة وتجميع تدفقات الفيديو)
+* **fzf** (مطلوب لتشغيل الوضع التفاعلي السريع `-i`)
 
 ---
 
-### الطريقة الأولى: التثبيت عبر pip (مُستحسن)
+### ⚡ الطريقة 1: عبر PyPI باستخدام `pip` (موصى به — Linux, macOS, Windows)
 
-أسرع وأسهل طريقة على لينكس، ماك، وويندوز:
+<div dir="ltr">
 
 ```bash
+# Install the latest stable release
 pip install ani-cli-arabic
-```
 
-تشغيل التطبيق:
-```bash
+# Launch the full TUI or use the short alias
 ani-cli-arabic
-# أو استخدام الاختصار المباشر
 ani-cli-ar
 ```
 
-للترقية في أي وقت:
+</div>
+
+<details>
+<summary><b>🔄 كيفية التحديث عبر pip</b></summary>
+
+<div dir="ltr">
+
 ```bash
 pip install --upgrade ani-cli-arabic
 ```
 
+</div>
+</details>
+
 ---
 
-### الطريقة الثانية: مستخدمو آرتش لينكس (AUR)
+### 🏹 الطريقة 2: لمستخدمي Arch Linux (AUR)
 
-متاح رسمياً على مستودع مستخدمي آرتش:
+متوفر مباشرة في مستودع AUR لتوزيعات Arch، Manjaro، EndeavourOS، و Garuda:
+
+<div dir="ltr">
 
 ```bash
-# باستخدام yay
+# Using yay
 yay -S ani-cli-arabic
 
-# باستخدام paru
+# Using paru
 paru -S ani-cli-arabic
 ```
 
+</div>
+
 ---
 
-### الطريقة الثالثة: التشغيل من المصدر
+### 🛠️ الطريقة 3: التشغيل من المصدر (Source)
 
-لتشغيل أحدث كود تطويري مباشرة:
+لتشغيل أحدث نسخة تطويرية مباشرة من المستودع:
+
+<div dir="ltr">
 
 ```bash
-# استنساخ المستودع
 git clone https://github.com/np4abdou1/ani-cli-arabic.git
 cd ani-cli-arabic
-
-# تثبيت المتطلبات
 pip install -r requirements.txt
-
-# التشغيل
 python3 main.py
 ```
 
+</div>
+
 ---
 
-## 🎮 كيفية الاستخدام
+## 🎮 طريقة الاستخدام
 
-### 1. وضع الواجهة الطرفية الكامل (TUI)
-شغّل التطبيق وتنقل بالقوائم عبر الأسهم:
+### 1️⃣ الواجهة الرسومية الكاملة للطرفية (الوضع الافتراضي)
+شغّل لوحة التحكم التفاعلية الكاملة مع التنقل بالأسهم، الثيمات، سجل المشاهدة، والمفضلة:
+<div dir="ltr">
+
 ```bash
-ani-cli-arabic
+ani-cli-ar
 ```
 
-### 2. الوضع التفاعلي السريع (`-i`)
-للبحث والمشاهدة السريعة مباشرة عبر قوائم `fzf`:
+</div>
+
+### 2️⃣ الوضع التفاعلي السريع عبر `fzf` (`-i`)
+تجاوز الواجهة الكاملة وابحث أو شغّل الحلقات فوراً عبر قائمة `fzf` خفيفة باللغة العربية أو الإنجليزية:
+<div dir="ltr">
+
 ```bash
-# باللغة العربية
+# Search in English
+ani-cli-ar -i "One Piece"
+
+# Search in Arabic
 ani-cli-ar -i "ون بيس"
-
-# باللغة الإنجليزية
-ani-cli-ar -i "Naruto"
 ```
 
-### 3. تحديد الخادم المزود من سطر الأوامر
-يمكنك تحديد خادم البث مباشرة عند التشغيل:
-```bash
-# البث من أنمي بالراحة (عربي)
-ani-cli-ar -p anime3rb "هنتر"
+</div>
 
-# البث من HiAnime (مترجم / مدبلج إنجليزي)
+### 3️⃣ اختيار المصدر عبر سطر الأوامر (`-p`)
+حدد مصدر البث المطلوب مباشرة عند تشغيل الأمر:
+<div dir="ltr">
+
+```bash
+# Stream from Anime3rb (Arabic Sub)
+ani-cli-ar -p anime3rb "Naruto"
+
+# Stream from HiAnime (English Sub/Dub)
 ani-cli-ar -p hianime "Attack on Titan"
 
-# البث من أنمي سلاير
+# Stream from Anime Slayer
 ani-cli-ar -p anime_slayer "Bleach"
 
-# البث من أنمي فاي
+# Stream from Animeify
 ani-cli-ar -p animeify "Jujutsu Kaisen"
 ```
 
-### 4. البحث المباشر
+</div>
+
+### 4️⃣ البحث المباشر
+انتقل مباشرة إلى نتائج البحث داخل الواجهة:
+<div dir="ltr">
+
 ```bash
-ani-cli-ar "Detective Conan"
+ani-cli-ar "Hunter x Hunter"
 ```
+
+</div>
 
 ---
 
-## 🎯 الميزات الرئيسية
+## 🎯 نظرة معمقة على المميزات الأساسية
 
-### 📺 خوادم ومصادر بث متعددة
-- **Anime3rb**: سيرفرات مباشرة فائقة السرعة مع ترجمة عربية مدمجة.
-- **Anime Slayer**: ربط مباشر مع خوادم وسيرفرات تطبيق أنمي سلاير.
-- **Animeify**: خيارات جودة متعددة وسيرفرات احتياطية.
-- **HiAnime**: بث إنجليزي سريع (Sub / Dub) مع معالجة ذكية للـ Referer وتخطي الحجب.
-
-### 📥 أداة تنزيل جماعي أصلية
-- تنزيل مواسم كاملة أو نطاق حلقات محدد (مثل `1-12` أو `1,3,5` أو `all`).
-- تنزيل مجزأ متوازي مع إمكانية الإيقاف والاستئناف.
-- شريط تقدم تفاعلي يوضح السرعة والوقت المتبقي والنسبة المئوية.
-- بدون أي برامج خارجية إضافية.
-
-### 🎬 مشغلات متعددة واستئناف دقيق
-- **المشغلات المدعومة**: MPV، VLC، Celluloid، IINA (على ماك)، و Syncplay (للمشاهدة مع الأصدقاء عبر الإنترنت).
-- **استئناف ذكي**: تتبع آني لموضع المشاهدة عبر منفذ IPC Socket لاستكمال الحلقة من الثانية ذاتها.
-- **المفضلة وسجل المشاهدة**: تبويبات منظمة لتثبيت أعمالك المفضلة وسجل المشاهدة.
-
-### 🎨 واجهة طرفية حديثة وسمات مخصصة
-- **17 سمة لونية**: أزرق، أحمر، أخضر، بنفسجي، سماوي، أصفر، وردي، برتقالي، أزرق مخضر، أرجواني، ليموني، مرجاني، خزامى، ذهبي، نعناعي، زهري، الغروب.
-- **حضور Discord غني (RPC)**: يعرض غلاف الأنمي واسم العمل والحلقة للمشاهدين على حسابك في ديسكورد.
-- **تسوية وتطبيع البحث العربي**: معالجة ذكية لحروف الهمزة والتاء المربوطة والأخطاء الإملائية.
+<table>
+  <tr>
+    <td width="50%" valign="top">
+      <h3>📥 محمّل الدفعات الذكي (Batch Downloader)</h3>
+      <ul>
+        <li><b>نطاقات مرنة:</b> حمّل مواسم كاملة أو حلقات محددة (مثل <code>1-12</code>، <code>1,3,5</code>، أو <code>all</code>).</li>
+        <li><b>متعدد المسارات (Multi-Threaded):</b> تحميل مقسم متوازي مع دعم الإيقاف المؤقت والاستئناف التلقائي.</li>
+        <li><b>مؤشرات حية:</b> عرض سرعة التحميل (MB/s)، الوقت المتبقي (ETA)، وشريط التقدم المئوي.</li>
+        <li><b>مستقل ذاتياً:</b> لا يحتاج إلى أي برامج تحميل خارجية.</li>
+      </ul>
+    </td>
+    <td width="50%" valign="top">
+      <h3>🎨 واجهة عصرية ومميزات ذكية</h3>
+      <ul>
+        <li><b>17 ثيم مدمج:</b> <code>blue</code>، <code>red</code>، <code>green</code>، <code>purple</code>، <code>cyan</code>، <code>gold</code>، <code>rose</code>، <code>sunset</code>، والمزيد.</li>
+        <li><b>ربط Discord Rich Presence:</b> يعرض بوستر الأنمي، الاسم، ورقم الحلقة الحالية مباشرة في ملفك الشخصي على ديسكورد.</li>
+        <li><b>بحث عربي ذكي:</b> معالجة تلقائية للأخطاء الإملائية (الهمزات، التاء المربوطة، والأسماء المعرّبة).</li>
+        <li><b>مشاهدة جماعية:</b> دعم مدمج لـ <b>Syncplay</b> للمشاهدة مع الأصدقاء في نفس اللحظة.</li>
+      </ul>
+    </td>
+  </tr>
+</table>
 
 ---
 
 ## ⌨️ اختصارات لوحة المفاتيح
 
-### القائمة الرئيسية والتنقل
-| المفتاح | الوظيفة |
-| :---: | :--- |
-| **↑ / ↓** أو **j / k** | التنقل عبر القوائم والعناصر |
-| **Enter** | اختيار / تأكيد العنصر |
-| **G** | الانتقال مباشرة إلى رقم حلقة محدد |
-| **B** | العودة إلى الشاشة السابقة |
-| **Q** / **Esc** | الخروج من التطبيق |
-| **S** | فتح شريط البحث |
-| **T** | عرض الأنميات الرائجة (Trending) |
-| **R** | عرض الأنميات الأعلى تقييماً (Top Rated) |
-| **F** | فتح قائمة المفضلة |
-| **H** | فتح سجل المشاهدة |
-| **O** | فتح قائمة الإعدادات |
-| **D** | دعم المشروع (تبرع PayPal) |
+<table>
+  <tr>
+    <th width="50%">🖥️ التنقل في الواجهة الرئيسية (TUI)</th>
+    <th width="50%">🎬 مشغل الفيديو (MPV)</th>
+  </tr>
+  <tr>
+    <td valign="top">
 
-### داخل المشغل (MPV)
-| المفتاح | الوظيفة |
+| الزر | الوظيفة |
 | :---: | :--- |
-| **Space** | إيقاف مؤقت / استئناف التشغيل |
-| **← / →** | تقديم / ترجيع 5 ثوانٍ |
-| **[ / ]** | إبطاء / تسريع الفيديو |
-| **F** | تبديل وضع ملء الشاشة |
-| **9 / 0** | خفض / رفع الصوت |
-| **Q** | إيقاف وحفظ موضع الاستئناف |
+| <kbd>↑</kbd> <kbd>↓</kbd> / <kbd>j</kbd> <kbd>k</kbd> | التنقل بين القوائم والعناصر |
+| <kbd>Enter</kbd> | بحث / تأكيد الاختيار |
+| <kbd>e</kbd> / <kbd>m</kbd> | أحدث الحلقات / الأفلام |
+| <kbd>t</kbd> / <kbd>p</kbd> / <kbd>r</kbd> | الرائج / الأكثر شعبية / الأعلى تقييماً |
+| <kbd>g</kbd> / <kbd>s</kbd> | تصفح التصنيفات / الاستوديوهات |
+| <kbd>l</kbd> / <kbd>f</kbd> | سجل المشاهدة / المفضلة |
+| <kbd>c</kbd> / <kbd>O</kbd> | فتح قائمة الإعدادات |
+| <kbd>d</kbd> | دعم المشروع (تبرع) |
+| <kbd>B</kbd> | الرجوع إلى الشاشة السابقة |
+| <kbd>Ctrl+C</kbd> / <kbd>Q</kbd> | إغلاق البرنامج |
+
+</td>
+    <td valign="top">
+
+| الزر | الوظيفة |
+| :---: | :--- |
+| <kbd>Space</kbd> | إيقاف مؤقت / استئناف التشغيل |
+| <kbd>←</kbd> / <kbd>→</kbd> | تقديم / ترجيع 5 ثوانٍ |
+| <kbd>[</kbd> / <kbd>]</kbd> | إبطاء / تسريع سرعة التشغيل |
+| <kbd>F</kbd> | تفعيل / إلغاء ملء الشاشة |
+| <kbd>9</kbd> / <kbd>0</kbd> | خفض / رفع مستوى الصوت |
+| <kbd>Q</kbd> | إيقاف المشاهدة وحفظ ثانية التوقف بدقة |
+
+</td>
+  </tr>
+</table>
 
 ---
 
 ## ⚙️ الإعدادات
 
-يتم تخزين الإعدادات محلياً في `~/.ani-cli-arabic/database/config.json`.
+يتم حفظ جميع تفضيلات المستخدم محلياً في المسار:
+<div dir="ltr">
 
-### خيارات قائمة الإعدادات (`[O]`)
-- **الخادم النشط**: التبديل بين `anime3rb` و `anime_slayer` و `animeify` و `hianime`.
-- **الجودة الافتراضية**: اختيار الجودة التلقائية (`1080p`، `720p`، `480p`، أو `سؤال دائماً`).
-- **مشغل الوسائط**: الاختيار بين `mpv` و `vlc` و `celluloid` و `iina` و `syncplay`.
-- **التشغيل التلقائي للحلقة التالية**: متابعة البث التلقائي بعد انتهاء الحلقة.
-- **حضور Discord RPC**: تفعيل أو تعطيل ملصقات ديسكورد.
-- **السمة اللونية**: التبديل المباشر بين 17 سمة لونية دون الحاجة لإعادة التشغيل.
-- **مسار التنزيل**: تخصيص مجلد حفظ حلقات الأنمي.
-- **الخصوصية والتحديثات**: تفعيل أو تعطيل القياسات المجهولة وفاحص الإصدارات التلقائي.
+```text
+~/.ani-cli-arabic/database/config.json
+```
+
+</div>
+
+افتح قائمة الإعدادات (<kbd>c</kbd> أو <kbd>O</kbd>) من القائمة الرئيسية في أي وقت لتخصيص:
+* **المصدر النشط (Active Provider)**: التبديل بين `anime3rb`، `anime_slayer`، `animeify`، و `hianime`.
+* **الجودة الافتراضية (Default Quality)**: تثبيت الجودة على `1080p`، `720p`، `480p`، أو `Ask` (السؤال في كل مرة).
+* **مشغل الوسائط (Media Player)**: الاختيار بين `mpv`، `vlc`، `celluloid`، `iina`، أو `syncplay`.
+* **التشغيل التلقائي (Auto-Next Episode)**: تشغيل الحلقة التالية تلقائياً فور انتهاء الحلقة الحالية.
+* **حالة ديسكورد (Discord Rich Presence)**: تفعيل أو إيقاف عرض النشاط الحي على ديسكورد.
+* **لون الثيم (Theme Color)**: معاينة والتبديل الفوري بين 17 لوحة ألوان مختلفة.
+* **مجلد التحميل (Download Directory)**: تحديد مسار المجلد المحلي لحفظ الحلقات المحملة.
 
 ---
 
 ## 👥 المساهمون
 
-شكر خاص لكل من ساهم في بناء واختبار وصيانة المشروع:
-
-</div>
+شكر خاص لكل من ساهم في بناء، اختبار، وتطوير مشروع **ani-cli-arabic**:
 
 <div align="center">
-
-[![Contributors](https://contrib.rocks/image?repo=np4abdou1/ani-cli-arabic)](https://github.com/np4abdou1/ani-cli-arabic/graphs/contributors)
-
+  <a href="https://github.com/np4abdou1/ani-cli-arabic/graphs/contributors"><img src="https://contrib.rocks/image?repo=np4abdou1/ani-cli-arabic" alt="Contributors" /></a>
 </div>
 
-<div dir="rtl">
+<br />
 
-**المساهمون الرئيسيون:**
-- [@np4abdou1](https://github.com/np4abdou1) - المنشئ والمطور الرئيسي
-- [@Anas-Tou](https://github.com/Anas-Tou) - مساهم
-- [@ilyes-pro](https://github.com/ilyes-Pro) - مساهم
+* **[@np4abdou1](https://github.com/np4abdou1)** — مؤسس المشروع والمطور الرئيسي
+* **[@Anas-Tou](https://github.com/Anas-Tou)** — مساهم أساسي
+* **[@ilyes-pro](https://github.com/ilyes-Pro)** — مساهم أساسي
 
-تريد المساهمة؟ يسعدنا استقبال مقترحاتك أو طلبات السحب (Pull Requests)!
+> 💡 **هل ترغب في المساهمة؟** اطّلع على [دليل المساهمة](.github/CONTRIBUTING.md) — نرحب دائماً بفتح التذاكر (Issues) وطلبات السحب (Pull Requests)!
 
 ---
 
-## 📄 الرخصة
+## 📄 الترخيص
 
-هذا المشروع مرخص بموجب **رخصة جنو العمومية الإصدار 3.0 (GPL-3.0)**. راجع ملف [LICENSE](LICENSE) للتفاصيل الكاملة.
+هذا المشروع مرخص بموجب رخصة **GNU General Public License v3.0**. راجع ملف [LICENSE](LICENSE) لمزيد من التفاصيل.
 
-- ✅ مجاني بالكامل للاستخدام الشخصي والتعليمي
-- ✅ مفتوح المصدر ومدعوم من المجتمع
-- ⚠️ أي تعديلات أو نسخ مشتقة يجب أن تظل مفتوحة المصدر تحت رخصة GPL-3.0
+* ✅ مجاني للاستخدام الشخصي، التعليمي، والمجتمعي
+* ✅ مفتوح المصدر وشفاف بنسبة 100%
+* ⚠️ أي تعديلات أو نسخ مشتقة (Forks) يجب أن تبقى مفتوحة المصدر تحت رخصة **GPL-3.0**
 
 ---
 
-</div>
-
 <div align="center">
 
-صُنع بـ ❤️ من مجتمع الأنمي
+  <h3>💖 ادعم هذا المشروع مفتوح المصدر</h3>
+  <p>دعمك يساعد في تغطية تكاليف البنية التحتية واستمرار التحديثات!</p>
+  <a href="https://paypal.me/np4abdou"><img src="https://img.shields.io/badge/Donate_with_PayPal-00457C?style=for-the-badge&logo=paypal&logoColor=white" alt="Donate with PayPal" /></a>
 
-[⭐ ضع نجمة للمستودع](https://github.com/np4abdou1/ani-cli-arabic) • [🐛 أبلغ عن مشكلة](https://github.com/np4abdou1/ani-cli-arabic/issues) • [💬 النقاشات](https://github.com/np4abdou1/ani-cli-arabic/discussions)
+  <br /><br />
+
+  صُنع بـ ❤️ بواسطة مجتمع الأنمي مفتوح المصدر
+
+  <p>
+    <a href="https://github.com/np4abdou1/ani-cli-arabic">⭐ ضع نجمة للمستودع</a> &nbsp;•&nbsp;
+    <a href="https://github.com/np4abdou1/ani-cli-arabic/issues">🐛 الإبلاغ عن خطأ</a> &nbsp;•&nbsp;
+    <a href="https://github.com/np4abdou1/ani-cli-arabic/discussions">💬 النقاشات</a>
+  </p>
+
+</div>
 
 </div>
