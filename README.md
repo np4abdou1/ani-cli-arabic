@@ -286,6 +286,7 @@ Special thanks to everyone who has helped build, test, and maintain **ani-cli-ar
 
 * **[@np4abdou1](https://github.com/np4abdou1)** — Creator & Lead Developer
 * **[@Anas-Tou](https://github.com/Anas-Tou)** — Core Contributor
+* **[@IsmailMechkene](https://github.com/IsmailMechkene)** — Core Contributor
 * **[@ilyes-pro](https://github.com/ilyes-Pro)** — Core Contributor
 
 > 💡 **Want to contribute?** Check out our [Contributing Guidelines](.github/CONTRIBUTING.md) — issues and pull requests are always welcome!
