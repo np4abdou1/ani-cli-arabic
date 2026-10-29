@@ -51,9 +51,7 @@
 <br />
 
 <div align="center">
-
-https://github.com/user-attachments/assets/e74d4443-20b0-4683-b346-bf168a720025
-
+  <img src="assets/showcase.gif" alt="ani-cli-arabic Showcase" />
 </div>
 
 ---
