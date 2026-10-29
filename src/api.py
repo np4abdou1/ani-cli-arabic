@@ -122,6 +122,7 @@ class AnimeAPI:
         self._search_cache: Dict[str, List[AnimeResult]] = {}
         self._lw_token: Optional[str] = None
         self._lw_snapshot: Optional[str] = None
+        self._lw_update_uri: Optional[str] = None
         self._lw_cookies: Dict[str, str] = {}
         self._lw_token_time: float = 0
         
@@ -155,33 +156,58 @@ class AnimeAPI:
         except Exception:
             pass
 
-    def _ensure_livewire_context(self):
+    def _ensure_livewire_context(self, force_refresh: bool = False):
         import time
+        from urllib.parse import urljoin
         now = time.time()
         with self._cache_lock:
-            if self._lw_token and self._lw_snapshot and (now - self._lw_token_time < 1800):
-                return self._lw_token, self._lw_snapshot, self._lw_cookies
+            if not force_refresh and self._lw_token and self._lw_snapshot and self._lw_update_uri and (now - self._lw_token_time < 1800):
+                return self._lw_token, self._lw_snapshot, self._lw_cookies, self._lw_update_uri
             
             s = self._get_session()
             try:
                 r_home = s.get(BASE_URL, headers=DEFAULT_HEADERS, timeout=8)
                 if r_home.status_code != 200:
-                    return None, None, {}
+                    return None, None, {}, None
                 
-                csrf_match = re.search(r'csrf-token.*?content="(.*?)"', r_home.text)
-                self._lw_token = csrf_match.group(1) if csrf_match else ""
+                # Extract CSRF token
+                csrf_match = re.search(r'data-csrf="([^"]+)"', r_home.text)
+                if csrf_match:
+                    self._lw_token = csrf_match.group(1)
+                else:
+                    csrf_m2 = re.search(r'csrf-token.*?content="([^"]+)"', r_home.text)
+                    self._lw_token = csrf_m2.group(1) if csrf_m2 else ""
                 
+                # Extract Livewire search snapshot
                 for m in re.finditer(r'wire:snapshot=(["\'])([^"\']+?)\1', r_home.text):
                     dec = m.group(2).replace('&quot;', '"').replace('&amp;', '&')
                     if '"name":"search"' in dec:
                         self._lw_snapshot = dec
                         break
+
+                # Extract dynamic Livewire update URI
+                update_uri_match = re.search(r'data-update-uri="([^"]+)"', r_home.text)
+                if update_uri_match:
+                    self._lw_update_uri = update_uri_match.group(1)
+                else:
+                    mod_match = re.search(r'data-module-url="([^"]+)"', r_home.text)
+                    if mod_match:
+                        self._lw_update_uri = f"{mod_match.group(1).rstrip('/')}/update"
+                    else:
+                        src_match = re.search(r'src="([^"]*?/livewire[^"/]*?)/livewire', r_home.text)
+                        if src_match:
+                            prefix = src_match.group(1)
+                            if not prefix.startswith("http"):
+                                prefix = urljoin(BASE_URL, prefix)
+                            self._lw_update_uri = f"{prefix}/update"
+                        else:
+                            self._lw_update_uri = f"{BASE_URL}/livewire/update"
                 
                 self._lw_cookies = dict(r_home.cookies)
                 self._lw_token_time = now
-                return self._lw_token, self._lw_snapshot, self._lw_cookies
+                return self._lw_token, self._lw_snapshot, self._lw_cookies, self._lw_update_uri
             except Exception:
-                return None, None, {}
+                return None, None, {}, None
 
     @retry_with_backoff()
     def search_anime(self, query: str) -> List[AnimeResult]:
@@ -195,11 +221,13 @@ class AnimeAPI:
             if q_key in self._search_cache:
                 return self._search_cache[q_key]
 
-        token, snapshot, cookies = self._ensure_livewire_context()
+        token, snapshot, cookies, update_uri = self._ensure_livewire_context()
         s = self._get_session()
         if cookies:
             for k, v in cookies.items():
                 s.cookies.set(k, v)
+
+        target_url = update_uri or f"{BASE_URL}/livewire/update"
 
         if token and snapshot:
             lw_headers = {
@@ -210,20 +238,30 @@ class AnimeAPI:
                 **DEFAULT_HEADERS
             }
 
-            # 1. Fast Primary Search pass
-            payload = {
-                "_token": token,
-                "components": [
-                    {
-                        "snapshot": snapshot,
-                        "updates": {"query": query, "deep": False},
-                        "calls": []
-                    }
-                ]
-            }
+            def _send_lw(q_val: str, snap_val: str, ep_url: str, tok_val: str):
+                pl = {
+                    "_token": tok_val,
+                    "components": [
+                        {
+                            "snapshot": snap_val,
+                            "updates": {"query": q_val, "deep": False},
+                            "calls": []
+                        }
+                    ]
+                }
+                hdrs = dict(lw_headers)
+                hdrs["X-CSRF-TOKEN"] = tok_val
+                return s.post(ep_url, json=pl, headers=hdrs, timeout=6)
 
+            # 1. Fast Primary Search pass
             try:
-                r_lw = s.post(f"{BASE_URL}/livewire/update", json=payload, headers=lw_headers, timeout=6)
+                r_lw = _send_lw(query, snapshot, target_url, token)
+                if r_lw.status_code in (404, 419):
+                    # Invalidate and refresh context if endpoint or token rotated
+                    token, snapshot, cookies, target_url = self._ensure_livewire_context(force_refresh=True)
+                    if token and snapshot and target_url:
+                        r_lw = _send_lw(query, snapshot, target_url, token)
+
                 if r_lw.status_code == 200:
                     data = r_lw.json()
                     comp = data.get("components", [{}])[0]
@@ -245,17 +283,7 @@ class AnimeAPI:
                     if sub_q.lower() == q_key:
                         continue
                     try:
-                        payload = {
-                            "_token": token,
-                            "components": [
-                                {
-                                    "snapshot": self._lw_snapshot or snapshot,
-                                    "updates": {"query": sub_q, "deep": False},
-                                    "calls": []
-                                }
-                            ]
-                        }
-                        r_lw = s.post(f"{BASE_URL}/livewire/update", json=payload, headers=lw_headers, timeout=5)
+                        r_lw = _send_lw(sub_q, self._lw_snapshot or snapshot, target_url, token)
                         if r_lw.status_code == 200:
                             data = r_lw.json()
                             comp = data.get("components", [{}])[0]
@@ -268,15 +296,24 @@ class AnimeAPI:
                     except Exception:
                         pass
 
-        # 3. Direct HTML search fallback if Livewire is temporarily blocked or unavailable
+        # 3. Direct HTML search fallback ONLY if results genuinely match the query
         try:
             r_fallback = s.get(f"{BASE_URL}/titles?q={query}", headers=DEFAULT_HEADERS, timeout=6)
             if r_fallback.status_code == 200:
-                items = self._parse_search_html(r_fallback.text)
-                if items:
+                raw_items = self._parse_search_html(r_fallback.text)
+                # Filter strictly by query keywords so we never return random catalog items
+                q_words = [w.lower() for w in re.split(r'\s+', query) if len(w) >= 2]
+                matched_items = [
+                    it for it in raw_items
+                    if any(
+                        qw in it.title_en.lower() or qw in (it.title_ar or "").lower() or qw in it.id.lower()
+                        for qw in q_words
+                    )
+                ]
+                if matched_items:
                     with self._cache_lock:
-                        self._search_cache[q_key] = items
-                    return items
+                        self._search_cache[q_key] = matched_items
+                    return matched_items
         except Exception:
             pass
 
@@ -303,6 +340,10 @@ class AnimeAPI:
             title = title_el.text.strip() if title_el else slug
             alt_el = card.find("h5")
             alt_title = alt_el.text.strip() if alt_el else ""
+
+            # Extract Arabic title if present in alt_title
+            ar_segments = [seg.strip() for seg in alt_title.split('-') if re.search(r'[\u0600-\u06FF]', seg)]
+            title_ar = ar_segments[0] if ar_segments else title
 
             # Poster
             img = card.find("img")
@@ -338,7 +379,7 @@ class AnimeAPI:
                 id=slug,
                 title_en=title,
                 title_jp=alt_title,
-                title_ar=title,
+                title_ar=title_ar,
                 title_romaji=alt_title or title,
                 type=anime_type,
                 episodes=episodes_count,
