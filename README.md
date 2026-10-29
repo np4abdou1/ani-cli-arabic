@@ -62,7 +62,7 @@ Version **2.0** is the largest architectural overhaul in the project's history, 
 
 | Feature | Highlights |
 | :--- | :--- |
-| 🌐 **Multi-Provider Engine** | Stream seamlessly from **4 independent sources**: `Anime3rb`, `Anime Slayer`, `Animeify`, and `HiAnime` (English Sub & Dub). |
+| 🌐 **Multi-Provider Engine** | Stream seamlessly from **6 independent sources**: `Anime3rb`, `Anime Slayer`, `Animeify`, `HiAnime` (English Sub & Dub), `Stardima` (Arabic Dub), and `Stardima Kids` (Cartoons). |
 | 📥 **Native Chunked Downloader** | Built from scratch with parallel chunked streaming, pause/resume, and live speed/ETA metrics — **zero external tools required** (no `aria2c` or `yt-dlp`). |
 | ⚡ **Rebuilt Interactive CLI (`-i`)** | Organic `fzf` workflow with mouse navigation, zero Arabic RTL text clipping, and a quick episode action menu (`Play`, `Download`, `Batch`, `Quality`). |
 | 🎬 **Universal Players & IPC** | Native support for **MPV**, **VLC**, **Celluloid**, **IINA**, and **Syncplay**. Real-time MPV JSON-IPC socket monitoring saves exact-second resume timestamps. |
@@ -82,6 +82,8 @@ Switch providers dynamically in the Settings menu (`[O]` / `[c]`) or directly vi
 | **Anime Slayer** | `anime_slayer` | 🇸🇦 Arabic Sub | Official API endpoints with multiple backup episode servers |
 | **Animeify** | `animeify` | 🇸🇦 Arabic Sub | Mirror servers with fast resolution switching |
 | **HiAnime** | `hianime` | 🇬🇧 English Sub / Dub | Fast English subbed & dubbed streams with dynamic referer resolution |
+| **Stardima** | `stardima` | 🇸🇦 Arabic Dub | Direct multi-server streams with automatic Arabic audio stream selection |
+| **Stardima Kids** | `stardima_kids` | 🇸🇦 Arabic Dub | Dubbed cartoons and kids series, isolated from anime catalog |
 
 ---
 
@@ -178,6 +180,12 @@ ani-cli-ar -p anime_slayer "Bleach"
 
 # Stream from Animeify
 ani-cli-ar -p animeify "Jujutsu Kaisen"
+
+# Stream Arabic-dubbed anime from Stardima
+ani-cli-ar -p stardima "ناروتو"
+
+# Stream Arabic-dubbed cartoons from Stardima Kids
+ani-cli-ar -p stardima_kids "سبونج بوب"
 ```
 
 ### 4️⃣ Direct Query Search
@@ -212,6 +220,8 @@ ani-cli-ar "Hunter x Hunter"
     </td>
   </tr>
 </table>
+
+> ℹ️ *Classification metadata uses TMDB data; this product uses the TMDB API but is not endorsed or certified by TMDB.*
 
 ---
 
@@ -264,13 +274,15 @@ All user preferences are stored locally in:
 ```
 
 Open Settings (<kbd>c</kbd> or <kbd>O</kbd>) from the main menu at any time to customize:
-* **Active Provider**: Switch between `anime3rb`, `anime_slayer`, `animeify`, and `hianime`.
+* **Active Provider**: Switch between `anime3rb`, `anime_slayer`, `animeify`, `hianime`, `stardima`, and `stardima_kids`.
+* **Stardima Audio Language**: Choose `dub` (default), `sub`, or `both`.
 * **Default Quality**: Lock in `1080p`, `720p`, `480p`, or `Ask` on every stream.
 * **Media Player**: Select `mpv`, `vlc`, `celluloid`, `iina`, or `syncplay`.
 * **Auto-Next Episode**: Automatically queue and play the next episode upon completion.
 * **Discord Rich Presence**: Toggle live Discord status activity on or off.
 * **Theme Color**: Preview and switch across 17 terminal color palettes instantly.
 * **Download Directory**: Configure your custom local folder for batch downloads.
+* **Analytics & Updates**: Toggle anonymous health telemetry or auto-update notifications.
 
 ---
 

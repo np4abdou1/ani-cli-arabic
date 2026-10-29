@@ -5,7 +5,7 @@ import shutil
 import subprocess
 import tempfile
 import threading
-from typing import Optional
+from typing import Dict, Optional
 from .utils import is_bundled, get_stream_referer
 from .logger import logger
 
@@ -298,7 +298,15 @@ class PlayerManager:
 
         return players
 
-    def play(self, url: str, title: str, player_type: str = 'ask', start_time: float = 0.0) -> dict:
+    def play(
+        self,
+        url: str,
+        title: str,
+        player_type: str = 'ask',
+        start_time: float = 0.0,
+        audio_lang: Optional[str] = None,
+        headers: Optional[Dict[str, str]] = None,
+    ) -> dict:
         available_players = self.get_available_players()
         default_result = {'time_pos': 0.0, 'duration': 0.0, 'percent': 0.0, 'completed': False}
         
@@ -351,15 +359,50 @@ class PlayerManager:
 
         try:
             if selected_player == 'MPV':
-                return self._play_mpv(url, title, available_players['MPV'], start_time=start_time)
+                return self._play_mpv(
+                    url,
+                    title,
+                    available_players['MPV'],
+                    start_time=start_time,
+                    audio_lang=audio_lang,
+                    headers=headers,
+                )
             elif selected_player == 'Celluloid':
-                return self._play_celluloid(url, title, available_players['Celluloid'], start_time=start_time)
+                return self._play_celluloid(
+                    url,
+                    title,
+                    available_players['Celluloid'],
+                    start_time=start_time,
+                    audio_lang=audio_lang,
+                    headers=headers,
+                )
             elif selected_player == 'IINA':
-                return self._play_iina(url, title, available_players['IINA'], start_time=start_time)
+                return self._play_iina(
+                    url,
+                    title,
+                    available_players['IINA'],
+                    start_time=start_time,
+                    audio_lang=audio_lang,
+                    headers=headers,
+                )
             elif selected_player == 'Syncplay':
-                return self._play_syncplay(url, title, available_players['Syncplay'], start_time=start_time)
+                return self._play_syncplay(
+                    url,
+                    title,
+                    available_players['Syncplay'],
+                    start_time=start_time,
+                    audio_lang=audio_lang,
+                    headers=headers,
+                )
             elif selected_player == 'VLC':
-                return self._play_vlc(url, title, available_players['VLC'], start_time=start_time)
+                return self._play_vlc(
+                    url,
+                    title,
+                    available_players['VLC'],
+                    start_time=start_time,
+                    audio_lang=audio_lang,
+                    headers=headers,
+                )
             elif selected_player == 'MPC-HC':
                 return self._play_mpc(url, title, available_players['MPC-HC'])
         except Exception as e:
@@ -372,7 +415,15 @@ class PlayerManager:
                 input("Press Enter to continue...")
         return default_result
 
-    def _play_vlc(self, url: str, title: str, vlc_path: str = None, start_time: float = 0.0) -> dict:
+    def _play_vlc(
+        self,
+        url: str,
+        title: str,
+        vlc_path: str = None,
+        start_time: float = 0.0,
+        audio_lang: Optional[str] = None,
+        headers: Optional[Dict[str, str]] = None,
+    ) -> dict:
         if not vlc_path:
             vlc_path = self.get_available_players().get('VLC')
         
@@ -380,6 +431,7 @@ class PlayerManager:
             raise FileNotFoundError("VLC not found")
 
         referer = get_stream_referer(url)
+        header_map = {str(k): str(v) for k, v in (headers or {}).items() if v}
         vlc_args = [
             vlc_path,
             '--fullscreen',
@@ -388,8 +440,14 @@ class PlayerManager:
         ]
         if start_time and start_time > 0:
             vlc_args.append(f'--start-time={int(start_time)}')
-        if referer:
+        if audio_lang:
+            vlc_args.append(f'--audio-language={audio_lang}')
+        if header_map.get('Referer'):
+            vlc_args.extend(['--http-referrer', header_map['Referer']])
+        elif referer:
             vlc_args.extend(['--http-referrer', referer])
+        if header_map.get('User-Agent'):
+            vlc_args.extend(['--http-user-agent', header_map['User-Agent']])
             
         vlc_args.append(url)
         
@@ -403,7 +461,15 @@ class PlayerManager:
         elapsed = time.time() - t_start
         return {'time_pos': start_time + elapsed, 'duration': 0.0, 'percent': 0.0, 'completed': False}
 
-    def _play_celluloid(self, url: str, title: str, celluloid_path: str = None, start_time: float = 0.0) -> dict:
+    def _play_celluloid(
+        self,
+        url: str,
+        title: str,
+        celluloid_path: str = None,
+        start_time: float = 0.0,
+        audio_lang: Optional[str] = None,
+        headers: Optional[Dict[str, str]] = None,
+    ) -> dict:
         if not celluloid_path:
             celluloid_path = self.get_available_players().get('Celluloid')
         if not celluloid_path:
@@ -413,8 +479,30 @@ class PlayerManager:
         args = [celluloid_path]
         if start_time and start_time > 0:
             args.append(f'--mpv-start={start_time}')
-        if referer:
-            args.append(f'--mpv-referrer={referer}')
+        if audio_lang:
+            args.append(f'--mpv-alang={audio_lang}')
+
+        ua = None
+        ref = referer
+        extra_headers = []
+        for header_name, header_value in (headers or {}).items():
+            if not header_value:
+                continue
+            lower_k = str(header_name).strip().lower()
+            if lower_k == 'user-agent':
+                ua = str(header_value).strip()
+            elif lower_k == 'referer':
+                ref = str(header_value).strip()
+            else:
+                extra_headers.append(f"{header_name}: {header_value}")
+
+        if ua:
+            args.append(f'--mpv-user-agent={ua}')
+        if ref:
+            args.append(f'--mpv-referrer={ref}')
+        for header_field in extra_headers:
+            args.append(f'--mpv-http-header-fields={header_field}')
+
         args.append(url)
         
         t_start = time.time()
@@ -422,7 +510,15 @@ class PlayerManager:
         elapsed = time.time() - t_start
         return {'time_pos': start_time + elapsed, 'duration': 0.0, 'percent': 0.0, 'completed': False}
 
-    def _play_iina(self, url: str, title: str, iina_path: str = None, start_time: float = 0.0) -> dict:
+    def _play_iina(
+        self,
+        url: str,
+        title: str,
+        iina_path: str = None,
+        start_time: float = 0.0,
+        audio_lang: Optional[str] = None,
+        headers: Optional[Dict[str, str]] = None,
+    ) -> dict:
         if not iina_path:
             iina_path = self.get_available_players().get('IINA')
         if not iina_path:
@@ -432,8 +528,30 @@ class PlayerManager:
         args = [iina_path, '--keep-running']
         if start_time and start_time > 0:
             args.append(f'--mpv-start={start_time}')
-        if referer:
-            args.append(f'--mpv-referrer={referer}')
+        if audio_lang:
+            args.append(f'--mpv-alang={audio_lang}')
+
+        ua = None
+        ref = referer
+        extra_headers = []
+        for header_name, header_value in (headers or {}).items():
+            if not header_value:
+                continue
+            lower_k = str(header_name).strip().lower()
+            if lower_k == 'user-agent':
+                ua = str(header_value).strip()
+            elif lower_k == 'referer':
+                ref = str(header_value).strip()
+            else:
+                extra_headers.append(f"{header_name}: {header_value}")
+
+        if ua:
+            args.append(f'--mpv-user-agent={ua}')
+        if ref:
+            args.append(f'--mpv-referrer={ref}')
+        for header_field in extra_headers:
+            args.append(f'--mpv-http-header-fields={header_field}')
+
         args.append(url)
         
         t_start = time.time()
@@ -441,22 +559,66 @@ class PlayerManager:
         elapsed = time.time() - t_start
         return {'time_pos': start_time + elapsed, 'duration': 0.0, 'percent': 0.0, 'completed': False}
 
-    def _play_syncplay(self, url: str, title: str, syncplay_path: str = None, start_time: float = 0.0) -> dict:
+    def _play_syncplay(
+        self,
+        url: str,
+        title: str,
+        syncplay_path: str = None,
+        start_time: float = 0.0,
+        audio_lang: Optional[str] = None,
+        headers: Optional[Dict[str, str]] = None,
+    ) -> dict:
         if not syncplay_path:
             syncplay_path = self.get_available_players().get('Syncplay')
         if not syncplay_path:
             raise FileNotFoundError("Syncplay not found")
 
         args = [syncplay_path, url]
+        mpv_args = []
         if start_time and start_time > 0:
-            args.extend(['--', f'--start={start_time}'])
+            mpv_args.append(f'--start={start_time}')
+        if audio_lang:
+            mpv_args.append(f'--alang={audio_lang}')
+
+        referer = get_stream_referer(url)
+        ua = None
+        ref = referer
+        extra_headers = []
+        for header_name, header_value in (headers or {}).items():
+            if not header_value:
+                continue
+            lower_k = str(header_name).strip().lower()
+            if lower_k == 'user-agent':
+                ua = str(header_value).strip()
+            elif lower_k == 'referer':
+                ref = str(header_value).strip()
+            else:
+                extra_headers.append(f"{header_name}: {header_value}")
+
+        if ua:
+            mpv_args.append(f'--user-agent={ua}')
+        if ref:
+            mpv_args.append(f'--referrer={ref}')
+        for header_field in extra_headers:
+            mpv_args.append(f'--http-header-fields={header_field}')
+
+        if mpv_args:
+            args.extend(['--'] + mpv_args)
 
         t_start = time.time()
         subprocess.run(args, check=False, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         elapsed = time.time() - t_start
         return {'time_pos': start_time + elapsed, 'duration': 0.0, 'percent': 0.0, 'completed': False}
 
-    def _play_mpv(self, url: str, title: str, mpv_path: str = None, start_time: float = 0.0) -> dict:
+    def _play_mpv(
+        self,
+        url: str,
+        title: str,
+        mpv_path: str = None,
+        start_time: float = 0.0,
+        audio_lang: Optional[str] = None,
+        headers: Optional[Dict[str, str]] = None,
+    ) -> dict:
         if not mpv_path:
             mpv_path = self.get_available_players().get('MPV')
         
@@ -500,13 +662,11 @@ class PlayerManager:
             '--stream-buffer-size=16MiB',
             '--network-timeout=15',
             '--tls-verify=no',
-            '--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36',
             '--hwdec=auto-safe',
             '--vo=gpu',
             '--profile=fast',
             '--sub-auto=fuzzy',
             '--slang=ara,ar,eng,en',
-            '--alang=jpn,ja,eng,en',
             '--really-quiet',
             '--terminal=no',
             '--msg-level=all=no',
@@ -518,8 +678,30 @@ class PlayerManager:
         else:
             mpv_args.append('--start=0')
 
-        if referer:
-            mpv_args.append(f'--referrer={referer}')
+        # Arabic-first for dubbed Stardima titles; keep the existing Japanese
+        # default for providers that do not set an audio preference.
+        mpv_args.append(f'--alang={audio_lang or "jpn,ja,eng,en"}')
+
+        ua = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36"
+        ref = referer
+        extra_headers = []
+        for header_name, header_value in (headers or {}).items():
+            if not header_value:
+                continue
+            lower_k = str(header_name).strip().lower()
+            if lower_k == 'user-agent':
+                ua = str(header_value).strip()
+            elif lower_k == 'referer':
+                ref = str(header_value).strip()
+            else:
+                extra_headers.append(f"{header_name}: {header_value}")
+
+        if ua:
+            mpv_args.append(f'--user-agent={ua}')
+        if ref:
+            mpv_args.append(f'--referrer={ref}')
+        for header_field in extra_headers:
+            mpv_args.append(f'--http-header-fields={header_field}')
 
         mpv_args.append(url)
 

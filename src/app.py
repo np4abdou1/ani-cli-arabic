@@ -12,7 +12,7 @@ from .ui import UIManager
 from .providers import ProviderManager
 from .player import PlayerManager
 from .discord_rpc import DiscordRPCManager
-from .models import QualityOption
+from .models import AnimeResult, Episode, QualityOption
 from .utils import download_file, show_cursor, hide_cursor
 from .history import HistoryManager, format_seconds
 from .settings import SettingsManager
@@ -20,10 +20,42 @@ from .favorites import FavoritesManager
 from .updater import check_for_updates, get_version_status
 from .deps import ensure_dependencies
 from .cli import run_simple_cli
-from .downloader import prompt_download_options, execute_batch_download
+from .downloader import prompt_download_options, execute_batch_download, is_hls_url
 from .logger import logger, install_global_exception_handler
 import shutil
 import argparse
+
+
+def normalize_latest_episodes(episodes):
+    """Normalize provider latest-feed entries into the dicts the latest menu expects."""
+    normalized = []
+    for episode in episodes or []:
+        if isinstance(episode, Episode):
+            normalized.append(
+                {
+                    "title": episode.title or f"Episode {episode.display_num}",
+                    "slug": episode.anime_id or episode.url,
+                    "ep_num": episode.display_num,
+                    "url": episode.url,
+                    "number": episode.number,
+                }
+            )
+        elif isinstance(episode, AnimeResult):
+            # Some providers' "latest" rail returns anime entries rather than
+            # episode entries.  Treat them as episode 1 of that title.
+            normalized.append(
+                {
+                    "title": episode.title_en or episode.title_ar or "Unknown",
+                    "slug": episode.id,
+                    "ep_num": 1,
+                    "url": episode.id,
+                    "number": "1",
+                }
+            )
+        elif isinstance(episode, dict):
+            normalized.append(episode)
+    return normalized
+
 
 class AniCliArApp:
     def __init__(self):
@@ -53,7 +85,7 @@ class AniCliArApp:
             formatter_class=argparse.RawTextHelpFormatter
         )
         parser.add_argument('-i', '--interactive', action='store_true', help="Force minimal interactive CLI mode")
-        parser.add_argument('-p', '--provider', choices=ProviderManager.get_provider_choices(), help="Specify active anime provider (anime3rb, anime_slayer, anidb)")
+        parser.add_argument('-p', '--provider', choices=ProviderManager.get_provider_choices(), help="Specify active anime provider (anime3rb, anime_slayer, anidb, stardima, stardima_kids)")
         parser.add_argument('-d', '--debug', action='store_true', help="Enable verbose debug logging to file and console")
         parser.add_argument('-v', '--version', action='store_true', help="Show version information")
         parser.add_argument('query', nargs='*', help="Anime name to search for")
@@ -212,7 +244,8 @@ class AniCliArApp:
                 action, payload = self.ui.home_screen_menu(
                     rpc_status=getattr(self, 'rpc_status', None),
                     version_info=self.version_info,
-                    active_provider=provider_name
+                    active_provider=provider_name,
+                    provider=self.api,
                 )
 
             if action in ["quit", "exit"] or action is None:
@@ -221,30 +254,51 @@ class AniCliArApp:
             results = []
 
             if action == "latest":
+                if hasattr(self.api, "supports") and not self.api.supports("latest"):
+                    self.ui.render_message("Info", f"{getattr(self.api, 'name', 'Provider')} does not support latest episodes.", "info")
+                    continue
                 self.handle_latest_episodes()
                 continue
 
             elif action == "movies":
+                if hasattr(self.api, "supports") and not self.api.supports("movies"):
+                    self.ui.render_message("Info", f"{getattr(self.api, 'name', 'Provider')} does not support anime movies.", "info")
+                    continue
                 self.handle_movies()
                 continue
 
             elif action == "top_rated":
+                if hasattr(self.api, "supports") and not self.api.supports("top_rated"):
+                    self.ui.render_message("Info", f"{getattr(self.api, 'name', 'Provider')} does not support top rated anime.", "info")
+                    continue
                 self.handle_top_rated()
                 continue
 
             elif action == "trending":
+                if hasattr(self.api, "supports") and not self.api.supports("trending"):
+                    self.ui.render_message("Info", f"{getattr(self.api, 'name', 'Provider')} does not support trending anime.", "info")
+                    continue
                 self.handle_trending()
                 continue
 
             elif action == "popular":
+                if hasattr(self.api, "supports") and not self.api.supports("popular"):
+                    self.ui.render_message("Info", f"{getattr(self.api, 'name', 'Provider')} does not support popular anime.", "info")
+                    continue
                 self.handle_popular()
                 continue
 
             elif action == "genres":
+                if hasattr(self.api, "supports") and not self.api.supports("genres"):
+                    self.ui.render_message("Info", f"{getattr(self.api, 'name', 'Provider')} does not support genres.", "info")
+                    continue
                 self.handle_genres()
                 continue
 
             elif action == "studios":
+                if hasattr(self.api, "supports") and not self.api.supports("studios"):
+                    self.ui.render_message("Info", f"{getattr(self.api, 'name', 'Provider')} does not support studios.", "info")
+                    continue
                 self.rpc.update_studios()
                 self.handle_studios()
                 continue
@@ -350,12 +404,28 @@ class AniCliArApp:
             self.ui.render_message("Info", "No recent episodes found.", "info")
             return
 
+        # The latest-episodes menu is dict-based; providers return Episode
+        # objects.  Normalize before rendering so every provider works.
+        episodes = normalize_latest_episodes(episodes)
+
         while True:
             res = self.ui.latest_episodes_menu(episodes)
             if res is None:
                 break
             idx, act = res
             ep_info = episodes[idx]
+            if isinstance(ep_info, Episode):
+                ep_info = {
+                    "title": ep_info.title or f"Episode {ep_info.display_num}",
+                    "slug": ep_info.anime_id or ep_info.url,
+                    "ep_num": ep_info.display_num,
+                }
+
+            # Latest feeds can contain an episode added after the provider's
+            # detail/episode cache was warmed; refresh just this title.
+            refresh_cache = getattr(self.api, "refresh_anime_cache", None)
+            if callable(refresh_cache):
+                refresh_cache(ep_info["slug"])
 
             selected_anime = self.ui.run_with_loading(
                 f"Loading {ep_info['title']}...",
@@ -373,11 +443,18 @@ class AniCliArApp:
             if not all_episodes:
                 continue
 
-            if act == 'play':
+            initial_idx = None
+            # Prefer the exact episode id; this disambiguates shows whose
+            # episode numbers reset each season.
+            latest_url = ep_info.get("url")
+            if latest_url:
+                for index, episode in enumerate(all_episodes):
+                    if getattr(episode, "url", "") == latest_url:
+                        initial_idx = index
+                        break
+            if initial_idx is None:
                 initial_idx = self._find_episode_index(all_episodes, ep_info["ep_num"])
-                self.handle_episode_selection(selected_anime, all_episodes, initial_selected=initial_idx)
-            else:
-                self.handle_episode_selection(selected_anime, all_episodes)
+            self.handle_episode_selection(selected_anime, all_episodes, initial_idx=initial_idx)
 
     def handle_movies(self):
         results = self.ui.run_with_loading(
@@ -761,7 +838,9 @@ class AniCliArApp:
                 'episodes': selected_anime.episodes,
                 'status': selected_anime.status,
                 'studio': selected_anime.creators,
-                'genres': selected_anime.genres
+                'genres': selected_anime.genres,
+                'language': getattr(selected_anime, 'language', ''),
+                'content_type': getattr(selected_anime, 'content_type', ''),
             }
 
             ep_idx = self.ui.episode_selection_menu(
@@ -915,26 +994,36 @@ class AniCliArApp:
             server_data = self.api.get_streaming_servers(selected_anime.id, selected_ep.number, selected_anime.type)
 
         if not server_data:
-            return None, None, "No servers found for this episode."
+            return None, None, None, "No servers found for this episode."
 
         selected_quality = self._pick_default_download_quality_option(server_data)
         if not selected_quality:
-            return None, None, "No suitable quality found for this episode."
+            return None, None, None, "No suitable quality found for this episode."
 
         current_ep_data = server_data.get('CurrentEpisode', {}) if isinstance(server_data, dict) else {}
         direct_url = selected_quality.direct_url or current_ep_data.get(selected_quality.server_key)
         if not direct_url or not direct_url.startswith("http"):
-            return None, None, "Failed to resolve direct video stream."
+            return None, None, None, "Failed to resolve direct video stream."
 
         quality_tag = self._extract_quality_tag(selected_quality.name)
-        filename = f"{selected_anime.title_en} - Ep {selected_ep.display_num} [{quality_tag}].mp4"
-        return direct_url, filename, None
+        ext = str(getattr(selected_quality, 'ext', 'mp4') or 'mp4').lstrip('.')
+        filename = f"{selected_anime.title_en} - Ep {selected_ep.display_num} [{quality_tag}].{ext}"
+        headers = getattr(selected_quality, 'headers', None) or None
+        return direct_url, filename, headers, None
 
     def download_episode_with_defaults(self, selected_anime, selected_ep):
-        direct_url, filename, error = self.resolve_default_download_target(selected_anime, selected_ep, show_loading=True)
+        direct_url, filename, headers, error = self.resolve_default_download_target(selected_anime, selected_ep, show_loading=True)
 
         if error:
             self.ui.render_message("✗ Download Error", error, "error")
+            return False
+
+        if is_hls_url(direct_url):
+            self.ui.render_message(
+                "Download Unavailable",
+                "This source is an HLS playlist — play it with mpv instead.",
+                "info",
+            )
             return False
 
         success = download_file(
@@ -942,7 +1031,8 @@ class AniCliArApp:
             filename,
             self.ui.console,
             mode=self._get_download_mode(),
-            download_dir=self._get_download_directory()
+            download_dir=self._get_download_directory(),
+            headers=headers,
         )
 
         if success:
@@ -1018,19 +1108,37 @@ class AniCliArApp:
         idx, action = result
         quality = available[idx]
         direct_url = getattr(quality, 'direct_url', '') or getattr(quality, 'url', '') or current_ep_data.get(getattr(quality, 'server_key', ''))
+
+        audio_lang = getattr(quality, 'audio_lang', '') or ''
+        if not audio_lang:
+            language = str(getattr(selected_anime, 'language', '') or '')
+            if language == 'dub':
+                audio_lang = 'ara,ar'
+            elif language == 'sub':
+                audio_lang = 'jpn,ja'
+        headers = getattr(quality, 'headers', None) or None
+        ext = str(getattr(quality, 'ext', 'mp4') or 'mp4').lstrip('.')
         
         if direct_url and direct_url.startswith("http"):
             quality_match = re.search(r"\b(\d{3,4}p)\b", quality.name)
             quality_tag = quality_match.group(1) if quality_match else quality.name
-            filename = f"{selected_anime.title_en} - Ep {selected_ep.display_num} [{quality_tag}].mp4"
+            filename = f"{selected_anime.title_en} - Ep {selected_ep.display_num} [{quality_tag}].{ext}"
             
             if action == 'download':
+                if is_hls_url(direct_url):
+                    self.ui.render_message(
+                        "Download Unavailable",
+                        "This source is an HLS playlist — play it with mpv instead.",
+                        "info",
+                    )
+                    return None
                 success = download_file(
                     direct_url,
                     filename,
                     self.ui.console,
                     mode=self._get_download_mode(),
-                    download_dir=self._get_download_directory()
+                    download_dir=self._get_download_directory(),
+                    headers=headers,
                 )
                 if success:
                     self.history.mark_watched(selected_anime.id, selected_ep.display_num, selected_anime.title_en)
@@ -1060,7 +1168,9 @@ class AniCliArApp:
                     direct_url, 
                     f"{selected_anime.title_en} - Ep {selected_ep.display_num} ({quality.name})", 
                     player_type=player_type,
-                    start_time=actual_start
+                    start_time=actual_start,
+                    audio_lang=audio_lang or None,
+                    headers=headers,
                 )
                 self.ui.clear()
                 

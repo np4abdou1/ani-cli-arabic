@@ -21,7 +21,7 @@ from src.models import QualityOption, AnimeResult
 from src.providers import ProviderManager
 from src.utils import download_file
 from src.favorites import FavoritesManager
-from src.downloader import prompt_download_options, execute_batch_download, parse_batch_ranges
+from src.downloader import prompt_download_options, execute_batch_download, parse_batch_ranges, is_hls_url
 
 
 def clean_season(season_str: Optional[str]) -> str:
@@ -234,12 +234,23 @@ class AniCliWrapper:
         if self.rpc:
             self.rpc.update_watching(anime.title_en, str(ep.number), getattr(anime, 'thumbnail', ''))
 
+        audio_lang = getattr(selected_q, 'audio_lang', '') or ''
+        if not audio_lang:
+            language = str(getattr(anime, 'language', '') or '')
+            if language == 'dub':
+                audio_lang = 'ara,ar'
+            elif language == 'sub':
+                audio_lang = 'jpn,ja'
+        headers = getattr(selected_q, 'headers', None) or None
+
         player_type = self.settings_manager.get('player')
         playback_info = self.player.play(
             direct_url,
             f"{anime.title_en} - Episode {ep.number}",
             player_type=player_type,
-            start_time=start_time
+            start_time=start_time,
+            audio_lang=audio_lang or None,
+            headers=headers,
         )
 
         pos = playback_info.get('time_pos', 0.0) if isinstance(playback_info, dict) else 0.0
@@ -291,12 +302,25 @@ class AniCliWrapper:
             self.console.print("[red]Failed to extract direct download link.[/red]")
             return False
 
+        if is_hls_url(direct_url):
+            self.console.print("[yellow]HLS playlist — play it with mpv instead of downloading.[/yellow]")
+            return False
+
         q_tag = getattr(selected_q, 'name', 'HD')
-        filename = f"{anime.title_en} - Ep {ep.display_num} [{q_tag}].mp4"
+        ext = str(getattr(selected_q, 'ext', 'mp4') or 'mp4').lstrip('.')
+        filename = f"{anime.title_en} - Ep {ep.display_num} [{q_tag}].{ext}"
         mode = self.settings_manager.get('download_mode', 'internal') or 'internal'
         d_dir = self.settings_manager.get('download_directory', 'downloads') or 'downloads'
+        headers = getattr(selected_q, 'headers', None) or None
 
-        res = download_file(direct_url, filename, self.console, mode=mode, download_dir=d_dir)
+        res = download_file(
+            direct_url,
+            filename,
+            self.console,
+            mode=mode,
+            download_dir=d_dir,
+            headers=headers,
+        )
         return res
 
     def batch_download(self, anime: Any, episodes: List[Any]):
@@ -370,6 +394,12 @@ class AniCliWrapper:
             if season_clean:
                 meta.append(season_clean)
 
+            language = str(getattr(res, 'language', '') or '')
+            if language == 'dub':
+                meta.append('DUB')
+            elif language == 'sub':
+                meta.append('SUB')
+
             meta_str = ""
             if meta:
                 meta_inner = " \033[90m|\033[0m ".join(meta)
@@ -419,6 +449,11 @@ class AniCliWrapper:
     def _select_episodes(self, anime: Any):
         if self.rpc:
             self.rpc.update_viewing_anime(anime.title_en, getattr(anime, 'thumbnail', ''))
+
+        if getattr(anime, "_from_latest", False):
+            refresh_cache = getattr(self.api, "refresh_anime_cache", None)
+            if callable(refresh_cache):
+                refresh_cache(anime.id)
 
         with self.console.status(f"[bold blue]Fetching episodes for {anime.title_en}...[/bold blue]"):
             episodes = self.api.get_episodes(anime.id)
@@ -603,10 +638,18 @@ class AniCliWrapper:
                 break
 
     def _get_next_ep_num(self, episodes: List[Any], current_ep: Any) -> Optional[str]:
+        # Prefer list order: handles specials such as 6.5 and multi-season
+        # numbering without assuming numeric contiguity.
         try:
-            cur = int(current_ep.number)
+            index = episodes.index(current_ep)
+            if index + 1 < len(episodes):
+                return str(episodes[index + 1].number)
+        except (ValueError, AttributeError):
+            pass
+        try:
+            cur = float(current_ep.number)
             for ep in episodes:
-                if int(ep.number) == cur + 1:
+                if float(ep.number) == cur + 1:
                     return str(ep.number)
         except Exception:
             pass
@@ -614,10 +657,16 @@ class AniCliWrapper:
 
     def _get_prev_ep_num(self, episodes: List[Any], current_ep: Any) -> Optional[str]:
         try:
-            cur = int(current_ep.number)
+            index = episodes.index(current_ep)
+            if index > 0:
+                return str(episodes[index - 1].number)
+        except (ValueError, AttributeError):
+            pass
+        try:
+            cur = float(current_ep.number)
             if cur > 1:
                 for ep in episodes:
-                    if int(ep.number) == cur - 1:
+                    if float(ep.number) == cur - 1:
                         return str(ep.number)
         except Exception:
             pass
@@ -900,12 +949,28 @@ class AniCliWrapper:
                     self.console.print(Text("  ") + rpc_text)
 
                 margin = "  "
+                prov_shortcuts = []
+                supports_fn = getattr(self.api, "supports", lambda f: True)
+                if supports_fn("latest"):
+                    prov_shortcuts.append("[cyan]E[/cyan]: Latest")
+                if supports_fn("movies"):
+                    prov_shortcuts.append("[cyan]M[/cyan]: Movies")
+                if supports_fn("trending"):
+                    prov_shortcuts.append("[cyan]T[/cyan]: Trending")
+                if supports_fn("popular"):
+                    prov_shortcuts.append("[cyan]P[/cyan]: Popular")
+                if supports_fn("top_rated"):
+                    prov_shortcuts.append("[cyan]R[/cyan]: Top Rated")
+                if supports_fn("genres"):
+                    prov_shortcuts.append("[cyan]G[/cyan]: Genres")
+                if supports_fn("studios"):
+                    prov_shortcuts.append("[cyan]S[/cyan]: Studios")
+
+                for i in range(0, len(prov_shortcuts), 5):
+                    self.console.print(margin + "  ".join(prov_shortcuts[i:i+5]), style="dim")
+
                 self.console.print(
-                    margin + "[cyan]E[/cyan]: Latest  [cyan]M[/cyan]: Movies   [cyan]T[/cyan]: Trending  [cyan]P[/cyan]: Popular   [cyan]R[/cyan]: Top Rated",
-                    style="dim"
-                )
-                self.console.print(
-                    margin + "[cyan]F[/cyan]: Favs    [cyan]H[/cyan]: History  [cyan]G[/cyan]: Genres    [cyan]S[/cyan]: Studios   [cyan]C[/cyan]: Provider",
+                    margin + "[cyan]F[/cyan]: Favs    [cyan]H[/cyan]: History  [cyan]C[/cyan]: Provider",
                     style="dim"
                 )
                 self.console.print(
@@ -931,13 +996,20 @@ class AniCliWrapper:
             cmd = query.lower()
             query = None
 
-            if cmd == 'e':
+            if cmd == 'e' and supports_fn('latest'):
                 with self.console.status("[bold blue]Fetching latest episodes...[/bold blue]"):
                     eps = self.api.get_latest_episodes(limit=50)
                 if eps:
+                    provider_id = str(getattr(self.api, 'id', '') or '')
+                    latest_language = ''
+                    if provider_id.startswith('stardima'):
+                        latest_language = str(self.settings_manager.get('stardima_language', 'dub') or '')
+                        if latest_language == 'both':
+                            latest_language = ''
+                    latest_content = str(getattr(self.api, 'content_scope', '') or '')
                     animes = [
                         AnimeResult(
-                            id=e.url.split('/')[-2] if '/episode/' in e.url else e.url,
+                            id=e.anime_id or e.url,
                             title_en=e.title or f"Episode {e.number}",
                             title_jp='',
                             type='SERIES',
@@ -953,34 +1025,38 @@ class AniCliWrapper:
                             premiered='',
                             creators='',
                             duration=e.duration,
-                            thumbnail=e.thumbnail
+                            thumbnail=e.thumbnail,
+                            language=latest_language,
+                            content_type=latest_content,
                         ) for e in eps
                     ]
+                    for latest_anime in animes:
+                        latest_anime._from_latest = True
                     self._process_anime_list(animes, "Latest Episodes")
                 continue
 
-            if cmd == 'm':
+            if cmd == 'm' and supports_fn('movies'):
                 with self.console.status("[bold blue]Fetching movies...[/bold blue]"):
                     movies = self.api.get_movies(limit=40)
                 if movies:
                     self._process_anime_list(movies, "Anime Movies")
                 continue
 
-            if cmd == 't':
+            if cmd == 't' and supports_fn('trending'):
                 with self.console.status("[bold blue]Fetching trending anime...[/bold blue]"):
                     trending = self.api.get_trending_anime(limit=40)
                 if trending:
                     self._process_anime_list(trending, "Trending Anime")
                 continue
 
-            if cmd == 'p':
+            if cmd == 'p' and supports_fn('popular'):
                 with self.console.status("[bold blue]Fetching popular anime...[/bold blue]"):
                     pinned = self.api.get_pinned_anime(limit=40)
                 if pinned:
                     self._process_anime_list(pinned, "Popular Anime")
                 continue
 
-            if cmd == 'r':
+            if cmd == 'r' and supports_fn('top_rated'):
                 with self.console.status("[bold blue]Fetching top rated anime...[/bold blue]"):
                     top = self.api.get_top_rated_anime(limit=40)
                 if top:
@@ -1007,7 +1083,7 @@ class AniCliWrapper:
                 self._show_settings_menu()
                 continue
 
-            if cmd == 'g':
+            if cmd == 'g' and supports_fn('genres'):
                 genres = POPULAR_GENRES
                 sel_g = self._launcher(genres, "Select Genre")
                 if sel_g:
@@ -1018,7 +1094,7 @@ class AniCliWrapper:
                         self._process_anime_list(g_results, f"Genre: {sel_g[0]}")
                 continue
 
-            if cmd == 's':
+            if cmd == 's' and supports_fn('studios'):
                 from src.config import POPULAR_STUDIOS_MAP
                 studios = list(POPULAR_STUDIOS_MAP.keys())
                 sel_s = self._launcher(studios, "Select Studio")

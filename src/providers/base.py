@@ -4,7 +4,7 @@ Defines the standard abstract contract for multi-provider support (Anime3rb, Ani
 """
 
 from abc import ABC, abstractmethod
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, Set
 
 from ..models import AnimeResult, Episode, QualityOption
 
@@ -15,6 +15,28 @@ class BaseAnimeProvider(ABC):
     id: str = "base"
     name: str = "Base Provider"
     description: str = "Base abstract anime provider"
+
+    # Set of supported features. Subclasses can customize this set.
+    # Standard feature keys: "search", "latest", "movies", "trending", "popular", "top_rated", "genres", "studios"
+    supported_features: Set[str] = {
+        "search",
+        "latest",
+        "movies",
+        "trending",
+        "popular",
+        "top_rated",
+        "genres",
+        "studios",
+    }
+
+    def supports(self, feature: str) -> bool:
+        """Check if the provider supports a given feature."""
+        feats = getattr(self, "supported_features", None)
+        if feats is None:
+            feats = getattr(self, "features", None)
+        if feats is None:
+            return True
+        return feature in feats
 
     @abstractmethod
     def search_anime(self, query: str) -> List[AnimeResult]:

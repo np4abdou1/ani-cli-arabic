@@ -84,6 +84,8 @@ https://github.com/user-attachments/assets/e74d4443-20b0-4683-b346-bf168a720025
 | **Anime Slayer** | `anime_slayer` | 🇸🇦 ترجمة عربية | نقاط اتصال API رسمية مع سيرفرات احتياطية متعددة لكل حلقة |
 | **Animeify** | `animeify` | 🇸🇦 ترجمة عربية | سيرفرات متعددة مع تبديل سريع بين الجودات |
 | **HiAnime** | `hianime` | 🇬🇧 ترجمة / دبلجة إنجليزية | بث سريع باللغة الإنجليزية (مترجم ومدبلج) مع معالجة تلقائية للروابط |
+| **Stardima** | `stardima` | 🇸🇦 دبلجة عربية | روابط بث متعددة ومباشرة مع تحديد تلقائي للمسار الصوتي العربي |
+| **Stardima Kids** | `stardima_kids` | 🇸🇦 دبلجة عربية | كرتون وبرامج أطفال مدبلجة، مفصولة تماماً عن كتالوج الأنمي |
 
 ---
 
@@ -206,6 +208,12 @@ ani-cli-ar -p anime_slayer "Bleach"
 
 # Stream from Animeify
 ani-cli-ar -p animeify "Jujutsu Kaisen"
+
+# البث من ستارديما أنمي (دبلجة عربية)
+ani-cli-ar -p stardima "ناروتو"
+
+# البث من ستارديما كيدز (كرتون مدبلج)
+ani-cli-ar -p stardima_kids "سبونج بوب"
 ```
 
 </div>
@@ -246,6 +254,8 @@ ani-cli-ar "Hunter x Hunter"
     </td>
   </tr>
 </table>
+
+> ℹ️ *بيانات تصنيف الأعمال مبنية على TMDB؛ هذا المنتج يستخدم واجهة TMDB API لكنه غير معتمد أو موثق من قِبل TMDB.*
 
 ---
 
@@ -302,13 +312,15 @@ ani-cli-ar "Hunter x Hunter"
 </div>
 
 افتح قائمة الإعدادات (<kbd>c</kbd> أو <kbd>O</kbd>) من القائمة الرئيسية في أي وقت لتخصيص:
-* **المصدر النشط (Active Provider)**: التبديل بين `anime3rb`، `anime_slayer`، `animeify`، و `hianime`.
+* **المصدر النشط (Active Provider)**: التبديل بين `anime3rb`، `anime_slayer`، `animeify`، `hianime`، `stardima`، و `stardima_kids`.
+* **لغة صوت ستارديما (Stardima Audio Language)**: اختيار `dub` (افتراضي للدبلجة)، `sub`، أو `both`.
 * **الجودة الافتراضية (Default Quality)**: تثبيت الجودة على `1080p`، `720p`، `480p`، أو `Ask` (السؤال في كل مرة).
 * **مشغل الوسائط (Media Player)**: الاختيار بين `mpv`، `vlc`، `celluloid`، `iina`، أو `syncplay`.
 * **التشغيل التلقائي (Auto-Next Episode)**: تشغيل الحلقة التالية تلقائياً فور انتهاء الحلقة الحالية.
 * **حالة ديسكورد (Discord Rich Presence)**: تفعيل أو إيقاف عرض النشاط الحي على ديسكورد.
 * **لون الثيم (Theme Color)**: معاينة والتبديل الفوري بين 17 لوحة ألوان مختلفة.
 * **مجلد التحميل (Download Directory)**: تحديد مسار المجلد المحلي لحفظ الحلقات المحملة.
+* **الخصوصية والتحديثات**: تفعيل أو تعطيل القياسات وفاحص الإصدارات التلقائي.
 
 ---
 

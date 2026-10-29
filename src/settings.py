@@ -27,6 +27,8 @@ class SettingsManager:
             "show_donation": True,
             "theme": "auto",
             "anime_provider": "anime3rb",
+            "stardima_language": "dub",
+            "stardima_include_unknown": False,
             "analytics": True,
             "debug_logging": False
         }
@@ -49,6 +51,10 @@ class SettingsManager:
         except (IOError, OSError, ValueError, TypeError) as e:
             import sys
             print(f"Warning: Failed to save settings: {e}", file=sys.stderr)
+
+    def reload(self):
+        """Re-read config.json so long-lived providers see UI changes immediately."""
+        self.settings = self._load_settings()
 
     def get(self, key, default=None):
         return self.settings.get(key, default)

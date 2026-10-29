@@ -32,6 +32,9 @@ class AnimeResult:
     other_names: List[str] = field(default_factory=list)
     external_links: Dict[str, str] = field(default_factory=dict)
     trailers: List[str] = field(default_factory=list)
+    # Stardima / multi-language metadata
+    language: str = ""  # "dub" | "sub" | ""
+    content_type: str = ""  # "anime" | "cartoon" | "live_action" | "unknown"
 
 @dataclass
 class Episode:
@@ -57,6 +60,8 @@ class QualityOption:
     res: str = ""
     premium: bool = False
     headers: Dict[str, str] = field(default_factory=dict)
+    audio_lang: str = ""  # mpv --alang preference, e.g. "ara,ar"
+    ext: str = "mp4"  # container extension for downloads
 
     @property
     def url(self) -> str:

@@ -2,7 +2,7 @@
 # THIS IS THE SINGLE SOURCE OF VERSION
 # All other files (pyproject.toml, workflows, etc.) read from here
 
-__version__ = "2.0.1"
+__version__ = "2.1.0"
 
 APP_VERSION = f"v{__version__}"
 GITHUB_REPO = "np4abdou1/ani-cli-arabic"

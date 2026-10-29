@@ -7,7 +7,7 @@ import re
 import json
 import base64
 import requests
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, Set
 from .base import BaseAnimeProvider
 from ..models import AnimeResult, Episode, QualityOption
 from ..logger import logger
@@ -16,6 +16,12 @@ class HiAnimeProvider(BaseAnimeProvider):
     id = "hianime"
     name = "HiAnime"
     description = "English Anime Provider (Upstream ani-cli)"
+
+    supported_features: Set[str] = {
+        "search",
+        "latest",
+        "popular",
+    }
 
     BASE_URL = "https://hianime.at"
 

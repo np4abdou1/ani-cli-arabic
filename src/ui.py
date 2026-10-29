@@ -380,26 +380,67 @@ class UIManager:
         
         return result_container.get('result')
 
-    def home_screen_menu(self, rpc_status=None, version_info=None, active_provider=None):
+    def home_screen_menu(self, rpc_status=None, version_info=None, active_provider=None, provider=None):
         """Main home screen with search input and category navigation shortcuts."""
         query = ""
         hovered_btn = None
 
+        prov_obj = provider
+        if prov_obj is None and hasattr(active_provider, "supports"):
+            prov_obj = active_provider
+        elif prov_obj is None:
+            try:
+                from .providers.manager import ProviderManager
+                prov_obj = ProviderManager.get_provider()
+            except Exception:
+                prov_obj = None
+
+        def supports_feature(feat: str) -> bool:
+            if prov_obj is not None:
+                if hasattr(prov_obj, "supports"):
+                    return prov_obj.supports(feat)
+                feats = getattr(prov_obj, "supported_features", None) or getattr(prov_obj, "features", None)
+                if feats is not None:
+                    return feat in feats
+            return True
+
+        provider_features = [
+            {"key": "e", "label": "latest eps", "action": "latest", "feature": "latest"},
+            {"key": "m", "label": "movies", "action": "movies", "feature": "movies"},
+            {"key": "t", "label": "trending", "action": "trending", "feature": "trending"},
+            {"key": "p", "label": "popular", "action": "popular", "feature": "popular"},
+            {"key": "r", "label": "top rated", "action": "top_rated", "feature": "top_rated"},
+            {"key": "g", "label": "genres", "action": "genres", "feature": "genres"},
+            {"key": "s", "label": "studios", "action": "studios", "feature": "studios"},
+        ]
+
+        active_provider_items = [
+            it for it in provider_features
+            if supports_feature(it["feature"])
+        ]
+
+        app_items = [
+            {"key": "l", "label": "history", "action": "history"},
+            {"key": "f", "label": "favorites", "action": "favorites"},
+            {"key": "c", "label": "settings", "action": "settings"},
+            {"key": "q", "label": "quit", "action": "quit", "color": "#d97979"},
+        ]
+
         shortcut_items = [
-            {"key": "e", "label": "Latest", "action": "latest"},
-            {"key": "m", "label": "Movies", "action": "movies"},
-            {"key": "t", "label": "Trending", "action": "trending"},
-            {"key": "p", "label": "Popular", "action": "popular"},
-            {"key": "r", "label": "Top Rated", "action": "top_rated"},
-            {"key": "g", "label": "Genres", "action": "genres"},
-            {"key": "s", "label": "Studios", "action": "studios"},
-            {"key": "l", "label": "History", "action": "history"},
-            {"key": "f", "label": "Favorites", "action": "favorites"},
-            {"key": "c", "label": "Settings", "action": "settings"},
+            {"key": "search", "label": "Search", "action": "search"},
+        ] + active_provider_items + app_items + [
             {"key": "n", "label": "Changelog", "action": "changelog"},
             {"key": "d", "label": "Donate", "action": "donate"},
-            {"key": "q", "label": "Quit", "action": "quit"},
         ]
+
+        active_prov_keys = [it["key"] for it in active_provider_items]
+        if active_prov_keys:
+            key_hints = ", ".join(active_prov_keys)
+            placeholder_text = f"Search anime or type shortcut ({key_hints})..."
+        else:
+            placeholder_text = "Search anime..."
+
+        grid_matrix = []
 
         def generate_renderable(cur_query, hovered):
             screen_w = max(40, self.console.width)
@@ -440,7 +481,7 @@ class UIManager:
                 input_text.append(cur_query, style="bold white")
                 input_text.append("█", style=f"bold {COLOR_TITLE}")
             else:
-                input_text.append("Search anime or type shortcut (e, m, t, p, r, g)...", style="dim")
+                input_text.append(placeholder_text, style="dim")
                 input_text.append("█", style=f"bold {COLOR_TITLE}")
 
             search_panel = Panel(
@@ -455,12 +496,10 @@ class UIManager:
             table.add_row(Align.center(search_panel))
             table.add_row(Text(""))
 
-            # 5. Clean Keybinds Grid (4 columns x 3 rows)
+            # 5. Clean Keybinds Grid (Dynamic columns & rows according to provider)
             grid = Table.grid(padding=(0, 3))
-            grid.add_column(justify="left")
-            grid.add_column(justify="left")
-            grid.add_column(justify="left")
-            grid.add_column(justify="left")
+            for _ in range(4):
+                grid.add_column(justify="left")
 
             def format_item(key, label, action_key, fg):
                 is_hov = (hovered == action_key)
@@ -486,32 +525,46 @@ class UIManager:
                         t.append(f" {label}", style="dim")
                 return t
 
-            row1 = [
-                format_item("↵", "search", "search", COLOR_TITLE),
-                format_item("e", "latest eps", "e", COLOR_TITLE),
-                format_item("m", "movies", "m", COLOR_TITLE),
-                format_item("t", "trending", "t", COLOR_TITLE),
-            ]
-            row2 = [
-                format_item("p", "popular", "p", COLOR_TITLE),
-                format_item("r", "top rated", "r", COLOR_TITLE),
-                format_item("g", "genres", "g", COLOR_TITLE),
-                format_item("s", "studios", "s", COLOR_TITLE),
-            ]
-            row3 = [
-                format_item("l", "history", "l", COLOR_TITLE),
-                format_item("f", "favorites", "f", COLOR_TITLE),
-                format_item("c", "settings", "c", COLOR_TITLE),
-                format_item("q", "quit", "q", "#d97979"),
-            ]
-            grid.add_row(*row1)
-            grid.add_row(*row2)
-            grid.add_row(*row3)
+            grid_matrix.clear()
+            top_items = [{"key": "↵", "label": "search", "action": "search", "color": COLOR_TITLE}] + active_provider_items
+
+            # Top rows: Search + Provider items in chunks of 4
+            for i in range(0, len(top_items), 4):
+                chunk = top_items[i:i + 4]
+                row_cells = []
+                matrix_row = []
+                for it in chunk:
+                    fg = it.get("color") or COLOR_TITLE
+                    row_cells.append(format_item(it["key"], it["label"], it["key"] if it["key"] != "↵" else "search", fg))
+                    matrix_row.append(it["key"] if it["key"] != "↵" else "search")
+                while len(row_cells) < 4:
+                    row_cells.append(Text(""))
+                    matrix_row.append(None)
+                grid.add_row(*row_cells)
+                grid_matrix.append(matrix_row)
+
+            # Bottom row: App navigation controls (always 4 items)
+            app_cells = []
+            app_matrix_row = []
+            for it in app_items:
+                fg = it.get("color") or COLOR_TITLE
+                app_cells.append(format_item(it["key"], it["label"], it["key"], fg))
+                app_matrix_row.append(it["key"])
+            grid.add_row(*app_cells)
+            grid_matrix.append(app_matrix_row)
 
             table.add_row(Align.center(grid))
             table.add_row(Text(""))
 
-            table.add_row(Align.center(format_item("d", "donate", "d", COLOR_TITLE)))
+            show_donate = True
+            try:
+                from .settings import SettingsManager
+                show_donate = SettingsManager().get("show_donation", True)
+            except Exception:
+                pass
+
+            if show_donate:
+                table.add_row(Align.center(format_item("d", "donate", "d", COLOR_TITLE)))
 
             return Align.center(table, vertical="middle", height=self.console.height)
 
@@ -573,6 +626,7 @@ class UIManager:
                         screen_h = self.console.height
                         screen_w = self.console.width
                         new_hover = None
+                        num_grid_rows = len(grid_matrix)
                         box_row = screen_h // 2 + 4
                         if abs(y - box_row) <= 5:
                             footer_span = 74
@@ -581,14 +635,10 @@ class UIManager:
                                 rel_x = x - start_x
                                 col_idx = min(3, max(0, int(rel_x / (footer_span / 4))))
                                 row_offset = y - (box_row - 1)
-                                if 0 <= row_offset < 3:
-                                    action_map = [
-                                        ["search", "e", "m", "t"],
-                                        ["p", "r", "g", "s"],
-                                        ["l", "f", "c", "q"]
-                                    ]
-                                    new_hover = action_map[row_offset][col_idx]
-                                elif row_offset in (3, 4):
+                                if 0 <= row_offset < num_grid_rows:
+                                    if col_idx < len(grid_matrix[row_offset]):
+                                        new_hover = grid_matrix[row_offset][col_idx]
+                                elif row_offset in (num_grid_rows, num_grid_rows + 1) and show_donate:
                                     new_hover = "d"
 
                         if new_hover != hovered_btn:
@@ -860,8 +910,12 @@ class UIManager:
                 year_match = re.search(r"\b(19\d\d|20\d\d)\b", str(premiered_val))
                 year_text = year_match.group(1) if year_match else (str(premiered_val) if premiered_val and str(premiered_val).strip() not in ["N/A", "None", ""] else "")
                 year_b = f"[ {year_text:^4} ]" if year_text else " " * 8
-                
-                badges_str = f"{year_b}  {type_b}  {score_b}"
+
+                language = str(getattr(anime, "language", "") or "").lower()
+                lang_text = "DUB" if language == "dub" else ("SUB" if language == "sub" else "")
+                lang_b = f"[ {lang_text:^3} ]" if lang_text else " " * 7
+
+                badges_str = f"{year_b}  {type_b}  {lang_b}  {score_b}"
                 badges_w = cell_len(badges_str)
                 
                 prefix = " ▶ " if is_selected else "   "
@@ -887,6 +941,8 @@ class UIManager:
                     row_text.append("  ")
                     row_text.append(type_b, style=f"bold {COLOR_HIGHLIGHT_FG}")
                     row_text.append("  ")
+                    row_text.append(lang_b, style=f"bold {COLOR_HIGHLIGHT_FG}")
+                    row_text.append("  ")
                     row_text.append(score_b, style=f"bold {COLOR_HIGHLIGHT_FG}")
                     row_text.stylize(f"bold {COLOR_HIGHLIGHT_FG} on {COLOR_BORDER}")
                     content.append_text(row_text)
@@ -898,6 +954,9 @@ class UIManager:
                     content.append(year_b, style=f"bold {COLOR_SUBTITLE}")
                     content.append("  ")
                     content.append(type_b, style="bold white")
+                    content.append("  ")
+                    lang_style = f"bold {COLOR_BOLT}" if language == "dub" else f"bold {COLOR_SUBTITLE}"
+                    content.append(lang_b, style=lang_style)
                     content.append("  ")
                     content.append(score_b, style=f"bold {COLOR_TITLE}")
                     content.append("\n")
@@ -1345,6 +1404,22 @@ class UIManager:
             title_badge.append("[ ", style=f"bold {COLOR_BORDER}")
             title_badge.append(f"{ar(anime_title)}", style="bold white")
             title_badge.append(" ]", style=f"bold {COLOR_BORDER}")
+
+            details = anime_details or {}
+            language = str(details.get("language") or "").lower()
+            if language in ("dub", "sub"):
+                lang_color = COLOR_BOLT if language == "dub" else COLOR_SUBTITLE
+                title_badge.append("   [ ", style=f"bold {lang_color}")
+                title_badge.append(language.upper(), style=f"bold {lang_color}")
+                title_badge.append(" ]", style=f"bold {lang_color}")
+
+            content_type = str(details.get("content_type") or "").lower()
+            if content_type in ("anime", "cartoon"):
+                content_label = "ANIME" if content_type == "anime" else "KIDS"
+                title_badge.append("   [ ", style=f"bold {COLOR_TITLE}")
+                title_badge.append(content_label, style=f"bold {COLOR_TITLE}")
+                title_badge.append(" ]", style=f"bold {COLOR_TITLE}")
+
             if is_favorite:
                 title_badge.append("   [ ", style="bold #ff79c6")
                 title_badge.append("★ Favorited", style="bold #ff79c6")
@@ -1969,6 +2044,8 @@ class UIManager:
                 ("Auto Next Episode", [True, False], "auto_next"),
                 ("Skip Intro Offset", ["00:05", "00:00", "00:10", "00:15"], "skip_intro"),
                 ("Streaming Quality", ["1080p", "720p", "480p"], "default_quality"),
+                ("Stardima Audio Language", ["dub", "sub", "both"], "stardima_language"),
+                ("Stardima Include Unknown", [False, True], "stardima_include_unknown"),
             ]),
             ("Downloads", [
                 ("Download Quality", ["1080p", "720p", "480p"], "default_download_quality"),
@@ -2136,11 +2213,11 @@ class UIManager:
                             cur_tab = new_tab
                             selected_row = 0
                             live.update(generate_renderable(), refresh=True)
-                    elif key in ['TAB', 'tab', ']']:
+                    elif key in ['TAB', 'tab', '\t', ']']:
                         cur_tab = (cur_tab + 1) % len(tabs)
                         selected_row = 0
                         live.update(generate_renderable(), refresh=True)
-                    elif key == '[':
+                    elif key in ['BACKTAB', 'backtab', 'SHIFT_TAB', '[']:
                         cur_tab = (cur_tab - 1) % len(tabs)
                         selected_row = 0
                         live.update(generate_renderable(), refresh=True)

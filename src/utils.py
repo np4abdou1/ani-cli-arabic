@@ -99,8 +99,12 @@ def get_key():
                     return 'RIGHT'
                 elif key2 == b'K':
                     return 'LEFT'
+                elif key2 == b'\x0f':
+                    return 'BACKTAB'
             elif key == b'\r':
                 return 'ENTER'
+            elif key == b'\t':
+                return 'TAB'
             elif key == b'\x1b':
                 # Handle ANSI escape sequences on Windows (e.g. VS Code terminal)
                 start_time = time.time()
@@ -166,6 +170,9 @@ def get_key():
         if raw in (b'\x7f', b'\x08'):
             return 'BACKSPACE'
             
+        if raw == b'\t':
+            return 'TAB'
+            
         if raw.startswith(b'\x1b'):
             # If isolated ESC byte, wait briefly to distinguish from escape sequence
             if len(raw) == 1:
@@ -176,6 +183,9 @@ def get_key():
                         pass
                 else:
                     return 'ESC'
+                    
+            if raw == b'\x1b[Z':
+                return 'BACKTAB'
                     
             # Parse arrow keys (handles single keypress and rapid hold-down bursts)
             if raw.startswith((b'\x1b[A', b'\x1bOA')):
@@ -330,6 +340,8 @@ def get_home_input_event():
                 return ('ENTER', None)
             elif ch in [b'\x08', b'\x7f']:
                 return ('BACKSPACE', None)
+            elif ch == b'\t':
+                return ('TAB', None)
             elif ch == b'\x1b':
                 return ('ESC', None)
             elif ch in [b'\xe0', b'\x00']:
@@ -340,6 +352,8 @@ def get_home_input_event():
                     return ('UP', None)
                 if ch2 == b'P':
                     return ('DOWN', None)
+                if ch2 == b'\x0f':
+                    return ('BACKTAB', None)
                 return None
             else:
                 try:
@@ -364,6 +378,8 @@ def get_home_input_event():
             return ('ENTER', None)
         if raw in (b'\x7f', b'\x08'):
             return ('BACKSPACE', None)
+        if raw == b'\t':
+            return ('TAB', None)
             
         if raw.startswith(b'\x1b'):
             if len(raw) == 1:
@@ -376,6 +392,8 @@ def get_home_input_event():
                     return ('ESC', None)
                     
             seq = raw.decode('utf-8', errors='ignore')
+            if seq == '\x1b[Z':
+                return ('BACKTAB', None)
             if seq.startswith('\x1b[<') and (seq.endswith('M') or seq.endswith('m')):
                 m = re.match(r'\x1b\[<(\d+);(\d+);(\d+);([Mm])', seq)
                 if m:
@@ -517,9 +535,11 @@ def _show_centered_download_message(console, title, message, is_error=False, dur
         time.sleep(max(0.5, duration))
 
 
-def _download_with_builtin(url, filename, filepath, console):
+def _download_with_builtin(url, filename, filepath, console, headers=None):
     """Resumable chunked single-file downloader with Rich centered progress modal."""
-    headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
+    request_headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
+    if headers:
+        request_headers.update({str(k): str(v) for k, v in headers.items() if v})
     part_path = f"{filepath}.part"
 
     if os.path.exists(filepath) and os.path.getsize(filepath) > 0 and not os.path.exists(part_path):
@@ -530,20 +550,20 @@ def _download_with_builtin(url, filename, filepath, console):
     if os.path.exists(part_path):
         resume_pos = os.path.getsize(part_path)
         if resume_pos > 0:
-            headers['Range'] = f"bytes={resume_pos}-"
+            request_headers['Range'] = f"bytes={resume_pos}-"
 
     last_error = None
     for _ in range(2):
         try:
-            with requests.get(url, stream=True, headers=headers, timeout=(10, 45)) as response:
+            with requests.get(url, stream=True, headers=request_headers, timeout=(10, 45)) as response:
                 if response.status_code == 416:
                     os.replace(part_path, filepath)
                     _show_centered_download_message(console, "Download Complete", filepath, is_error=False, duration=1.0)
                     return True
 
                 if response.status_code not in (200, 206):
-                    headers.pop('Range', None)
-                    with requests.get(url, stream=True, headers=headers, timeout=(10, 45)) as r_retry:
+                    request_headers.pop('Range', None)
+                    with requests.get(url, stream=True, headers=request_headers, timeout=(10, 45)) as r_retry:
                         r_retry.raise_for_status()
                         response = r_retry
                         resume_pos = 0
@@ -616,7 +636,7 @@ def _download_with_builtin(url, filename, filepath, console):
     raise RuntimeError("Download failed")
 
 
-def download_file(url, filename, console, mode="internal", download_dir=None):
+def download_file(url, filename, console, mode="internal", download_dir=None, headers=None):
     from .logger import logger
     filename = sanitize_download_filename(filename)
 
@@ -628,7 +648,7 @@ def download_file(url, filename, console, mode="internal", download_dir=None):
     logger.debug("DOWNLOAD", f"Starting download of '{filename}' from {url[:60]}...")
     success = False
     try:
-        success = _download_with_builtin(url, filename, filepath, console)
+        success = _download_with_builtin(url, filename, filepath, console, headers=headers)
         return success
     except KeyboardInterrupt:
         _show_centered_download_message(

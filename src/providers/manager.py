@@ -9,6 +9,7 @@ from .anime3rb import Anime3rbProvider
 from .anime_slayer import AnimeSlayerProvider
 from .hianime import HiAnimeProvider
 from .animeify import AnimeifyProvider
+from .stardima import StardimaProvider, StardimaKidsProvider
 
 
 class ProviderManager:
@@ -22,6 +23,10 @@ class ProviderManager:
         "anidb": HiAnimeProvider,
         "ani-cli": HiAnimeProvider,
         "hianime": HiAnimeProvider,
+        "stardima": StardimaProvider,
+        "stardima_anime": StardimaProvider,
+        "stardima_kids": StardimaKidsProvider,
+        "stardima_cartoon": StardimaKidsProvider,
     }
 
     _INSTANCES: Dict[str, BaseAnimeProvider] = {}
