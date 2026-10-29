@@ -26,46 +26,34 @@ from .utils import get_key, RawTerminal
 
 _CHANGELOG_ITEMS: List[Dict[str, Any]] = [
     {
-        "badge": "V2.0 Core",
+        "badge": "Stardima",
         "badge_style": "bold green",
-        "title": "Major V2.0 Architecture Release",
-        "desc": "Ground-up rewrite with faster startup, smoother scrolling, and zero lag across all terminals."
+        "title": "Arabic-Dubbed Anime & Cartoons Providers",
+        "desc": "Seamless streaming for Arabic-dubbed anime (stardima) and cartoons (stardima_kids) with robust multi-server extraction (Backup, Uqload, Mixdrop, LuluStream, SaveFiles, Mp4upload, Forafile, Firestream)."
     },
     {
-        "badge": "Providers",
+        "badge": "Audio & Player",
         "badge_style": "bold cyan",
-        "title": "HiAnime & Multi-Source Streaming",
-        "desc": "Dynamic stream referer resolution, high-speed CDN, and seamless multi-sub/dub provider switching."
+        "title": "Automatic Arabic Audio & Sanitized Headers",
+        "desc": "Automatic selection of Arabic audio streams (ara, ar) with proper language tagging and hardened MPV header escaping to prevent HTTP 400 errors."
     },
     {
-        "badge": "Downloader",
-        "badge_style": "bold yellow",
-        "title": "Native Chunked Batch Downloader",
-        "desc": "Built-in multithreaded downloader with resume support, zero external tools, and real-time progress."
-    },
-    {
-        "badge": "CLI Mode",
+        "badge": "Dynamic TUI",
         "badge_style": "bold magenta",
-        "title": "Native FZF Flow & Action Menu",
-        "desc": "Clean search interface, mouse click support, no Arabic RTL glitches, and intuitive episode action menus."
+        "title": "Dynamic Home Screen Keybind Hints",
+        "desc": "Shortcuts, search bar hints, and mouse click areas now dynamically adapt to each provider's supported features (search, latest, movies, trending, popular, top-rated, genres)."
     },
     {
-        "badge": "Infrastructure",
-        "badge_style": "bold blue",
-        "title": "Resilient 3-Tier Fallback Engine",
-        "desc": "Zero downtime with automatic domain fallbacks across custom domain, Cloudflare Pages, and Workers."
-    },
-    {
-        "badge": "Privacy",
-        "badge_style": "bold green",
-        "title": "Enhanced Privacy & Hardening",
-        "desc": "Removed playback telemetry and strictly isolated development builds to protect user privacy."
-    },
-    {
-        "badge": "Updater",
+        "badge": "Settings UI",
         "badge_style": "bold yellow",
-        "title": "Seamless Cross-Platform Updates",
-        "desc": "One-click upgrades for pip, pipx, AUR (yay/paru), and Homebrew."
+        "title": "Tab Key Navigation & Instant Setting Reloads",
+        "desc": "Navigate settings tabs seamlessly using Tab and Shift+Tab, with instant provider and preferences reloading across all screens without restarting."
+    },
+    {
+        "badge": "Classifier",
+        "badge_style": "bold blue",
+        "title": "Offline TMDB Dub Classification",
+        "desc": "Pre-indexed offline catalog cleanly separates dubbed anime from kids and cartoon series with zero startup latency."
     }
 ]
 
