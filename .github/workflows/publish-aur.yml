@@ -84,5 +84,5 @@ jobs:
           ssh_private_key: ${{ secrets.AUR_SSH_PRIVATE_KEY }}
           commit_message: Update to ${{ steps.get_version.outputs.VERSION }}
           ssh_keyscan_types: rsa,ecdsa,ed25519
-          post_process: git checkout -B master
-          force_push: true
+          post_process: git checkout master
+          force_push: false
