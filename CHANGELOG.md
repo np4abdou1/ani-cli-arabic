@@ -6,6 +6,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.1.1] - 2026-10-29
+
+### Fixed
+- **Anime3rb Search Resolution**: Dynamically extracts hashed Livewire endpoints (`data-update-uri` / `data-module-url`) directly from page HTML and re-negotiates CSRF tokens upon 404/419 responses, fixing irrelevant catalog search results caused by upstream endpoint rotation.
+- **Fallback Keyword Filtering**: Guarded HTML search fallback with strict multi-word query verification to ensure unrelated general catalog titles are never presented as search matches.
+- **Arabic Title Matching**: Improved extraction of Arabic title segments from Anime3rb alternative titles.
+
+### Documentation
+- **Showcase Demo**: Replaced video attachment link with an optimized native showcase GIF (`assets/showcase.gif`) across English and Arabic documentation.
+
+---
+
 ## [2.1.0] - 2026-10-29
 
 ### Added

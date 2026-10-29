@@ -26,6 +26,12 @@ from .utils import get_key, RawTerminal
 
 _CHANGELOG_ITEMS: List[Dict[str, Any]] = [
     {
+        "badge": "Anime3rb",
+        "badge_style": "bold green",
+        "title": "Dynamic Livewire Search & Token Recovery",
+        "desc": "Dynamically resolves Anime3rb's hashed Livewire endpoints directly from page metadata with automatic 404/419 re-negotiation, fixing irrelevant catalog search results."
+    },
+    {
         "badge": "Stardima",
         "badge_style": "bold green",
         "title": "Arabic-Dubbed Anime & Cartoons Providers",
