@@ -19,6 +19,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Get Version
         id: get_version
@@ -82,3 +84,5 @@ jobs:
           ssh_private_key: ${{ secrets.AUR_SSH_PRIVATE_KEY }}
           commit_message: Update to ${{ steps.get_version.outputs.VERSION }}
           ssh_keyscan_types: rsa,ecdsa,ed25519
+          post_process: git checkout -B master
+          force_push: true
