@@ -88,6 +88,7 @@ class AniCliArApp:
         parser.add_argument('-p', '--provider', choices=ProviderManager.get_provider_choices(), help="Specify active anime provider (anime3rb, anime_slayer, anidb, stardima, stardima_kids)")
         parser.add_argument('-d', '--debug', action='store_true', help="Enable verbose debug logging to file and console")
         parser.add_argument('-v', '--version', action='store_true', help="Show version information")
+        parser.add_argument('-u', '--update', action='store_true', help="Check for and install updates")
         parser.add_argument('query', nargs='*', help="Anime name to search for")
         
         args = parser.parse_args()
@@ -105,6 +106,11 @@ class AniCliArApp:
         if args.version:
             from .version import __version__
             print(f"ani-cli-arabic v{__version__}")
+            sys.exit(0)
+
+        if args.update:
+            from .updater import check_for_updates
+            check_for_updates(auto_update=True, interactive=True)
             sys.exit(0)
             
         self.force_cli = args.interactive
@@ -134,13 +140,7 @@ class AniCliArApp:
             threading.Thread(target=connect_rpc, daemon=True).start()
         
         
-        def check_updates_bg():
-            try:
-                check_for_updates(auto_update=True)
-            except Exception:
-                pass
-        threading.Thread(target=check_updates_bg, daemon=True).start()
-        
+        # Non-blocking background check for version status (does not spawn package managers)
         def check_version_bg():
             try:
                 self.version_info = get_version_status()

@@ -20,6 +20,7 @@ console = Console()
 
 
 def get_latest_pypi_version() -> Optional[str]:
+    """Fetches the latest version published on PyPI."""
     try:
         resp = requests.get("https://pypi.org/pypi/ani-cli-arabic/json", timeout=6)
         if resp.status_code == 200:
@@ -29,7 +30,22 @@ def get_latest_pypi_version() -> Optional[str]:
     return None
 
 
+def get_latest_aur_version() -> Optional[str]:
+    """Fetches the latest version published in Arch Linux AUR."""
+    try:
+        resp = requests.get("https://aur.archlinux.org/rpc/v5/info?arg[]=ani-cli-arabic", timeout=6)
+        if resp.status_code == 200:
+            results = resp.json().get("results", [])
+            if results:
+                raw_ver = results[0].get("Version", "")
+                return raw_ver.split("-")[0].strip()
+    except Exception:
+        pass
+    return None
+
+
 def get_latest_github_release() -> Optional[Dict[str, Any]]:
+    """Fetches the latest release payload from GitHub Releases API."""
     try:
         resp = requests.get(API_RELEASES_URL, timeout=6)
         if resp.status_code == 200:
@@ -87,92 +103,137 @@ def detect_install_method() -> str:
     return "pip"
 
 
-def update_aur(latest_ver: str) -> bool:
+def update_aur(latest_ver: str, interactive: bool = False) -> bool:
+    """Handles AUR updates without clobbering background TUI processes."""
     console.print(f"\n[cyan]Update available: v{__version__} → v{latest_ver}[/cyan]")
     console.print("[dim]Detected Arch Linux package (AUR).[/dim]\n")
 
-    # AUR helpers do NOT use sudo to invoke; they build as user and prompt for sudo internally
-    helpers = [
-        ("yay", ["yay", "-S", "--noconfirm", "ani-cli-arabic"]),
-        ("paru", ["paru", "-S", "--noconfirm", "ani-cli-arabic"]),
-        ("pamac", ["pamac", "upgrade", "--no-confirm", "ani-cli-arabic"])
-    ]
+    helper = None
+    for h in ["yay", "paru", "pamac"]:
+        if shutil.which(h):
+            helper = h
+            break
 
-    for name, cmd in helpers:
-        if shutil.which(name):
-            console.print(f"[cyan]Executing: {' '.join(cmd)}[/cyan]")
-            try:
+    if not helper:
+        console.print("[yellow]Please update using your preferred AUR helper:[/yellow]")
+        console.print("  yay -S ani-cli-arabic")
+        console.print("  paru -S ani-cli-arabic\n")
+        return False
+
+    cmd = [helper, "-S", "ani-cli-arabic"]
+
+    if interactive:
+        try:
+            choice = input(f"Run '{' '.join(cmd)}' now? [Y/n]: ").strip().lower()
+            if choice in ("", "y", "yes"):
+                console.print(f"[cyan]Executing: {' '.join(cmd)}[/cyan]")
                 res = subprocess.run(cmd)
                 if res.returncode == 0:
-                    console.print("[green]✓ Updated successfully via " + name + ".[/green]")
+                    console.print(f"[green]✓ Updated successfully via {helper}.[/green]")
                     console.print("Please restart the application.")
                     sys.exit(0)
-            except Exception as e:
-                console.print(f"[yellow]Warning: {name} failed: {e}[/yellow]")
+                else:
+                    console.print(f"[yellow]{helper} exited with status {res.returncode}.[/yellow]")
+            else:
+                console.print("[dim]Update skipped.[/dim]")
+        except (KeyboardInterrupt, EOFError):
+            console.print("\n[dim]Update cancelled.[/dim]")
+    else:
+        console.print(f"[yellow]To update, please run:[/yellow] [bold]{' '.join(cmd)}[/bold]\n")
 
-    console.print("[yellow]No supported AUR helper found (yay/paru/pamac).[/yellow]")
-    console.print("Please update using your preferred AUR tool:")
-    console.print("  yay -S ani-cli-arabic")
-    console.print("  paru -S ani-cli-arabic\n")
     return False
 
 
-def update_brew(latest_ver: str) -> bool:
+def update_brew(latest_ver: str, interactive: bool = False) -> bool:
+    """Handles Homebrew updates."""
     console.print(f"\n[cyan]Update available: v{__version__} → v{latest_ver}[/cyan]")
-    console.print("[dim]Updating via Homebrew...[/dim]\n")
-    try:
-        res = subprocess.run(["brew", "upgrade", "ani-cli-arabic"])
-        if res.returncode == 0:
-            console.print("[green]✓ Updated successfully via Homebrew.[/green]")
-            sys.exit(0)
-    except Exception as e:
-        console.print(f"[red]Homebrew upgrade error: {e}[/red]")
+    console.print("[dim]Detected Homebrew installation.[/dim]\n")
+
+    if interactive:
+        try:
+            choice = input("Run 'brew upgrade ani-cli-arabic' now? [Y/n]: ").strip().lower()
+            if choice in ("", "y", "yes"):
+                console.print("[dim]Updating via Homebrew...[/dim]\n")
+                res = subprocess.run(["brew", "upgrade", "ani-cli-arabic"])
+                if res.returncode == 0:
+                    console.print("[green]✓ Updated successfully via Homebrew.[/green]")
+                    sys.exit(0)
+            else:
+                console.print("[dim]Update skipped.[/dim]")
+        except (KeyboardInterrupt, EOFError):
+            console.print("\n[dim]Update cancelled.[/dim]")
+    else:
+        console.print("[yellow]To update, please run:[/yellow] [bold]brew upgrade ani-cli-arabic[/bold]\n")
+
     return False
 
 
-def update_pipx(latest_ver: str) -> bool:
+def update_pipx(latest_ver: str, interactive: bool = False) -> bool:
+    """Handles pipx updates."""
     console.print(f"\n[cyan]Update available: v{__version__} → v{latest_ver}[/cyan]")
-    console.print("[dim]Updating via pipx...[/dim]\n")
-    try:
-        res = subprocess.run(["pipx", "upgrade", "ani-cli-arabic"])
-        if res.returncode == 0:
-            console.print("[green]✓ Updated successfully via pipx.[/green]")
-            sys.exit(0)
-    except Exception as e:
-        console.print(f"[red]pipx upgrade error: {e}[/red]")
+    console.print("[dim]Detected pipx installation.[/dim]\n")
+
+    if interactive:
+        try:
+            choice = input("Run 'pipx upgrade ani-cli-arabic' now? [Y/n]: ").strip().lower()
+            if choice in ("", "y", "yes"):
+                console.print("[dim]Updating via pipx...[/dim]\n")
+                res = subprocess.run(["pipx", "upgrade", "ani-cli-arabic"])
+                if res.returncode == 0:
+                    console.print("[green]✓ Updated successfully via pipx.[/green]")
+                    sys.exit(0)
+            else:
+                console.print("[dim]Update skipped.[/dim]")
+        except (KeyboardInterrupt, EOFError):
+            console.print("\n[dim]Update cancelled.[/dim]")
+    else:
+        console.print("[yellow]To update, please run:[/yellow] [bold]pipx upgrade ani-cli-arabic[/bold]\n")
+
     return False
 
 
-def update_pip(latest_ver: str) -> bool:
+def update_pip(latest_ver: str, interactive: bool = False) -> bool:
+    """Handles standard pip updates."""
     console.print(f"\n[cyan]Update available: v{__version__} → v{latest_ver}[/cyan]")
-    console.print("[dim]Downloading update from PyPI...[/dim]\n")
 
-    cmd = [sys.executable, "-m", "pip", "install", "--upgrade", "--no-cache-dir", "ani-cli-arabic"]
-    is_venv = sys.prefix != getattr(sys, "base_prefix", sys.prefix)
-    if platform.system() != "Windows" and not is_venv:
-        cmd.append("--user")
+    if interactive:
+        try:
+            choice = input(f"Update to v{latest_ver} via pip now? [Y/n]: ").strip().lower()
+            if choice in ("", "y", "yes"):
+                console.print("[dim]Downloading update from PyPI...[/dim]\n")
+                cmd = [sys.executable, "-m", "pip", "install", "--upgrade", "--no-cache-dir", "ani-cli-arabic"]
+                is_venv = sys.prefix != getattr(sys, "base_prefix", sys.prefix)
+                if platform.system() != "Windows" and not is_venv:
+                    cmd.append("--user")
 
-    res = subprocess.run(cmd, capture_output=True, text=True)
+                res = subprocess.run(cmd, capture_output=True, text=True)
 
-    # Handle PEP 668 (externally-managed-environment)
-    if res.returncode != 0 and "externally-managed-environment" in res.stderr:
-        console.print("[dim]System-managed Python environment detected; retrying with override...[/dim]")
-        if "--user" in cmd:
-            cmd.remove("--user")
-        cmd.append("--break-system-packages")
-        res = subprocess.run(cmd, capture_output=True, text=True)
+                # Handle PEP 668 (externally-managed-environment)
+                if res.returncode != 0 and "externally-managed-environment" in res.stderr:
+                    console.print("[dim]System-managed Python environment detected; retrying with override...[/dim]")
+                    if "--user" in cmd:
+                        cmd.remove("--user")
+                    cmd.append("--break-system-packages")
+                    res = subprocess.run(cmd, capture_output=True, text=True)
 
-    if res.returncode == 0:
-        console.print(f"[green]✓ Successfully updated to v{latest_ver}.[/green]")
-        console.print("Please restart the application.")
-        sys.exit(0)
+                if res.returncode == 0:
+                    console.print(f"[green]✓ Successfully updated to v{latest_ver}.[/green]")
+                    console.print("Please restart the application.")
+                    sys.exit(0)
 
-    console.print(f"[red]Update failed: {res.stderr.strip() or 'Unknown error'}[/red]")
-    console.print("Try running manually: pip install --upgrade ani-cli-arabic")
+                console.print(f"[red]Update failed: {res.stderr.strip() or 'Unknown error'}[/red]")
+            else:
+                console.print("[dim]Update skipped.[/dim]")
+        except (KeyboardInterrupt, EOFError):
+            console.print("\n[dim]Update cancelled.[/dim]")
+    else:
+        console.print("[yellow]To update, please run:[/yellow] [bold]pip install --upgrade ani-cli-arabic[/bold]\n")
+
     return False
 
 
-def update_binary(latest_ver: str, release_data: Dict[str, Any]) -> bool:
+def update_binary(latest_ver: str, release_data: Dict[str, Any], interactive: bool = False) -> bool:
+    """Downloads and replaces bundled standalone binary."""
     console.print(f"\n[cyan]Update available: v{__version__} → v{latest_ver}[/cyan]")
     console.print("[dim]Downloading executable update from GitHub...[/dim]\n")
 
@@ -220,42 +281,55 @@ def update_binary(latest_ver: str, release_data: Dict[str, Any]) -> bool:
     return False
 
 
-def check_for_updates(auto_update: bool = True) -> bool:
+def check_for_updates(auto_update: bool = False, interactive: bool = False) -> bool:
     """Checks for newer releases and updates via the appropriate platform package manager."""
     try:
-        latest_version = get_latest_pypi_version()
-        release_data = None
+        method = detect_install_method()
 
+        # For AUR, query the AUR RPC directly. If AUR has not been bumped yet,
+        # we must never report an update or invoke yay, avoiding infinite reinstall loops.
+        if method == "aur":
+            latest_version = get_latest_aur_version()
+        else:
+            latest_version = get_latest_pypi_version()
+
+        release_data = None
         if not latest_version:
             release_data = get_latest_github_release()
             if release_data:
                 latest_version = release_data.get("tag_name", "").lstrip("v")
 
         if not latest_version:
+            if interactive:
+                console.print("[dim]Unable to fetch latest release version (network timeout or offline).[/dim]")
             return False
 
         if parse_version(latest_version) <= parse_version(__version__):
+            if interactive:
+                console.print(f"[green]✓ ani-cli-arabic is up to date (v{__version__}).[/green]")
             return False
 
-        if not auto_update:
+        if not auto_update and not interactive:
             return True
 
-        method = detect_install_method()
         if method == "aur":
-            return update_aur(latest_version)
+            return update_aur(latest_version, interactive=interactive)
         elif method == "brew":
-            return update_brew(latest_version)
+            return update_brew(latest_version, interactive=interactive)
         elif method == "pipx":
-            return update_pipx(latest_version)
+            return update_pipx(latest_version, interactive=interactive)
         elif method == "executable":
             if not release_data:
                 release_data = get_latest_github_release()
             if release_data:
-                return update_binary(latest_version, release_data)
+                return update_binary(latest_version, release_data, interactive=interactive)
         elif method == "source":
+            if interactive:
+                console.print(f"\n[cyan]Update available: v{__version__} → v{latest_version}[/cyan]")
+                console.print("[dim]Running from local git source checkout. Run 'git pull' to update.[/dim]\n")
             return False
         else:
-            return update_pip(latest_version)
+            return update_pip(latest_version, interactive=interactive)
     except Exception:
         pass
 
@@ -263,17 +337,23 @@ def check_for_updates(auto_update: bool = True) -> bool:
 
 
 def get_version_status() -> Optional[Dict[str, Any]]:
+    """Returns structured version and update status for the active installation method."""
     try:
-        latest_pip = get_latest_pypi_version() or "N/A"
+        method = detect_install_method()
+        if method == "aur":
+            latest_ver = get_latest_aur_version() or "N/A"
+        else:
+            latest_ver = get_latest_pypi_version() or "N/A"
+
         is_outdated = False
-        if latest_pip != "N/A" and parse_version(latest_pip) > parse_version(__version__):
+        if latest_ver != "N/A" and parse_version(latest_ver) > parse_version(__version__):
             is_outdated = True
 
         return {
             "current": __version__,
-            "latest": latest_pip,
+            "latest": latest_ver,
             "is_outdated": is_outdated,
-            "install_method": detect_install_method()
+            "install_method": method
         }
     except Exception:
         return None

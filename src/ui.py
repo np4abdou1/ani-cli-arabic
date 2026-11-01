@@ -470,6 +470,11 @@ class UIManager:
             meta.append("[ ", style="dim")
             meta.append(f"★ {get_github_stars()}", style="bold white")
             meta.append(" ]", style="dim")
+
+            if version_info and version_info.get("is_outdated"):
+                meta.append("   [ ", style="dim")
+                meta.append(f"update: v{version_info['latest']}", style="bold #a9e34b")
+                meta.append(" ]", style="dim")
             
             table.add_row(Align.center(meta))
             table.add_row(Text(""))
