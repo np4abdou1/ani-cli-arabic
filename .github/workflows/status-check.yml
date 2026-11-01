@@ -2,7 +2,7 @@ name: Provider Health Check & Status
 
 on:
   schedule:
-    - cron: '*/30 * * * *'  # Runs every 30 minutes
+    - cron: '14,44 * * * *'  # Runs every 30 mins at off-peak minutes (14 and 44) to prevent GitHub cron dropping
   workflow_dispatch:        # Allows manual trigger anytime
 
 permissions:
