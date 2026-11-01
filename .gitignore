@@ -13,8 +13,8 @@ downloads/
 /worker
 eggs/
 .eggs/
-lib/
-lib64/
+/lib/
+/lib64/
 /site
 parts/
 sdist/
