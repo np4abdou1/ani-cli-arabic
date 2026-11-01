@@ -31,9 +31,20 @@ jobs:
         run: |
           python scripts/check_providers.py
 
-      - name: Commit updated status.json if changed
+      - name: Publish to dedicated status-data branch (0 commits on main)
         run: |
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action [Status Bot]"
-          git add status.json website/public/status.json 2>/dev/null || git add status.json
-          git diff --staged --quiet || (git commit -m "chore(status): update provider health metrics [skip ci]" && git push)
+
+          # Copy generated status payload
+          cp status.json /tmp/status.json
+
+          # Switch to orphan branch status-data so main branch remains completely clean
+          git checkout --orphan status-data 2>/dev/null || git checkout status-data
+          git rm -rf . > /dev/null 2>&1 || true
+
+          # Keep only status.json on this branch
+          cp /tmp/status.json status.json
+          git add status.json
+          git commit -m "status: update live provider telemetry" --amend -m "status: update live provider telemetry" 2>/dev/null || git commit -m "status: update live provider telemetry"
+          git push -f origin status-data
