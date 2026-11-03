@@ -6,6 +6,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.1.2] - 2026-11-03
+
+### Added
+- **Live User Community View**: You can now see on the official website ([https://ani-cli-arabic.dev/](https://ani-cli-arabic.dev/)) how many users are actively using the CLI.
+- **Provider Resolution & Stream Verification**: Added direct byte-range delivery validation and adaptive query fallbacks across Anime3rb and Anime Slayer.
+- **CLI Accent Synchronization**: Added instant terminal theme palette matching directly on the web application.
+
+---
+
 ## [2.1.1] - 2026-10-29
 
 ### Fixed
