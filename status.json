@@ -1,8 +1,8 @@
 {
   "status": "operational",
   "status_headline": "All Systems Operational",
-  "status_description": "All streaming and search services are operating normally with optimal response latencies.",
-  "last_updated": "2026-11-01T16:31:40.111868+00:00",
+  "status_description": "All streaming, search, and CDN video delivery pipelines are responding with optimal latency.",
+  "last_updated": "2026-11-03T20:06:36.802885+00:00",
   "check_interval_seconds": 1800,
   "providers_count": 5,
   "providers": [
@@ -14,25 +14,24 @@
       "status": "operational",
       "status_label": "Operational",
       "message": "Operational",
-      "search_latency_ms": 1322,
-      "stream_latency_ms": 7205,
-      "total_latency_ms": 9770,
+      "search_latency_ms": 1098,
+      "stream_latency_ms": 2133,
+      "cdn_latency_ms": 411,
+      "total_latency_ms": 3642,
       "results_count": 12,
       "servers_count": 3,
+      "qualities": [
+        "1080p (1080p)",
+        "720p (720p)",
+        "480p (480p)"
+      ],
+      "tested_title": "Naruto",
+      "tested_episode": "Ep 1",
+      "stream_verified": true,
+      "is_runner_challenge": false,
+      "diagnostic_note": "Playback validated: 3 streams discovered (1080p (1080p), 720p (720p), 480p (480p)). CDN delivery confirmed (HTTP 206).",
       "uptime_30d_pct": 100.0,
       "history": [
-        {
-          "date": "2026-10-03",
-          "status": "operational",
-          "uptime_pct": 100.0,
-          "incidents": 0
-        },
-        {
-          "date": "2026-10-04",
-          "status": "operational",
-          "uptime_pct": 100.0,
-          "incidents": 0
-        },
         {
           "date": "2026-10-05",
           "status": "operational",
@@ -197,6 +196,18 @@
         },
         {
           "date": "2026-11-01",
+          "status": "operational",
+          "uptime_pct": 100.0,
+          "incidents": 0
+        },
+        {
+          "date": "2026-11-02",
+          "status": "operational",
+          "uptime_pct": 100.0,
+          "incidents": 0
+        },
+        {
+          "date": "2026-11-03",
           "status": "operational",
           "uptime_pct": 100.0,
           "incidents": 0
@@ -211,25 +222,22 @@
       "status": "operational",
       "status_label": "Operational",
       "message": "Operational",
-      "search_latency_ms": 960,
-      "stream_latency_ms": 765,
-      "total_latency_ms": 1898,
+      "search_latency_ms": 273,
+      "stream_latency_ms": 653,
+      "cdn_latency_ms": 420,
+      "total_latency_ms": 1346,
       "results_count": 28,
       "servers_count": 1,
+      "qualities": [
+        "Auto"
+      ],
+      "tested_title": "Naruto",
+      "tested_episode": "Ep 1",
+      "stream_verified": true,
+      "is_runner_challenge": false,
+      "diagnostic_note": "Playback validated: 1 streams discovered (Auto). CDN delivery confirmed (HTTP 200).",
       "uptime_30d_pct": 100.0,
       "history": [
-        {
-          "date": "2026-10-03",
-          "status": "operational",
-          "uptime_pct": 100.0,
-          "incidents": 0
-        },
-        {
-          "date": "2026-10-04",
-          "status": "operational",
-          "uptime_pct": 100.0,
-          "incidents": 0
-        },
         {
           "date": "2026-10-05",
           "status": "operational",
@@ -394,6 +402,18 @@
         },
         {
           "date": "2026-11-01",
+          "status": "operational",
+          "uptime_pct": 100.0,
+          "incidents": 0
+        },
+        {
+          "date": "2026-11-02",
+          "status": "operational",
+          "uptime_pct": 100.0,
+          "incidents": 0
+        },
+        {
+          "date": "2026-11-03",
           "status": "operational",
           "uptime_pct": 100.0,
           "incidents": 0
@@ -408,25 +428,24 @@
       "status": "operational",
       "status_label": "Operational",
       "message": "Operational",
-      "search_latency_ms": 656,
-      "stream_latency_ms": 1704,
-      "total_latency_ms": 3080,
+      "search_latency_ms": 444,
+      "stream_latency_ms": 1329,
+      "cdn_latency_ms": 380,
+      "total_latency_ms": 2153,
       "results_count": 10,
-      "servers_count": 1,
+      "servers_count": 3,
+      "qualities": [
+        "480p • Backup",
+        "360p • Uqload",
+        "720p • Lulustream"
+      ],
+      "tested_title": "NARUTO Spin-Off: Rock Lee & His Ninja Pals",
+      "tested_episode": "Ep 1",
+      "stream_verified": true,
+      "is_runner_challenge": false,
+      "diagnostic_note": "Playback validated: 3 streams discovered (480p • Backup, 360p • Uqload, 720p • Lulustream). CDN delivery confirmed (HTTP 206).",
       "uptime_30d_pct": 100.0,
       "history": [
-        {
-          "date": "2026-10-03",
-          "status": "operational",
-          "uptime_pct": 100.0,
-          "incidents": 0
-        },
-        {
-          "date": "2026-10-04",
-          "status": "operational",
-          "uptime_pct": 100.0,
-          "incidents": 0
-        },
         {
           "date": "2026-10-05",
           "status": "operational",
@@ -591,6 +610,18 @@
         },
         {
           "date": "2026-11-01",
+          "status": "operational",
+          "uptime_pct": 100.0,
+          "incidents": 0
+        },
+        {
+          "date": "2026-11-02",
+          "status": "operational",
+          "uptime_pct": 100.0,
+          "incidents": 0
+        },
+        {
+          "date": "2026-11-03",
           "status": "operational",
           "uptime_pct": 100.0,
           "incidents": 0
@@ -605,25 +636,25 @@
       "status": "operational",
       "status_label": "Operational",
       "message": "Operational",
-      "search_latency_ms": 628,
-      "stream_latency_ms": 4078,
-      "total_latency_ms": 7539,
+      "search_latency_ms": 421,
+      "stream_latency_ms": 4000,
+      "cdn_latency_ms": 354,
+      "total_latency_ms": 4775,
       "results_count": 2,
-      "servers_count": 2,
+      "servers_count": 4,
+      "qualities": [
+        "1080p • Backup",
+        "1080p • Uqload",
+        "720p • Lulustream",
+        "720p • Mixdrop"
+      ],
+      "tested_title": "Looney Tunes Cartoons",
+      "tested_episode": "Ep 1",
+      "stream_verified": true,
+      "is_runner_challenge": false,
+      "diagnostic_note": "Playback validated: 4 streams discovered (1080p • Backup, 1080p • Uqload, 720p • Lulustream). CDN delivery confirmed (HTTP 206).",
       "uptime_30d_pct": 100.0,
       "history": [
-        {
-          "date": "2026-10-03",
-          "status": "operational",
-          "uptime_pct": 100.0,
-          "incidents": 0
-        },
-        {
-          "date": "2026-10-04",
-          "status": "operational",
-          "uptime_pct": 100.0,
-          "incidents": 0
-        },
         {
           "date": "2026-10-05",
           "status": "operational",
@@ -788,6 +819,18 @@
         },
         {
           "date": "2026-11-01",
+          "status": "operational",
+          "uptime_pct": 100.0,
+          "incidents": 0
+        },
+        {
+          "date": "2026-11-02",
+          "status": "operational",
+          "uptime_pct": 100.0,
+          "incidents": 0
+        },
+        {
+          "date": "2026-11-03",
           "status": "operational",
           "uptime_pct": 100.0,
           "incidents": 0
@@ -802,25 +845,25 @@
       "status": "operational",
       "status_label": "Operational",
       "message": "Operational",
-      "search_latency_ms": 469,
-      "stream_latency_ms": 2422,
-      "total_latency_ms": 3265,
+      "search_latency_ms": 302,
+      "stream_latency_ms": 5836,
+      "cdn_latency_ms": 651,
+      "total_latency_ms": 6789,
       "results_count": 19,
       "servers_count": 4,
+      "qualities": [
+        "CDN > 1080p",
+        "CDN > 720p",
+        "CDN > 480p",
+        "OK.ru > 720p"
+      ],
+      "tested_title": "Boruto: Naruto Next Generations",
+      "tested_episode": "Ep 1",
+      "stream_verified": true,
+      "is_runner_challenge": false,
+      "diagnostic_note": "Playback validated: 4 streams discovered (CDN > 1080p, CDN > 720p, CDN > 480p). CDN delivery confirmed (HTTP 206).",
       "uptime_30d_pct": 100.0,
       "history": [
-        {
-          "date": "2026-10-03",
-          "status": "operational",
-          "uptime_pct": 100.0,
-          "incidents": 0
-        },
-        {
-          "date": "2026-10-04",
-          "status": "operational",
-          "uptime_pct": 100.0,
-          "incidents": 0
-        },
         {
           "date": "2026-10-05",
           "status": "operational",
@@ -985,6 +1028,18 @@
         },
         {
           "date": "2026-11-01",
+          "status": "operational",
+          "uptime_pct": 100.0,
+          "incidents": 0
+        },
+        {
+          "date": "2026-11-02",
+          "status": "operational",
+          "uptime_pct": 100.0,
+          "incidents": 0
+        },
+        {
+          "date": "2026-11-03",
           "status": "operational",
           "uptime_pct": 100.0,
           "incidents": 0

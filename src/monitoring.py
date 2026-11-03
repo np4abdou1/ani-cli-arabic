@@ -308,12 +308,13 @@ class MonitoringSystem:
             return
         self._initialized = True
         self.user_fingerprint = self._generate_fingerprint()
+        self._heartbeat_started = False
 
     def _generate_fingerprint(self) -> str:
         return get_hardware_fingerprint()
 
     def _send_payload(self, payload: dict):
-        """Asynchronously dispatches launch event to the operational analytics endpoints."""
+        """Asynchronously dispatches telemetry/heartbeat event to the operational analytics endpoints."""
         if is_dev_environment():
             return
 
@@ -335,7 +336,7 @@ class MonitoringSystem:
                 for endpoint in ANALYTICS_ENDPOINTS:
                     try:
                         req = urllib.request.Request(endpoint, data=data, headers=headers, method="POST")
-                        with urllib.request.urlopen(req, timeout=2.0) as resp:
+                        with urllib.request.urlopen(req, timeout=2.5) as resp:
                             if resp.status in (200, 201, 202, 204):
                                 return
                     except Exception:
@@ -352,7 +353,10 @@ class MonitoringSystem:
             self.track_app_start()
 
     def track_app_start(self):
-        """Sends anonymous 'launch' event for user session identification."""
+        """
+        Sends anonymous 'launch' event for user session identification,
+        and initializes background live active presence heartbeat.
+        """
         os_info = get_os_info()
         payload = {
             "event_type": "launch",
@@ -366,6 +370,36 @@ class MonitoringSystem:
             "created_at": datetime.now(timezone.utc).isoformat()
         }
         self._send_payload(payload)
+        self.start_live_heartbeat()
+
+    def start_live_heartbeat(self):
+        """
+        Maintains live active presence in a lightweight background daemon thread.
+        Pulses an active ping every 180 seconds.
+        When the application terminates or closes, this thread terminates instantly
+        and transmits nothing (zero exit delay). The backend edge KV clears the session.
+        """
+        if self._heartbeat_started or is_dev_environment():
+            return
+        self._heartbeat_started = True
+
+        def _heartbeat_loop():
+            import time
+            while True:
+                time.sleep(180)
+                try:
+                    pulse_payload = {
+                        "event_type": "heartbeat",
+                        "fingerprint": self.user_fingerprint,
+                        "client_version": APP_VERSION,
+                        "created_at": datetime.now(timezone.utc).isoformat()
+                    }
+                    self._send_payload(pulse_payload)
+                except Exception:
+                    pass
+
+        t = threading.Thread(target=_heartbeat_loop, daemon=True, name="AniCliLiveHeartbeat")
+        t.start()
 
     def track_video_play(self, *args, **kwargs):
         """No-op: Video playback tracking has been removed for user privacy."""
