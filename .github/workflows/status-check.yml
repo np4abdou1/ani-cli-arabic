@@ -46,5 +46,5 @@ jobs:
           # Keep only status.json on this branch
           cp /tmp/status.json status.json
           git add status.json
-          git commit -m "status: update live provider telemetry" --amend -m "status: update live provider telemetry" 2>/dev/null || git commit -m "status: update live provider telemetry"
+          git commit -m "status: update data" --amend -m "status: update data" 2>/dev/null || git commit -m "status: update data"
           git push -f origin status-data

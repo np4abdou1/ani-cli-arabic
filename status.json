@@ -2,7 +2,7 @@
   "status": "operational",
   "status_headline": "All Systems Operational",
   "status_description": "All streaming, search, and CDN video delivery pipelines are responding with optimal latency.",
-  "last_updated": "2026-11-03T20:06:36.802885+00:00",
+  "last_updated": "2026-11-04T20:17:41.243612+00:00",
   "check_interval_seconds": 1800,
   "providers_count": 5,
   "providers": [
@@ -14,10 +14,10 @@
       "status": "operational",
       "status_label": "Operational",
       "message": "Operational",
-      "search_latency_ms": 1098,
-      "stream_latency_ms": 2133,
-      "cdn_latency_ms": 411,
-      "total_latency_ms": 3642,
+      "search_latency_ms": 1682,
+      "stream_latency_ms": 2103,
+      "cdn_latency_ms": 546,
+      "total_latency_ms": 4331,
       "results_count": 12,
       "servers_count": 3,
       "qualities": [
@@ -33,12 +33,6 @@
       "uptime_30d_pct": 100.0,
       "history": [
         {
-          "date": "2026-10-05",
-          "status": "operational",
-          "uptime_pct": 100.0,
-          "incidents": 0
-        },
-        {
           "date": "2026-10-06",
           "status": "operational",
           "uptime_pct": 100.0,
@@ -208,6 +202,12 @@
         },
         {
           "date": "2026-11-03",
+          "status": "operational",
+          "uptime_pct": 100.0,
+          "incidents": 0
+        },
+        {
+          "date": "2026-11-04",
           "status": "operational",
           "uptime_pct": 100.0,
           "incidents": 0
@@ -222,10 +222,10 @@
       "status": "operational",
       "status_label": "Operational",
       "message": "Operational",
-      "search_latency_ms": 273,
-      "stream_latency_ms": 653,
-      "cdn_latency_ms": 420,
-      "total_latency_ms": 1346,
+      "search_latency_ms": 7542,
+      "stream_latency_ms": 5455,
+      "cdn_latency_ms": 6489,
+      "total_latency_ms": 19486,
       "results_count": 28,
       "servers_count": 1,
       "qualities": [
@@ -238,12 +238,6 @@
       "diagnostic_note": "Playback validated: 1 streams discovered (Auto). CDN delivery confirmed (HTTP 200).",
       "uptime_30d_pct": 100.0,
       "history": [
-        {
-          "date": "2026-10-05",
-          "status": "operational",
-          "uptime_pct": 100.0,
-          "incidents": 0
-        },
         {
           "date": "2026-10-06",
           "status": "operational",
@@ -417,6 +411,12 @@
           "status": "operational",
           "uptime_pct": 100.0,
           "incidents": 0
+        },
+        {
+          "date": "2026-11-04",
+          "status": "operational",
+          "uptime_pct": 100.0,
+          "incidents": 0
         }
       ]
     },
@@ -428,10 +428,10 @@
       "status": "operational",
       "status_label": "Operational",
       "message": "Operational",
-      "search_latency_ms": 444,
-      "stream_latency_ms": 1329,
-      "cdn_latency_ms": 380,
-      "total_latency_ms": 2153,
+      "search_latency_ms": 1843,
+      "stream_latency_ms": 6185,
+      "cdn_latency_ms": 1296,
+      "total_latency_ms": 9324,
       "results_count": 10,
       "servers_count": 3,
       "qualities": [
@@ -447,12 +447,6 @@
       "uptime_30d_pct": 100.0,
       "history": [
         {
-          "date": "2026-10-05",
-          "status": "operational",
-          "uptime_pct": 100.0,
-          "incidents": 0
-        },
-        {
           "date": "2026-10-06",
           "status": "operational",
           "uptime_pct": 100.0,
@@ -625,6 +619,12 @@
           "status": "operational",
           "uptime_pct": 100.0,
           "incidents": 0
+        },
+        {
+          "date": "2026-11-04",
+          "status": "operational",
+          "uptime_pct": 100.0,
+          "incidents": 0
         }
       ]
     },
@@ -636,10 +636,10 @@
       "status": "operational",
       "status_label": "Operational",
       "message": "Operational",
-      "search_latency_ms": 421,
-      "stream_latency_ms": 4000,
-      "cdn_latency_ms": 354,
-      "total_latency_ms": 4775,
+      "search_latency_ms": 1156,
+      "stream_latency_ms": 3903,
+      "cdn_latency_ms": 432,
+      "total_latency_ms": 5491,
       "results_count": 2,
       "servers_count": 4,
       "qualities": [
@@ -656,12 +656,6 @@
       "uptime_30d_pct": 100.0,
       "history": [
         {
-          "date": "2026-10-05",
-          "status": "operational",
-          "uptime_pct": 100.0,
-          "incidents": 0
-        },
-        {
           "date": "2026-10-06",
           "status": "operational",
           "uptime_pct": 100.0,
@@ -831,6 +825,12 @@
         },
         {
           "date": "2026-11-03",
+          "status": "operational",
+          "uptime_pct": 100.0,
+          "incidents": 0
+        },
+        {
+          "date": "2026-11-04",
           "status": "operational",
           "uptime_pct": 100.0,
           "incidents": 0
@@ -845,10 +845,10 @@
       "status": "operational",
       "status_label": "Operational",
       "message": "Operational",
-      "search_latency_ms": 302,
-      "stream_latency_ms": 5836,
-      "cdn_latency_ms": 651,
-      "total_latency_ms": 6789,
+      "search_latency_ms": 384,
+      "stream_latency_ms": 10151,
+      "cdn_latency_ms": 3444,
+      "total_latency_ms": 13979,
       "results_count": 19,
       "servers_count": 4,
       "qualities": [
@@ -859,17 +859,11 @@
       ],
       "tested_title": "Boruto: Naruto Next Generations",
       "tested_episode": "Ep 1",
-      "stream_verified": true,
+      "stream_verified": false,
       "is_runner_challenge": false,
-      "diagnostic_note": "Playback validated: 4 streams discovered (CDN > 1080p, CDN > 720p, CDN > 480p). CDN delivery confirmed (HTTP 206).",
+      "diagnostic_note": "Extracted 4 streams. CDN probe note: <urlopen error [SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: certi",
       "uptime_30d_pct": 100.0,
       "history": [
-        {
-          "date": "2026-10-05",
-          "status": "operational",
-          "uptime_pct": 100.0,
-          "incidents": 0
-        },
         {
           "date": "2026-10-06",
           "status": "operational",
@@ -1040,6 +1034,12 @@
         },
         {
           "date": "2026-11-03",
+          "status": "operational",
+          "uptime_pct": 100.0,
+          "incidents": 0
+        },
+        {
+          "date": "2026-11-04",
           "status": "operational",
           "uptime_pct": 100.0,
           "incidents": 0
