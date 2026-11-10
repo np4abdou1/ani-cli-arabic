@@ -208,12 +208,13 @@ def update_pip(latest_ver: str, interactive: bool = False) -> bool:
 
                 res = subprocess.run(cmd, capture_output=True, text=True)
 
-                # Handle PEP 668 (externally-managed-environment)
+                # Handle PEP 668 (externally-managed-environment on Arch/Debian/Ubuntu)
                 if res.returncode != 0 and "externally-managed-environment" in res.stderr:
-                    console.print("[dim]System-managed Python environment detected; retrying with override...[/dim]")
-                    if "--user" in cmd:
-                        cmd.remove("--user")
-                    cmd.append("--break-system-packages")
+                    console.print("[dim]System-managed Python environment detected; retrying with user override...[/dim]")
+                    if "--user" not in cmd and not is_venv:
+                        cmd.append("--user")
+                    if "--break-system-packages" not in cmd:
+                        cmd.append("--break-system-packages")
                     res = subprocess.run(cmd, capture_output=True, text=True)
 
                 if res.returncode == 0:
