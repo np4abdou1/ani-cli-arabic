@@ -2059,6 +2059,7 @@ class UIManager:
                 ("Download Directory", [], "download_directory"),
             ]),
             ("System", [
+                ("Auto Updates", [True, False], "auto_update"),
                 ("Discord Rich Presence", [True, False], "discord_rpc"),
                 ("Debug Logging", [False, True], "debug_logging"),
             ])

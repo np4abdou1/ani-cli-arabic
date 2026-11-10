@@ -24,6 +24,7 @@ class SettingsManager:
             "player": "mpv",
             "auto_next": False,
             "discord_rpc": True,
+            "auto_update": True,
             "show_donation": True,
             "theme": "auto",
             "anime_provider": "anime3rb",

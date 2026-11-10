@@ -89,6 +89,7 @@ class AniCliArApp:
         parser.add_argument('-d', '--debug', action='store_true', help="Enable verbose debug logging to file and console")
         parser.add_argument('-v', '--version', action='store_true', help="Show version information")
         parser.add_argument('-u', '--update', action='store_true', help="Check for and install updates")
+        parser.add_argument('--no-update', action='store_true', help="Skip automatic startup update check")
         parser.add_argument('query', nargs='*', help="Anime name to search for")
         
         args = parser.parse_args()
@@ -110,8 +111,18 @@ class AniCliArApp:
 
         if args.update:
             from .updater import check_for_updates
-            check_for_updates(auto_update=True, interactive=True)
+            check_for_updates(auto_update=True, interactive=True, force=True)
             sys.exit(0)
+
+        # Forced automatic update check on launch
+        if not getattr(args, "no_update", False) and self.settings.get("auto_update", True):
+            try:
+                from .updater import perform_auto_update, restart_application
+                if perform_auto_update():
+                    restart_application()
+                    return
+            except Exception as e:
+                logger.debug("UPDATER", f"Auto-update check bypassed: {e}")
             
         self.force_cli = args.interactive
         initial_query = " ".join(args.query) if args.query else None

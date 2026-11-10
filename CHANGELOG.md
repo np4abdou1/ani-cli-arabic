@@ -6,6 +6,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.1.4] - 2026-11-10
+
+### Added
+- **Automatic Startup Updater**: Seamless automatic update checks on launch that immediately fetch and apply package updates across pip, AUR, Homebrew, pipx, and standalone binaries before restarting into the new version.
+- **Configurable Auto-Update Settings**: Added an Auto Updates toggle under Settings > System (`"auto_update": true`), and added `--no-update` startup flag to skip checks when needed.
+
+---
+
 ## [2.1.3] - 2026-11-10
 
 ### Changed
