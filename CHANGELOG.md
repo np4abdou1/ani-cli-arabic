@@ -6,6 +6,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.1.3] - 2026-11-10
+
+### Changed
+- **Counted Daily Active Community Metric**: Upgraded live community indicators across web and operational analytics from a volatile 5-minute sliding window to verified counted daily active users (`active today`), tracked directly via distinct anonymous machine sessions.
+
+---
+
 ## [2.1.2] - 2026-11-03
 
 ### Added
