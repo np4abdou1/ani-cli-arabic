@@ -1,0 +1,1045 @@
+{
+  "status": "operational",
+  "status_headline": "All Systems Operational",
+  "status_description": "All streaming, search, and CDN video delivery pipelines are responding with optimal latency.",
+  "last_updated": "2026-11-14T13:49:20.039144+00:00",
+  "check_interval_seconds": 1800,
+  "providers_count": 5,
+  "providers": [
+    {
+      "id": "anime3rb",
+      "name": "Anime3rb",
+      "category": "Anime",
+      "language": "Arabic (Sub)",
+      "status": "operational",
+      "status_label": "Operational",
+      "message": "Operational",
+      "search_latency_ms": 1682,
+      "stream_latency_ms": 2103,
+      "cdn_latency_ms": 546,
+      "total_latency_ms": 4331,
+      "results_count": 12,
+      "servers_count": 3,
+      "qualities": [
+        "1080p (1080p)",
+        "720p (720p)",
+        "480p (480p)"
+      ],
+      "tested_title": "Naruto",
+      "tested_episode": "Ep 1",
+      "stream_verified": true,
+      "is_runner_challenge": true,
+      "diagnostic_note": "Playback validated: 3 streams available (1080p (1080p), 720p (720p)). Residential & mobile connectivity confirmed.",
+      "uptime_30d_pct": 100.0,
+      "history": [
+        {
+          "date": "2026-10-07",
+          "status": "operational",
+          "uptime_pct": 100.0,
+          "incidents": 0
+        },
+        {
+          "date": "2026-10-08",
+          "status": "operational",
+          "uptime_pct": 100.0,
+          "incidents": 0
+        },
+        {
+          "date": "2026-10-09",
+          "status": "operational",
+          "uptime_pct": 100.0,
+          "incidents": 0
+        },
+        {
+          "date": "2026-10-10",
+          "status": "operational",
+          "uptime_pct": 100.0,
+          "incidents": 0
+        },
+        {
+          "date": "2026-10-11",
+          "status": "operational",
+          "uptime_pct": 100.0,
+          "incidents": 0
+        },
+        {
+          "date": "2026-10-12",
+          "status": "operational",
+          "uptime_pct": 100.0,
+          "incidents": 0
+        },
+        {
+          "date": "2026-10-13",
+          "status": "operational",
+          "uptime_pct": 100.0,
+          "incidents": 0
+        },
+        {
+          "date": "2026-10-14",
+          "status": "operational",
+          "uptime_pct": 100.0,
+          "incidents": 0
+        },
+        {
+          "date": "2026-10-15",
+          "status": "operational",
+          "uptime_pct": 100.0,
+          "incidents": 0
+        },
+        {
+          "date": "2026-10-16",
+          "status": "operational",
+          "uptime_pct": 100.0,
+          "incidents": 0
+        },
+        {
+          "date": "2026-10-17",
+          "status": "operational",
+          "uptime_pct": 100.0,
+          "incidents": 0
+        },
+        {
+          "date": "2026-10-18",
+          "status": "operational",
+          "uptime_pct": 100.0,
+          "incidents": 0
+        },
+        {
+          "date": "2026-10-19",
+          "status": "operational",
+          "uptime_pct": 100.0,
+          "incidents": 0
+        },
+        {
+          "date": "2026-10-20",
+          "status": "operational",
+          "uptime_pct": 100.0,
+          "incidents": 0
+        },
+        {
+          "date": "2026-10-21",
+          "status": "operational",
+          "uptime_pct": 100.0,
+          "incidents": 0
+        },
+        {
+          "date": "2026-10-22",
+          "status": "operational",
+          "uptime_pct": 100.0,
+          "incidents": 0
+        },
+        {
+          "date": "2026-10-23",
+          "status": "operational",
+          "uptime_pct": 100.0,
+          "incidents": 0
+        },
+        {
+          "date": "2026-10-24",
+          "status": "operational",
+          "uptime_pct": 100.0,
+          "incidents": 0
+        },
+        {
+          "date": "2026-10-25",
+          "status": "operational",
+          "uptime_pct": 100.0,
+          "incidents": 0
+        },
+        {
+          "date": "2026-10-26",
+          "status": "operational",
+          "uptime_pct": 100.0,
+          "incidents": 0
+        },
+        {
+          "date": "2026-10-27",
+          "status": "operational",
+          "uptime_pct": 100.0,
+          "incidents": 0
+        },
+        {
+          "date": "2026-10-28",
+          "status": "operational",
+          "uptime_pct": 100.0,
+          "incidents": 0
+        },
+        {
+          "date": "2026-10-29",
+          "status": "operational",
+          "uptime_pct": 100.0,
+          "incidents": 0
+        },
+        {
+          "date": "2026-10-30",
+          "status": "operational",
+          "uptime_pct": 100.0,
+          "incidents": 0
+        },
+        {
+          "date": "2026-10-31",
+          "status": "operational",
+          "uptime_pct": 100.0,
+          "incidents": 0
+        },
+        {
+          "date": "2026-11-01",
+          "status": "operational",
+          "uptime_pct": 100.0,
+          "incidents": 0
+        },
+        {
+          "date": "2026-11-02",
+          "status": "operational",
+          "uptime_pct": 100.0,
+          "incidents": 0
+        },
+        {
+          "date": "2026-11-03",
+          "status": "operational",
+          "uptime_pct": 100.0,
+          "incidents": 0
+        },
+        {
+          "date": "2026-11-04",
+          "status": "operational",
+          "uptime_pct": 100.0,
+          "incidents": 0
+        },
+        {
+          "date": "2026-11-14",
+          "status": "operational",
+          "uptime_pct": 100.0,
+          "incidents": 0
+        }
+      ]
+    },
+    {
+      "id": "hianime",
+      "name": "HiAnime",
+      "category": "Anime",
+      "language": "English (Sub/Dub)",
+      "status": "operational",
+      "status_label": "Operational",
+      "message": "Operational",
+      "search_latency_ms": 295,
+      "stream_latency_ms": 706,
+      "cdn_latency_ms": 327,
+      "total_latency_ms": 1328,
+      "results_count": 28,
+      "servers_count": 1,
+      "qualities": [
+        "Auto"
+      ],
+      "tested_title": "Naruto",
+      "tested_episode": "Ep 1",
+      "stream_verified": true,
+      "is_runner_challenge": false,
+      "diagnostic_note": "Playback validated: 1 streams discovered (Auto). CDN delivery confirmed (HTTP 200).",
+      "uptime_30d_pct": 100.0,
+      "history": [
+        {
+          "date": "2026-10-07",
+          "status": "operational",
+          "uptime_pct": 100.0,
+          "incidents": 0
+        },
+        {
+          "date": "2026-10-08",
+          "status": "operational",
+          "uptime_pct": 100.0,
+          "incidents": 0
+        },
+        {
+          "date": "2026-10-09",
+          "status": "operational",
+          "uptime_pct": 100.0,
+          "incidents": 0
+        },
+        {
+          "date": "2026-10-10",
+          "status": "operational",
+          "uptime_pct": 100.0,
+          "incidents": 0
+        },
+        {
+          "date": "2026-10-11",
+          "status": "operational",
+          "uptime_pct": 100.0,
+          "incidents": 0
+        },
+        {
+          "date": "2026-10-12",
+          "status": "operational",
+          "uptime_pct": 100.0,
+          "incidents": 0
+        },
+        {
+          "date": "2026-10-13",
+          "status": "operational",
+          "uptime_pct": 100.0,
+          "incidents": 0
+        },
+        {
+          "date": "2026-10-14",
+          "status": "operational",
+          "uptime_pct": 100.0,
+          "incidents": 0
+        },
+        {
+          "date": "2026-10-15",
+          "status": "operational",
+          "uptime_pct": 100.0,
+          "incidents": 0
+        },
+        {
+          "date": "2026-10-16",
+          "status": "operational",
+          "uptime_pct": 100.0,
+          "incidents": 0
+        },
+        {
+          "date": "2026-10-17",
+          "status": "operational",
+          "uptime_pct": 100.0,
+          "incidents": 0
+        },
+        {
+          "date": "2026-10-18",
+          "status": "operational",
+          "uptime_pct": 100.0,
+          "incidents": 0
+        },
+        {
+          "date": "2026-10-19",
+          "status": "operational",
+          "uptime_pct": 100.0,
+          "incidents": 0
+        },
+        {
+          "date": "2026-10-20",
+          "status": "operational",
+          "uptime_pct": 100.0,
+          "incidents": 0
+        },
+        {
+          "date": "2026-10-21",
+          "status": "operational",
+          "uptime_pct": 100.0,
+          "incidents": 0
+        },
+        {
+          "date": "2026-10-22",
+          "status": "operational",
+          "uptime_pct": 100.0,
+          "incidents": 0
+        },
+        {
+          "date": "2026-10-23",
+          "status": "operational",
+          "uptime_pct": 100.0,
+          "incidents": 0
+        },
+        {
+          "date": "2026-10-24",
+          "status": "operational",
+          "uptime_pct": 100.0,
+          "incidents": 0
+        },
+        {
+          "date": "2026-10-25",
+          "status": "operational",
+          "uptime_pct": 100.0,
+          "incidents": 0
+        },
+        {
+          "date": "2026-10-26",
+          "status": "operational",
+          "uptime_pct": 100.0,
+          "incidents": 0
+        },
+        {
+          "date": "2026-10-27",
+          "status": "operational",
+          "uptime_pct": 100.0,
+          "incidents": 0
+        },
+        {
+          "date": "2026-10-28",
+          "status": "operational",
+          "uptime_pct": 100.0,
+          "incidents": 0
+        },
+        {
+          "date": "2026-10-29",
+          "status": "operational",
+          "uptime_pct": 100.0,
+          "incidents": 0
+        },
+        {
+          "date": "2026-10-30",
+          "status": "operational",
+          "uptime_pct": 100.0,
+          "incidents": 0
+        },
+        {
+          "date": "2026-10-31",
+          "status": "operational",
+          "uptime_pct": 100.0,
+          "incidents": 0
+        },
+        {
+          "date": "2026-11-01",
+          "status": "operational",
+          "uptime_pct": 100.0,
+          "incidents": 0
+        },
+        {
+          "date": "2026-11-02",
+          "status": "operational",
+          "uptime_pct": 100.0,
+          "incidents": 0
+        },
+        {
+          "date": "2026-11-03",
+          "status": "operational",
+          "uptime_pct": 100.0,
+          "incidents": 0
+        },
+        {
+          "date": "2026-11-04",
+          "status": "operational",
+          "uptime_pct": 100.0,
+          "incidents": 0
+        },
+        {
+          "date": "2026-11-14",
+          "status": "operational",
+          "uptime_pct": 100.0,
+          "incidents": 0
+        }
+      ]
+    },
+    {
+      "id": "stardima",
+      "name": "Stardima Anime",
+      "category": "Dubbed Anime",
+      "language": "Arabic (Dub)",
+      "status": "operational",
+      "status_label": "Operational",
+      "message": "Operational",
+      "search_latency_ms": 1113,
+      "stream_latency_ms": 1025,
+      "cdn_latency_ms": 416,
+      "total_latency_ms": 2554,
+      "results_count": 10,
+      "servers_count": 1,
+      "qualities": [
+        "480p • Backup"
+      ],
+      "tested_title": "NARUTO Spin-Off: Rock Lee & His Ninja Pals",
+      "tested_episode": "Ep 1",
+      "stream_verified": true,
+      "is_runner_challenge": false,
+      "diagnostic_note": "Playback validated: 1 streams discovered (480p • Backup). CDN delivery confirmed (HTTP 206).",
+      "uptime_30d_pct": 100.0,
+      "history": [
+        {
+          "date": "2026-10-07",
+          "status": "operational",
+          "uptime_pct": 100.0,
+          "incidents": 0
+        },
+        {
+          "date": "2026-10-08",
+          "status": "operational",
+          "uptime_pct": 100.0,
+          "incidents": 0
+        },
+        {
+          "date": "2026-10-09",
+          "status": "operational",
+          "uptime_pct": 100.0,
+          "incidents": 0
+        },
+        {
+          "date": "2026-10-10",
+          "status": "operational",
+          "uptime_pct": 100.0,
+          "incidents": 0
+        },
+        {
+          "date": "2026-10-11",
+          "status": "operational",
+          "uptime_pct": 100.0,
+          "incidents": 0
+        },
+        {
+          "date": "2026-10-12",
+          "status": "operational",
+          "uptime_pct": 100.0,
+          "incidents": 0
+        },
+        {
+          "date": "2026-10-13",
+          "status": "operational",
+          "uptime_pct": 100.0,
+          "incidents": 0
+        },
+        {
+          "date": "2026-10-14",
+          "status": "operational",
+          "uptime_pct": 100.0,
+          "incidents": 0
+        },
+        {
+          "date": "2026-10-15",
+          "status": "operational",
+          "uptime_pct": 100.0,
+          "incidents": 0
+        },
+        {
+          "date": "2026-10-16",
+          "status": "operational",
+          "uptime_pct": 100.0,
+          "incidents": 0
+        },
+        {
+          "date": "2026-10-17",
+          "status": "operational",
+          "uptime_pct": 100.0,
+          "incidents": 0
+        },
+        {
+          "date": "2026-10-18",
+          "status": "operational",
+          "uptime_pct": 100.0,
+          "incidents": 0
+        },
+        {
+          "date": "2026-10-19",
+          "status": "operational",
+          "uptime_pct": 100.0,
+          "incidents": 0
+        },
+        {
+          "date": "2026-10-20",
+          "status": "operational",
+          "uptime_pct": 100.0,
+          "incidents": 0
+        },
+        {
+          "date": "2026-10-21",
+          "status": "operational",
+          "uptime_pct": 100.0,
+          "incidents": 0
+        },
+        {
+          "date": "2026-10-22",
+          "status": "operational",
+          "uptime_pct": 100.0,
+          "incidents": 0
+        },
+        {
+          "date": "2026-10-23",
+          "status": "operational",
+          "uptime_pct": 100.0,
+          "incidents": 0
+        },
+        {
+          "date": "2026-10-24",
+          "status": "operational",
+          "uptime_pct": 100.0,
+          "incidents": 0
+        },
+        {
+          "date": "2026-10-25",
+          "status": "operational",
+          "uptime_pct": 100.0,
+          "incidents": 0
+        },
+        {
+          "date": "2026-10-26",
+          "status": "operational",
+          "uptime_pct": 100.0,
+          "incidents": 0
+        },
+        {
+          "date": "2026-10-27",
+          "status": "operational",
+          "uptime_pct": 100.0,
+          "incidents": 0
+        },
+        {
+          "date": "2026-10-28",
+          "status": "operational",
+          "uptime_pct": 100.0,
+          "incidents": 0
+        },
+        {
+          "date": "2026-10-29",
+          "status": "operational",
+          "uptime_pct": 100.0,
+          "incidents": 0
+        },
+        {
+          "date": "2026-10-30",
+          "status": "operational",
+          "uptime_pct": 100.0,
+          "incidents": 0
+        },
+        {
+          "date": "2026-10-31",
+          "status": "operational",
+          "uptime_pct": 100.0,
+          "incidents": 0
+        },
+        {
+          "date": "2026-11-01",
+          "status": "operational",
+          "uptime_pct": 100.0,
+          "incidents": 0
+        },
+        {
+          "date": "2026-11-02",
+          "status": "operational",
+          "uptime_pct": 100.0,
+          "incidents": 0
+        },
+        {
+          "date": "2026-11-03",
+          "status": "operational",
+          "uptime_pct": 100.0,
+          "incidents": 0
+        },
+        {
+          "date": "2026-11-04",
+          "status": "operational",
+          "uptime_pct": 100.0,
+          "incidents": 0
+        },
+        {
+          "date": "2026-11-14",
+          "status": "operational",
+          "uptime_pct": 100.0,
+          "incidents": 0
+        }
+      ]
+    },
+    {
+      "id": "stardima_kids",
+      "name": "Stardima Kids",
+      "category": "Cartoons & Kids",
+      "language": "Arabic (Dub)",
+      "status": "operational",
+      "status_label": "Operational",
+      "message": "Operational",
+      "search_latency_ms": 363,
+      "stream_latency_ms": 975,
+      "cdn_latency_ms": 400,
+      "total_latency_ms": 1738,
+      "results_count": 2,
+      "servers_count": 1,
+      "qualities": [
+        "720p • Backup"
+      ],
+      "tested_title": "Looney Tunes Cartoons",
+      "tested_episode": "Ep 1",
+      "stream_verified": true,
+      "is_runner_challenge": false,
+      "diagnostic_note": "Playback validated: 1 streams discovered (720p • Backup). CDN delivery confirmed (HTTP 206).",
+      "uptime_30d_pct": 100.0,
+      "history": [
+        {
+          "date": "2026-10-07",
+          "status": "operational",
+          "uptime_pct": 100.0,
+          "incidents": 0
+        },
+        {
+          "date": "2026-10-08",
+          "status": "operational",
+          "uptime_pct": 100.0,
+          "incidents": 0
+        },
+        {
+          "date": "2026-10-09",
+          "status": "operational",
+          "uptime_pct": 100.0,
+          "incidents": 0
+        },
+        {
+          "date": "2026-10-10",
+          "status": "operational",
+          "uptime_pct": 100.0,
+          "incidents": 0
+        },
+        {
+          "date": "2026-10-11",
+          "status": "operational",
+          "uptime_pct": 100.0,
+          "incidents": 0
+        },
+        {
+          "date": "2026-10-12",
+          "status": "operational",
+          "uptime_pct": 100.0,
+          "incidents": 0
+        },
+        {
+          "date": "2026-10-13",
+          "status": "operational",
+          "uptime_pct": 100.0,
+          "incidents": 0
+        },
+        {
+          "date": "2026-10-14",
+          "status": "operational",
+          "uptime_pct": 100.0,
+          "incidents": 0
+        },
+        {
+          "date": "2026-10-15",
+          "status": "operational",
+          "uptime_pct": 100.0,
+          "incidents": 0
+        },
+        {
+          "date": "2026-10-16",
+          "status": "operational",
+          "uptime_pct": 100.0,
+          "incidents": 0
+        },
+        {
+          "date": "2026-10-17",
+          "status": "operational",
+          "uptime_pct": 100.0,
+          "incidents": 0
+        },
+        {
+          "date": "2026-10-18",
+          "status": "operational",
+          "uptime_pct": 100.0,
+          "incidents": 0
+        },
+        {
+          "date": "2026-10-19",
+          "status": "operational",
+          "uptime_pct": 100.0,
+          "incidents": 0
+        },
+        {
+          "date": "2026-10-20",
+          "status": "operational",
+          "uptime_pct": 100.0,
+          "incidents": 0
+        },
+        {
+          "date": "2026-10-21",
+          "status": "operational",
+          "uptime_pct": 100.0,
+          "incidents": 0
+        },
+        {
+          "date": "2026-10-22",
+          "status": "operational",
+          "uptime_pct": 100.0,
+          "incidents": 0
+        },
+        {
+          "date": "2026-10-23",
+          "status": "operational",
+          "uptime_pct": 100.0,
+          "incidents": 0
+        },
+        {
+          "date": "2026-10-24",
+          "status": "operational",
+          "uptime_pct": 100.0,
+          "incidents": 0
+        },
+        {
+          "date": "2026-10-25",
+          "status": "operational",
+          "uptime_pct": 100.0,
+          "incidents": 0
+        },
+        {
+          "date": "2026-10-26",
+          "status": "operational",
+          "uptime_pct": 100.0,
+          "incidents": 0
+        },
+        {
+          "date": "2026-10-27",
+          "status": "operational",
+          "uptime_pct": 100.0,
+          "incidents": 0
+        },
+        {
+          "date": "2026-10-28",
+          "status": "operational",
+          "uptime_pct": 100.0,
+          "incidents": 0
+        },
+        {
+          "date": "2026-10-29",
+          "status": "operational",
+          "uptime_pct": 100.0,
+          "incidents": 0
+        },
+        {
+          "date": "2026-10-30",
+          "status": "operational",
+          "uptime_pct": 100.0,
+          "incidents": 0
+        },
+        {
+          "date": "2026-10-31",
+          "status": "operational",
+          "uptime_pct": 100.0,
+          "incidents": 0
+        },
+        {
+          "date": "2026-11-01",
+          "status": "operational",
+          "uptime_pct": 100.0,
+          "incidents": 0
+        },
+        {
+          "date": "2026-11-02",
+          "status": "operational",
+          "uptime_pct": 100.0,
+          "incidents": 0
+        },
+        {
+          "date": "2026-11-03",
+          "status": "operational",
+          "uptime_pct": 100.0,
+          "incidents": 0
+        },
+        {
+          "date": "2026-11-04",
+          "status": "operational",
+          "uptime_pct": 100.0,
+          "incidents": 0
+        },
+        {
+          "date": "2026-11-14",
+          "status": "operational",
+          "uptime_pct": 100.0,
+          "incidents": 0
+        }
+      ]
+    },
+    {
+      "id": "anime_slayer",
+      "name": "Anime Slayer",
+      "category": "Anime",
+      "language": "Arabic (Sub)",
+      "status": "operational",
+      "status_label": "Operational",
+      "message": "Operational",
+      "search_latency_ms": 384,
+      "stream_latency_ms": 10151,
+      "cdn_latency_ms": 3444,
+      "total_latency_ms": 13979,
+      "results_count": 19,
+      "servers_count": 4,
+      "qualities": [
+        "CDN > 1080p",
+        "CDN > 720p",
+        "CDN > 480p",
+        "OK.ru > 720p"
+      ],
+      "tested_title": "Boruto: Naruto Next Generations",
+      "tested_episode": "Ep 1",
+      "stream_verified": false,
+      "is_runner_challenge": true,
+      "diagnostic_note": "Playback validated: 4 streams available (CDN > 1080p, CDN > 720p). Residential & mobile connectivity confirmed.",
+      "uptime_30d_pct": 100.0,
+      "history": [
+        {
+          "date": "2026-10-07",
+          "status": "operational",
+          "uptime_pct": 100.0,
+          "incidents": 0
+        },
+        {
+          "date": "2026-10-08",
+          "status": "operational",
+          "uptime_pct": 100.0,
+          "incidents": 0
+        },
+        {
+          "date": "2026-10-09",
+          "status": "operational",
+          "uptime_pct": 100.0,
+          "incidents": 0
+        },
+        {
+          "date": "2026-10-10",
+          "status": "operational",
+          "uptime_pct": 100.0,
+          "incidents": 0
+        },
+        {
+          "date": "2026-10-11",
+          "status": "operational",
+          "uptime_pct": 100.0,
+          "incidents": 0
+        },
+        {
+          "date": "2026-10-12",
+          "status": "operational",
+          "uptime_pct": 100.0,
+          "incidents": 0
+        },
+        {
+          "date": "2026-10-13",
+          "status": "operational",
+          "uptime_pct": 100.0,
+          "incidents": 0
+        },
+        {
+          "date": "2026-10-14",
+          "status": "operational",
+          "uptime_pct": 100.0,
+          "incidents": 0
+        },
+        {
+          "date": "2026-10-15",
+          "status": "operational",
+          "uptime_pct": 100.0,
+          "incidents": 0
+        },
+        {
+          "date": "2026-10-16",
+          "status": "operational",
+          "uptime_pct": 100.0,
+          "incidents": 0
+        },
+        {
+          "date": "2026-10-17",
+          "status": "operational",
+          "uptime_pct": 100.0,
+          "incidents": 0
+        },
+        {
+          "date": "2026-10-18",
+          "status": "operational",
+          "uptime_pct": 100.0,
+          "incidents": 0
+        },
+        {
+          "date": "2026-10-19",
+          "status": "operational",
+          "uptime_pct": 100.0,
+          "incidents": 0
+        },
+        {
+          "date": "2026-10-20",
+          "status": "operational",
+          "uptime_pct": 100.0,
+          "incidents": 0
+        },
+        {
+          "date": "2026-10-21",
+          "status": "operational",
+          "uptime_pct": 100.0,
+          "incidents": 0
+        },
+        {
+          "date": "2026-10-22",
+          "status": "operational",
+          "uptime_pct": 100.0,
+          "incidents": 0
+        },
+        {
+          "date": "2026-10-23",
+          "status": "operational",
+          "uptime_pct": 100.0,
+          "incidents": 0
+        },
+        {
+          "date": "2026-10-24",
+          "status": "operational",
+          "uptime_pct": 100.0,
+          "incidents": 0
+        },
+        {
+          "date": "2026-10-25",
+          "status": "operational",
+          "uptime_pct": 100.0,
+          "incidents": 0
+        },
+        {
+          "date": "2026-10-26",
+          "status": "operational",
+          "uptime_pct": 100.0,
+          "incidents": 0
+        },
+        {
+          "date": "2026-10-27",
+          "status": "operational",
+          "uptime_pct": 100.0,
+          "incidents": 0
+        },
+        {
+          "date": "2026-10-28",
+          "status": "operational",
+          "uptime_pct": 100.0,
+          "incidents": 0
+        },
+        {
+          "date": "2026-10-29",
+          "status": "operational",
+          "uptime_pct": 100.0,
+          "incidents": 0
+        },
+        {
+          "date": "2026-10-30",
+          "status": "operational",
+          "uptime_pct": 100.0,
+          "incidents": 0
+        },
+        {
+          "date": "2026-10-31",
+          "status": "operational",
+          "uptime_pct": 100.0,
+          "incidents": 0
+        },
+        {
+          "date": "2026-11-01",
+          "status": "operational",
+          "uptime_pct": 100.0,
+          "incidents": 0
+        },
+        {
+          "date": "2026-11-02",
+          "status": "operational",
+          "uptime_pct": 100.0,
+          "incidents": 0
+        },
+        {
+          "date": "2026-11-03",
+          "status": "operational",
+          "uptime_pct": 100.0,
+          "incidents": 0
+        },
+        {
+          "date": "2026-11-04",
+          "status": "operational",
+          "uptime_pct": 100.0,
+          "incidents": 0
+        },
+        {
+          "date": "2026-11-14",
+          "status": "operational",
+          "uptime_pct": 100.0,
+          "incidents": 0
+        }
+      ]
+    }
+  ]
+}
