@@ -6,6 +6,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.1.5] - 2026-11-18
+
+### Fixed
+- **Anime3rb Stream Performance**: Parallelized direct CDN stream resolution using multi-worker execution, dropping stream resolution latency from ~7–25s down to ~1.0s.
+- **Anime3rb 429 Resilience**: Added automated backoff and retry handling for Vid3rb player endpoint rate limits.
+- **Anime3rb Slug Sanitization & CDN Referers**: Fixed slug parsing for paths containing `titles/` or `episode/` and attached direct upstream Referer headers to eliminate 403 Forbidden streaming errors.
+
+---
+
 ## [2.1.4] - 2026-11-10
 
 ### Added
