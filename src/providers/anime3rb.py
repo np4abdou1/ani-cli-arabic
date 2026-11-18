@@ -34,7 +34,8 @@ class Anime3rbProvider(BaseAnimeProvider):
             return self.api.get_episode_streams(episode) or []
         anime_id = getattr(episode, 'anime_id', '')
         if not anime_id and getattr(episode, 'url', ''):
-            parts = [p for p in episode.url.strip('/').split('/') if p]
+            clean_url = episode.url.split('?')[0].strip('/')
+            parts = [p for p in clean_url.split('/') if p]
             if len(parts) >= 2 and parts[-2] != 'episode':
                 anime_id = parts[-2]
             elif len(parts) >= 1:

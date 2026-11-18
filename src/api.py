@@ -583,7 +583,8 @@ class AnimeAPI:
         """Extract all direct playable streaming links and resolutions for an episode."""
         anime_id = getattr(episode, 'anime_id', '')
         if not anime_id and getattr(episode, 'url', ''):
-            parts = [p for p in episode.url.strip('/').split('/') if p]
+            clean_url = episode.url.split('?')[0].strip('/')
+            parts = [p for p in clean_url.split('/') if p]
             if len(parts) >= 2 and parts[-2] != 'episode':
                 anime_id = parts[-2]
             elif len(parts) >= 1:
@@ -610,8 +611,10 @@ class AnimeAPI:
                 snap_data = json.loads(raw_snap)
                 data_dict = snap_data.get("data", {})
                 v_url = data_dict.get("video_url")
-                if v_url and "vid3rb" in v_url:
-                    return v_url
+                if v_url:
+                    v_url = str(v_url).replace('&amp;', '&').replace('\\/', '/')
+                    if "vid3rb" in v_url or "player" in v_url or "video" in v_url:
+                        return v_url
             except Exception:
                 pass
 
@@ -636,7 +639,7 @@ class AnimeAPI:
         # Tier 4: Search for any video_url in inline scripts or Livewire 2 wire:initial-data
         for m in re.finditer(r'["\']video_url["\']\s*:\s*["\'](https?://[^"\']+)["\']', html_text):
             candidate = m.group(1).replace('\\/', '/').replace('&amp;', '&')
-            if "vid3rb" in candidate:
+            if "vid3rb" in candidate or "player" in candidate or "video" in candidate:
                 return candidate
 
         return None
@@ -691,34 +694,29 @@ class AnimeAPI:
 
         return []
 
-    def _resolve_direct_stream_url(self, session, raw_url: str, player_url: str, max_retries: int = 10) -> str:
+    def _resolve_direct_stream_url(self, session, raw_url: str, player_url: str, max_retries: int = 2) -> str:
         """
-        Follows 302 redirects to obtain the direct CDN file URL while validating
-        target CDN host health via _cdn_health_manager. Ensures MPV never stalls
-        on dead or lagging CDN servers.
+        Follows 302 redirects to obtain the direct CDN file URL.
         """
         redir_headers = {
             "Referer": player_url or "https://video.vid3rb.com/",
             **DEFAULT_HEADERS
         }
-        best_candidate = raw_url
-
-        for _ in range(max_retries):
+        for attempt in range(max_retries):
             try:
-                session.cookies.clear()
                 r_redirect = session.get(raw_url, headers=redir_headers, allow_redirects=False, timeout=3.5)
                 if r_redirect.status_code in [301, 302, 307, 308]:
                     loc = r_redirect.headers.get("Location") or r_redirect.headers.get("location")
                     if loc:
-                        parsed = urlparse(loc)
-                        host = parsed.netloc.split(":")[0].strip()
-                        if _cdn_health_manager.is_host_healthy(host):
-                            return loc
-                        best_candidate = loc
+                        return loc
+                elif r_redirect.status_code == 429 and attempt + 1 < max_retries:
+                    time.sleep(0.5)
+                    continue
+                elif r_redirect.status_code == 200:
+                    return raw_url
             except Exception:
                 pass
-
-        return best_candidate
+        return raw_url
 
     @retry_with_backoff()
     def get_streaming_servers(self, anime_id: str, episode_num: str, anime_type: str = 'SERIES') -> Optional[Dict]:
@@ -726,7 +724,15 @@ class AnimeAPI:
         Extract direct CDN stream URLs and return mapped qualities.
         Returns a dict structured for full backward compatibility + direct URL support.
         """
-        slug = anime_id.strip().lstrip("/").replace("episode/", "").split("/")[0]
+        slug = str(anime_id).strip()
+        if "anime3rb.com" in slug:
+            slug = urlparse(slug).path
+        slug = slug.strip("/")
+        for prefix in ("titles/", "episode/"):
+            if slug.startswith(prefix):
+                slug = slug[len(prefix):]
+        slug = slug.split("/")[0].strip()
+
         ep_num = int(re.search(r"\d+", str(episode_num)).group(0)) if re.search(r"\d+", str(episode_num)) else 1
         ep_url = f"{BASE_URL}/episode/{slug}/{ep_num}"
 
@@ -734,7 +740,12 @@ class AnimeAPI:
         try:
             r = s.get(ep_url, headers=DEFAULT_HEADERS, timeout=6)
             if r.status_code != 200:
-                return None
+                if ep_num == 1:
+                    r_title = s.get(f"{BASE_URL}/titles/{slug}", headers=DEFAULT_HEADERS, timeout=6)
+                    if r_title.status_code == 200 and self._extract_player_url(r_title.text):
+                        r = r_title
+                if r.status_code != 200:
+                    return None
 
             player_url = self._extract_player_url(r.text)
             if not player_url:
@@ -745,6 +756,10 @@ class AnimeAPI:
                 **DEFAULT_HEADERS
             }
             r_player = s.get(player_url, headers=player_headers, timeout=6)
+            if r_player.status_code == 429:
+                time.sleep(0.6)
+                r_player = s.get(player_url, headers=player_headers, timeout=6)
+
             sources = []
             if r_player.status_code == 200:
                 sources = self._extract_player_sources(r_player.text)
@@ -766,6 +781,20 @@ class AnimeAPI:
             if not sources:
                 return None
 
+            valid_sources = [x for x in sources if isinstance(x, dict) and not x.get("premium", False) and x.get("src")]
+            if not valid_sources:
+                return None
+
+            from concurrent.futures import ThreadPoolExecutor
+
+            def _resolve_source_task(src_item: Dict[str, Any]):
+                raw_src = src_item.get("src", "")
+                resolved_url = self._resolve_direct_stream_url(s, raw_src, player_url)
+                return src_item, resolved_url
+
+            with ThreadPoolExecutor(max_workers=min(len(valid_sources), 4)) as executor:
+                resolved_sources = list(executor.map(_resolve_source_task, valid_sources))
+
             # Resolve direct CDN links with dynamic health verification
             server_dict = {
                 "CurrentEpisode": {},
@@ -773,16 +802,10 @@ class AnimeAPI:
                 "DirectStreams": {}
             }
 
-            for src_item in sources:
+            for src_item, direct_url in resolved_sources:
                 label = src_item.get("label", "Unknown")
                 res = str(src_item.get("res", ""))
                 is_premium = src_item.get("premium", False)
-                raw_src = src_item.get("src", "")
-
-                if is_premium or not raw_src:
-                    continue
-
-                direct_url = self._resolve_direct_stream_url(s, raw_src, player_url)
 
                 # Map quality keys
                 key = f"{res}p" if res else label
@@ -805,7 +828,8 @@ class AnimeAPI:
                     style="info",
                     direct_url=direct_url,
                     res=res,
-                    premium=is_premium
+                    premium=is_premium,
+                    headers={"Referer": "https://video.vid3rb.com/", "User-Agent": DEFAULT_HEADERS["User-Agent"]}
                 ))
 
             return server_dict
